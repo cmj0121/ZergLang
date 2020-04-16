@@ -1,0 +1,29 @@
+kind: pipeline
+type: docker
+name: zerg:gcc:8.3
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: gcc:8.3
+    image: gcc:8.3
+    commands:
+      - make
+---
+kind: pipeline
+type: docker
+name: zerg:gcc:9.3
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: gcc:9.3
+    image: gcc:9.3
+    commands:
+      - make
