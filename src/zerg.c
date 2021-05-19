@@ -5,7 +5,7 @@
 
 #include "zerg.h"
 
-int verbose = 0;
+int verbose = CRIT;
 
 static void help(char *name) {
 	fprintf(stderr, "%s (v%d.%d.%d) usage: %s [OPTIONS] FILE\n", PROJ_NAME, MAJOR, MINOR, MACRO, name);
@@ -15,6 +15,7 @@ static void help(char *name) {
 	fprintf(stderr, "  -v, --verbose  verbose message\n");
 	exit(-1);
 }
+
 
 int main(int argc, char *argv[]) {
 	int opt, opt_idx = 0, ret = 1;
@@ -33,9 +34,18 @@ int main(int argc, char *argv[]) {
 				verbose ++;
 				break;
 			default:
-				fprintf(stderr, "error: unkonwn option: '%c'\n", opt);
+				fprintf(stderr, "error: unknown option: '%c'\n", opt);
 				help(argv[0]);
 				goto END;
+		}
+	}
+
+	_D(DEBUG, "finish parse the command, start parse source file");
+	for (int idx = optind; idx < argc; ++idx) {
+		_D(INFO, "process file '%s'", argv[idx]);
+		if (0 > compile(argv[idx])) {
+			_D(CRIT, "failed to compile '%s'", argv[idx]);
+			goto END;	
 		}
 	}
 
