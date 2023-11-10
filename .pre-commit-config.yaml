@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/markdownlint/markdownlint
+    rev: v0.15.0
+    hooks:
+      - id: markdownlint
+        args:
+          - -t code_blocks
+
+  # -------- security related linter --------
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        # run the detect mode and show all the leak credentials
+        entry: gitleaks detect --verbose --redact
