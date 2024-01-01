@@ -30,3 +30,31 @@ import_stmt   ::=  ( import_single | import_multi ) NEWLINE
 import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
+
+# ======== Start of Expressions ========
+expression  ::= exclusive
+
+# The logical expression which execute from left to right and short-circuit
+# the evaluation if the result is determined.
+exclusive   ::= disjunction 'xor' exclusive | disjunction
+disjunction ::= conjunction 'or' disjunction | conjunction
+conjunction ::= inversion 'and' conjunction | inversion
+inversion   ::= 'not' inversion | comparison
+
+# The comparison expression which execute from left to right and both side
+# are evaluated, compared and return the truth result of comparison.
+comparison ::= bitwise_or compare_op bitwise_or
+compare_op ::= ( '>=' | '>' | '==' | '!=' | '<=' | '<' )
+
+# The bitwise expression which execute from left to right and both side
+# are evaluated, compared and return the result.
+bitwise_or    ::= bitwise_xor '|' bitwise_or | bitwise_xor
+bitwise_xor   ::= bitwise_and '^' bitwise_xor | bitwise_and
+bitwise_and   ::= bitwise_shift '&' bitwise_and | bitwise_shift
+bitwise_shift ::= sum ( '<<' | '>>' ) bitwise_shift | sum
+
+sum     ::= term ( '+' | '-' ) sum | term
+term    ::= factor ( '*' | '/' | '%' ) term | factor
+factor  ::= ( '+' | '-' | '~' ) factor | primary
+primary ::= primary '.' NAME | atom
+atom    ::= STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
