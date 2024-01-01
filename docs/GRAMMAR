@@ -1,0 +1,32 @@
+# Grammar for Zerg
+#
+# Author cmj <cmj@cmj.tw>
+
+# ======== Start of Grammar ========
+# Grammatical Elements and Rules
+#
+#   - Upper case names (NAME) denote pre-defined token type.
+#   - Strings with single quotes denote KEYWORDS
+#
+# Grammar Syntax
+#
+#   - rule_name ::= expression       The general grammar syntax for rule name and related expression.
+#   - e1 e2                          The expression match e1, then match e2.
+#   - e1 | e2                        The expression match e1 or e2.
+#   - ( e )                          The expression match e which may follow extra notation.
+#   - e?                             The expression optionally match e.
+#   - e*                             The expression match zero or more occurrences of e.
+#   - e+                             The expression match one or more occurrences of e.
+
+# ======== Start of Rules ========
+file   ::= source EOF
+source ::= import_stmt* block*
+
+# Import another source file or pre-compiled object file, search from current directory,
+# standard library, and other directories specified by command line arguments.
+#
+# It may be the local file package or git repository
+import_stmt   ::=  ( import_single | import_multi ) NEWLINE
+import_single ::= 'import' import_expr
+import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
+import_expr    ::= STRING ( 'as' NAME )?
