@@ -32,7 +32,7 @@ import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
 
-block ::= ( expr_stmt | func_stmt | type_stmt )
+block ::= ( expr_stmt | func_stmt | type_stmt | loop_stmt )
 
 # the stament which may be an expression or assignment, which is the most
 # common statement in Zerg.
@@ -67,6 +67,18 @@ struct_attr ::= pub? NAME ':' type NEWLINE
 # type is the optimized compile-time value and should be used in the match statement.
 enum_stmt   ::= 'enum' NAME '{' enum_attr* '}'
 enum_attr   ::= pub? NAME NEWLINE
+
+# the statement to define a loop which may be executed repeatedly.
+loop_stmt   ::= while_stmt | for_stmt
+# execute the scope repeatedly while the condition is true, it may be an infinite loop
+# if the condition is always true, and the expression will be evaluated before each
+# iteration of the loop.
+while_stmt  ::= 'while' expression scope
+# execute the scope repeatedly for each element in the expression. the variable will
+# be assigned to the element of the expression in each iteration of the loop, which may
+# override the existing variable outside the loop, or create a new variable if using
+# the walrus operator.
+for_stmt    ::= 'for' NAME ( ':=' )?'in' expression scope
 
 named_args ::= NAME ':' type
 type_hint  ::= '->' type
