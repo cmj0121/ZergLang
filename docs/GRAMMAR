@@ -31,6 +31,33 @@ import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
 
+block ::= ( expr_stmt | func_stmt )
+
+# the stament which may be an expression or assignment, which is the most
+# common statement in Zerg.
+expr_stmt ::= ( expression | assignment ) NEWLINE
+
+# the statement to define a new variable with the optional type, or update the value
+# of a declared variable with the same type.
+#
+# The constant variable is immutable, stored in the read-only memory, and can not be
+# changed after declaration.
+assignment   ::= typed_assign | muted_assign
+typed_assign ::= 'const'? NAME ':' type? '=' expression
+muted_assign ::= NAME '=' expression
+
+# the statement to define a routine function which may be called by other
+# functions or expressions.
+#
+# It may be a public function which can be called by other source file.
+func_stmt ::= pub? fn func_head scope
+func_head ::= NAME '(' func_args? ')' type_hint?
+func_args ::= func_arg ',' named_args | named_args
+
+named_args ::= NAME ':' type
+type_hint  ::= '->' type
+type       ::= NAME
+
 # ======== Start of Expressions ========
 expression  ::= exclusive
 
@@ -57,4 +84,6 @@ sum     ::= term ( '+' | '-' ) sum | term
 term    ::= factor ( '*' | '/' | '%' ) term | factor
 factor  ::= ( '+' | '-' | '~' ) factor | primary
 primary ::= primary '.' NAME | atom
-atom    ::= STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
+atom    ::= NAME | STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
+
+pub   ::= 'pub'
