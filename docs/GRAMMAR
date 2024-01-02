@@ -32,7 +32,7 @@ import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
 
-block ::= ( expr_stmt | func_stmt )
+block ::= ( expr_stmt | func_stmt | type_stmt )
 
 # the stament which may be an expression or assignment, which is the most
 # common statement in Zerg.
@@ -44,7 +44,7 @@ expr_stmt ::= ( expression | assignment ) NEWLINE
 # The constant variable is immutable, stored in the read-only memory, and can not be
 # changed after declaration.
 assignment   ::= typed_assign | muted_assign
-typed_assign ::= 'const'? NAME ':' type? '=' expression
+typed_assign ::= const? NAME ':' type? '=' expression
 muted_assign ::= NAME '=' expression
 
 # the statement to define a routine function which may be called by other
@@ -54,6 +54,19 @@ muted_assign ::= NAME '=' expression
 func_stmt ::= pub? fn func_head scope
 func_head ::= NAME '(' func_args? ')' type_hint?
 func_args ::= func_arg ',' named_args | named_args
+
+# the statement to define a new type with the optional fields.
+# it may be a struct or enum type.
+type_stmt   ::= 'type' ( struct_stmt | enum_stmt )
+# the struct type is a collection of fields, each field has a name and type, and
+# be used to represent a data structure.
+struct_stmt ::= 'struct' NAME '{' struct_attr* '}'
+struct_attr ::= pub? NAME ':' type NEWLINE
+# the enumerated type is a collection of named values, each value has a name and
+# be used to represent a set of related constants. the value of the enumerated
+# type is the optimized compile-time value and should be used in the match statement.
+enum_stmt   ::= 'enum' NAME '{' enum_attr* '}'
+enum_attr   ::= pub? NAME NEWLINE
 
 named_args ::= NAME ':' type
 type_hint  ::= '->' type
@@ -88,3 +101,4 @@ primary ::= primary '.' NAME | atom
 atom    ::= NAME | STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
 
 pub   ::= 'pub'
+const ::= 'const'
