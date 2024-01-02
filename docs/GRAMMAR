@@ -21,6 +21,7 @@
 # ======== Start of Rules ========
 file   ::= source EOF
 source ::= import_stmt* block*
+scope  ::= '{' source '}'
 
 # Import another source file or pre-compiled object file, search from current directory,
 # standard library, and other directories specified by command line arguments.
