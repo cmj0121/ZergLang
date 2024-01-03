@@ -32,7 +32,7 @@ import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
 
-block ::= ( expr_stmt | func_stmt | type_stmt | loop_stmt )
+block ::= ( expr_stmt | func_stmt | type_stmt | loop_stmt | condi_stmt )
 
 # the stament which may be an expression or assignment, which is the most
 # common statement in Zerg.
@@ -79,6 +79,19 @@ while_stmt  ::= 'while' expression scope
 # override the existing variable outside the loop, or create a new variable if using
 # the walrus operator.
 for_stmt    ::= 'for' NAME ( ':=' )?'in' expression scope
+
+# the conditional statement which may be executed by the condition.
+condi_stmt ::= if_stmt | match_stmt | break_stmt | conti_stmt
+if_stmt    ::= 'if' expression scope ( 'elif' expression scope )* ( 'else' scope )?
+# the match statement is the syntax-sugar of the conditional statement, which is
+# equivalent to the conditional statement with multiple elif statements.
+#
+# in more detail, the case expression should be the compile-time constant, and the
+# match statement will be optimized to the conditional statement.
+match_stmt ::= 'match' expression '{' match_attr* '}'
+match_attr ::= ( '_' | expression ) => ( expression | scope ) NEWLINE
+break_stmt ::= 'break'
+conti_stmt ::= 'continue'
 
 named_args ::= NAME ':' type
 type_hint  ::= '->' type
