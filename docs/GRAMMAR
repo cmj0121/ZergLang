@@ -32,7 +32,14 @@ import_single ::= 'import' import_expr
 import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
 import_expr    ::= STRING ( 'as' NAME )?
 
-block ::= ( expr_stmt | func_stmt | type_stmt | loop_stmt | condi_stmt )
+block ::= simple_stmt | compound_stmt
+simple_stmt   ::= nop_stmt | break_stmt | conti_stmt | return_stmt | expr_stmt
+compound_stmt ::= func_stmt | type_stmt | loop_stmt | condi_stmt
+
+nop_stmt    ::= 'nop' NEWLINE
+break_stmt  ::= 'break' NEWLINE
+conti_stmt  ::= 'continue' NEWLINE
+return_stmt ::= 'return' expression? NEWLINE
 
 # the stament which may be an expression or assignment, which is the most
 # common statement in Zerg.
@@ -81,17 +88,15 @@ while_stmt  ::= 'while' expression scope
 for_stmt    ::= 'for' NAME ( ':=' )?'in' expression scope
 
 # the conditional statement which may be executed by the condition.
-condi_stmt ::= if_stmt | match_stmt | break_stmt | conti_stmt
+condi_stmt ::= if_stmt | match_stmt
 if_stmt    ::= 'if' expression scope ( 'elif' expression scope )* ( 'else' scope )?
 # the match statement is the syntax-sugar of the conditional statement, which is
 # equivalent to the conditional statement with multiple elif statements.
 #
 # in more detail, the case expression should be the compile-time constant, and the
 # match statement will be optimized to the conditional statement.
-match_stmt ::= 'match' expression '{' match_attr* '}'
-match_attr ::= ( '_' | expression ) => ( expression | scope ) NEWLINE
-break_stmt ::= 'break'
-conti_stmt ::= 'continue'
+match_stmt  ::= 'match' expression '{' match_attr* '}'
+match_attr  ::= ( '_' | expression ) => ( expression | scope ) NEWLINE
 
 named_type ::= NAME ':' type
 type_hint  ::= '->' type
