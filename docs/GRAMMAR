@@ -53,7 +53,7 @@ muted_assign ::= NAME '=' expression
 # It may be a public function which can be called by other source file.
 func_stmt ::= pub? fn func_head scope
 func_head ::= NAME '(' func_args? ')' type_hint?
-func_args ::= func_arg ',' named_args | named_args
+func_args ::= func_arg ',' named_type | named_type
 
 # the statement to define a new type with the optional fields.
 # it may be a struct or enum type.
@@ -93,7 +93,7 @@ match_attr ::= ( '_' | expression ) => ( expression | scope ) NEWLINE
 break_stmt ::= 'break'
 conti_stmt ::= 'continue'
 
-named_args ::= NAME ':' type
+named_type ::= NAME ':' type
 type_hint  ::= '->' type
 type       ::= NAME
 
@@ -122,8 +122,21 @@ bitwise_shift ::= sum ( '<<' | '>>' ) bitwise_shift | sum
 sum     ::= term ( '+' | '-' ) sum | term
 term    ::= factor ( '*' | '/' | '%' ) term | factor
 factor  ::= ( '+' | '-' | '~' ) factor | primary
-primary ::= primary '.' NAME | atom
+primary ::= attr | call | index | comprehensions | atom
 atom    ::= NAME | STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
+
+# The comprehensions are the syntax-sugar to generate a complex data structure
+# by iterating over another data structure.
+comprehensions ::= list_comp | dict_comp | set_comp
+list_comp       ::= '[' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? ']'
+dict_comp       ::= '{' expression ':' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? '}'
+set_comp        ::= '{' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? '}'
+
+attr  ::= primary '.' NAME
+call  ::= primary '(' args? ')'
+slice ::= primary '[' index ']'
+args  ::= args ',' expression | expression
+index ::= expression? ':' expression? ( ':' expression )? | expression
 
 pub   ::= 'pub'
 const ::= 'const'
