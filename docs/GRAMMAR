@@ -1,0 +1,147 @@
+# Grammar for Zerg
+#
+# Author cmj <cmj@cmj.tw>
+
+# ======== Start of Grammar ========
+# Grammatical Elements and Rules
+#
+#   - Upper case names (NAME) denote pre-defined token type.
+#   - Strings with single quotes denote KEYWORDS
+#
+# Grammar Syntax
+#
+#   - rule_name ::= expression       The general grammar syntax for rule name and related expression.
+#   - e1 e2                          The expression match e1, then match e2.
+#   - e1 | e2                        The expression match e1 or e2.
+#   - ( e )                          The expression match e which may follow extra notation.
+#   - e?                             The expression optionally match e.
+#   - e*                             The expression match zero or more occurrences of e.
+#   - e+                             The expression match one or more occurrences of e.
+
+# ======== Start of Rules ========
+file   ::= source EOF
+source ::= import_stmt* block*
+scope  ::= '{' source '}'
+
+# Import another source file or pre-compiled object file, search from current directory,
+# standard library, and other directories specified by command line arguments.
+#
+# It may be the local file package or git repository
+import_stmt   ::=  ( import_single | import_multi ) NEWLINE
+import_single ::= 'import' import_expr
+import_multi  ::= 'import' '(' ( import_expr NEWLINE )+ ')'
+import_expr    ::= STRING ( 'as' NAME )?
+
+block ::= simple_stmt | compound_stmt
+simple_stmt   ::= nop_stmt | break_stmt | conti_stmt | return_stmt | expr_stmt
+compound_stmt ::= func_stmt | type_stmt | loop_stmt | condi_stmt
+
+nop_stmt    ::= 'nop' NEWLINE
+break_stmt  ::= 'break' NEWLINE
+conti_stmt  ::= 'continue' NEWLINE
+return_stmt ::= 'return' expression? NEWLINE
+
+# the stament which may be an expression or assignment, which is the most
+# common statement in Zerg.
+expr_stmt ::= ( expression | assignment ) NEWLINE
+
+# the statement to define a new variable with the optional type, or update the value
+# of a declared variable with the same type.
+#
+# The constant variable is immutable, stored in the read-only memory, and can not be
+# changed after declaration.
+assignment   ::= typed_assign | muted_assign
+typed_assign ::= const? NAME ':' type? '=' expression
+muted_assign ::= NAME '=' expression
+
+# the statement to define a routine function which may be called by other
+# functions or expressions.
+#
+# It may be a public function which can be called by other source file.
+func_stmt ::= pub? fn func_head scope
+func_head ::= NAME '(' func_args? ')' type_hint?
+func_args ::= func_arg ',' named_type | named_type
+
+# the statement to define a new type with the optional fields.
+# it may be a struct or enum type.
+type_stmt   ::= 'type' ( struct_stmt | enum_stmt )
+# the struct type is a collection of fields, each field has a name and type, and
+# be used to represent a data structure.
+struct_stmt ::= 'struct' NAME '{' struct_attr* '}'
+struct_attr ::= pub? NAME ':' type NEWLINE
+# the enumerated type is a collection of named values, each value has a name and
+# be used to represent a set of related constants. the value of the enumerated
+# type is the optimized compile-time value and should be used in the match statement.
+enum_stmt   ::= 'enum' NAME '{' enum_attr* '}'
+enum_attr   ::= pub? NAME NEWLINE
+
+# the statement to define a loop which may be executed repeatedly.
+loop_stmt   ::= while_stmt | for_stmt
+# execute the scope repeatedly while the condition is true, it may be an infinite loop
+# if the condition is always true, and the expression will be evaluated before each
+# iteration of the loop.
+while_stmt  ::= 'while' expression scope
+# execute the scope repeatedly for each element in the expression. the variable will
+# be assigned to the element of the expression in each iteration of the loop, which may
+# override the existing variable outside the loop, or create a new variable if using
+# the walrus operator.
+for_stmt    ::= 'for' NAME ( ':=' )?'in' expression scope
+
+# the conditional statement which may be executed by the condition.
+condi_stmt ::= if_stmt | match_stmt
+if_stmt    ::= 'if' expression scope ( 'elif' expression scope )* ( 'else' scope )?
+# the match statement is the syntax-sugar of the conditional statement, which is
+# equivalent to the conditional statement with multiple elif statements.
+#
+# in more detail, the case expression should be the compile-time constant, and the
+# match statement will be optimized to the conditional statement.
+match_stmt  ::= 'match' expression '{' match_attr* '}'
+match_attr  ::= ( '_' | expression ) => ( expression | scope ) NEWLINE
+
+named_type ::= NAME ':' type
+type_hint  ::= '->' type
+type       ::= NAME
+
+# ======== Start of Expressions ========
+expression  ::= exclusive
+
+# The logical expression which execute from left to right and short-circuit
+# the evaluation if the result is determined.
+exclusive   ::= disjunction 'xor' exclusive | disjunction
+disjunction ::= conjunction 'or' disjunction | conjunction
+conjunction ::= inversion 'and' conjunction | inversion
+inversion   ::= 'not' inversion | comparison
+
+# The comparison expression which execute from left to right and both side
+# are evaluated, compared and return the truth result of comparison.
+comparison ::= bitwise_or compare_op bitwise_or
+compare_op ::= ( '>=' | '>' | '==' | '!=' | '<=' | '<' )
+
+# The bitwise expression which execute from left to right and both side
+# are evaluated, compared and return the result.
+bitwise_or    ::= bitwise_xor '|' bitwise_or | bitwise_xor
+bitwise_xor   ::= bitwise_and '^' bitwise_xor | bitwise_and
+bitwise_and   ::= bitwise_shift '&' bitwise_and | bitwise_shift
+bitwise_shift ::= sum ( '<<' | '>>' ) bitwise_shift | sum
+
+sum     ::= term ( '+' | '-' ) sum | term
+term    ::= factor ( '*' | '/' | '%' ) term | factor
+factor  ::= ( '+' | '-' | '~' ) factor | primary
+primary ::= attr | call | index | comprehensions | atom
+atom    ::= NAME | STRING | NUMBER | CHAR | 'true' | 'false' | 'nil'
+
+# The comprehensions are the syntax-sugar to generate a complex data structure
+# by iterating over another data structure.
+comprehensions ::= list_comp | dict_comp | set_comp
+list_comp       ::= '[' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? ']'
+dict_comp       ::= '{' expression ':' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? '}'
+set_comp        ::= '{' expression 'for' NAME ':=' 'in' expression ( 'if' expression )? '}'
+
+attr  ::= primary '.' NAME
+call  ::= primary '(' args? ')'
+slice ::= primary '[' index ']'
+args  ::= args ',' expression | expression
+index ::= expression? ':' expression? ( ':' expression )? | expression
+
+pub   ::= 'pub'
+const ::= 'const'
