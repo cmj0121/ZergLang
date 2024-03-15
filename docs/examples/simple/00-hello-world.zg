@@ -1,0 +1,11 @@
+//! The Hello World program in Zerg
+
+// The entrypoint of the program, always in the __main.zg__ file and
+// the function name is always be the `main`, with no arguments and
+// optional return value (returning `nil` by default).
+fn main() {
+	// The special statement `print` is used to show the human-readable
+	// message to the user. It can be used to print the variables and
+	// string literals.
+	print "Hello, World!"
+}

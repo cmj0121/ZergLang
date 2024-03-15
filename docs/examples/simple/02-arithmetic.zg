@@ -1,0 +1,32 @@
+//! All the simple arithmetic operations example code.
+
+fn arithmetic(source: i64) -> i64 {
+	// load the source value from the parameter, perform some arithmetic operations
+	// and save the result to the stack.
+	x := source + 1 - 2 * 3 / 4 % 5
+
+	// evaluaate the expression inside the closure and get the result from the
+	// function call, copy the result to the stack in the current scope.
+	y := fn(inside: i64) -> i64 {
+		// reassign the existing variable and create a new one in stack and not
+		// affect the original variable and not accessible outside the closure.
+		x := inside + 1
+		y := x + 2
+
+		// the new variable is accessible inside the closure and invisible
+		// outside the closure.
+		outsite := x + y
+
+		// the result value is the last expression and move the value
+		// to the outsite variable by copying the value.
+		return outsite
+	}(1234)
+
+	// Return the result immediately and the result is the last expression.
+	return x + y
+}
+
+fn main() {
+	// evaluate the arithmetic function and print the result.
+	print arithmetic(5566)
+}
