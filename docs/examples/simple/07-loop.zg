@@ -1,0 +1,30 @@
+//! The loop example codes.
+
+fn main() {
+	vec := [1, 2, 3, 4, 5]
+	idx := 0
+
+	// The simple loop statement without condition, and it will run the statement
+	// in the loop body forever until the explicit break statement called.
+	loop {
+		if idx >= len(vec) {
+			break
+		}
+
+		++idx
+	}
+
+	mut elm := 0
+	// The for-loop statement that iterate the element from the instance that implement
+	// the iterator interface and overwrites the mutable variable in each iteration.
+	for elm in vec {
+		print "$elm"
+	}
+
+	// The for-loop statement that iterate the element from the instance that implement
+	// the iterator interface and creates the new variable in each iteration inside the
+	// loop body, also provides the index of the element as the first variable.
+	for index, elm := in vec {
+		print "vec[$index] = $elm"
+	}
+}

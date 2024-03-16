@@ -1,0 +1,34 @@
+//! The mutable and reference variant example code.
+
+fn show_my_age(age: u8) {
+	// show the variable in the format string and it's a immutable variable,
+	// which pass the reference to the function for the performance and trust
+	// the function will not modify the variable in the function.
+	//
+	// It is equivalent to the function signature `fn show_my_age(age: &u8)`.
+	print "my age is $age"
+}
+
+fn birthday(age: &mut u8) {
+	// same as the `show_my_age` but only accept the reference of the variable.
+	// unlike `birthday(age: mut u8)`, it's a mutable reference, so it can be
+	// modified in the function, and the original variable will be changed.
+	print "my birthday is coming, my age is $age"
+
+	// in this case, the `age` is a mutable reference, so it can be modified,
+	// and the original variable will be changed.
+	++age
+}
+
+// The default variant is immutable in Zerg and only used for reading.
+// All the immutable variable is copy by reference, so it's very fast.
+fn main() {
+	// define a mutable variable, and assume it will be modified in the future,
+	// otherwise, it's better to use the immutable variable.
+	mut age := 21
+
+	show_my_age(age)
+	// only allow pass the mutable reference to the function, otherwise it will
+	// be a compile error.
+	birthday(&mut age)
+}

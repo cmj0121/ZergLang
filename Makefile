@@ -1,6 +1,6 @@
-SUBDIR :=
+SUBDIR := docs
 
-.PHONY: all clean test run build upgrade help $(SUBDIR)
+.PHONY: all clean test run build upgrade install help $(SUBDIR)
 
 all: $(SUBDIR) 		# default action
 	@[ -f .git/hooks/pre-commit ] || pre-commit install --install-hooks
@@ -18,11 +18,14 @@ build:				# build the binary/library
 upgrade:			# upgrade all the necessary packages
 	pre-commit autoupdate
 
+install:			# install in the local system
+
 help:				# show this message
 	@printf "Usage: make [OPTION]\n"
 	@printf "\n"
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
 
+all clean test run build install: $(SUBDIR)
 $(SUBDIR):
 	$(MAKE) -C $@ $(MAKECMDGOALS)

@@ -1,0 +1,41 @@
+//! The named type with compact field representation.
+
+// The named and compile-time generated type with the known size
+// and replaced with the actual type in the compile-time. It is
+// the zero-cost abstraction.
+enum Mode {
+	Success,
+	Failure,
+}
+
+// The named structure with the empty property is the zero-cost
+// abstraction, and it has the compile-time known size.
+struct Dummy {}
+
+// The compact properties struture which all the properties are
+// the compile-time known size to make the structure has the
+// compile-time known size.
+struct Person {
+	// The reference property to make the structure has the compile-time
+	// known size.
+	name: &str,
+	age:  u8,
+	mode: Mode,
+}
+
+fn main() {
+	// Create the instance of the named structure with the empty property,
+	// and show the named instance with the default representation.
+	dummy := Dummy{}
+	print dummy
+
+	// Create the instance with the passed properties, and show the named
+	// instance with the default compact representation.
+	//
+	// The initializer of the instance is order-insensitive, the properties
+	// should pass the name of the property to make the initializer order,
+	// or pass the variable same as the property name.
+	name := "John"
+	person := Person{name, age: 30}
+	print person
+}

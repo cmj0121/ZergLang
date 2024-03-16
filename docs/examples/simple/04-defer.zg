@@ -1,0 +1,35 @@
+//! The defer example code.
+
+// The main entry point for the program with the defer example.
+//
+// The defer is the serve as a queue (FIFO) to store the function
+// and its parameters, and then call the function when the current
+// function returns or raise exception.
+fn main() {
+	mut name := "example"
+
+	// The defer function can be called after function returns.
+	// It can access the local variables and parameters in the
+	// current function and access the global variables.
+	//
+	// The variable will be loaded when defer is called, so the
+	// value of the variable will be the same as the value when
+	// function returns.
+	defer fn() {
+		// It should print `run function with a modified`
+		print "run function with a $name"
+	}()
+
+	// Another example of using defer function with parameters, which
+	// is pass the parameters to the function when defer is declared.
+	//
+	// This parameter is copy by value, so it is safe to use it in the
+	// defer function whatever the parameter is a reference or a value.
+	defer fn(name: &str) {
+		// It should print `run function with a example`
+		print "run function with a $name"
+	}(name)
+
+	name := "modified"
+	print "main function with a $name"
+}
