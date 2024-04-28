@@ -77,3 +77,70 @@ class TestLexerByToken:
 
         assert len(tokens) == 1
         assert tokens[0].raw == '1+2'
+
+
+class TestLexerByOperator:
+    def setup_method(self):
+        self.lexer = Lexer().lexer
+
+    def test_simple_expr(self):
+        src = "1 + 2"
+        tokens = list(self.lexer(src))
+
+        assert len(tokens) == 3
+        assert tokens[0].raw == '1'
+        assert tokens[1].raw == '+'
+        assert tokens[1].type == TokenType.ADD
+        assert tokens[2].raw == '2'
+
+    def test_expression(self):
+        src = "1+2"
+        tokens = list(self.lexer(src))
+
+        assert len(tokens) == 3
+        assert tokens[0].raw == '1'
+        assert tokens[1].raw == '+'
+        assert tokens[1].type == TokenType.ADD
+        assert tokens[2].raw == '2'
+
+    def test_arithmetic(self):
+        src = "-1 + ~2 * +3 / 4 % 5"
+        tokens = list(self.lexer(src))
+
+        assert len(tokens) == 12
+        assert tokens[0].raw == '-'
+        assert tokens[0].type == TokenType.SUB
+        assert tokens[1].raw == '1'
+        assert tokens[2].raw == '+'
+        assert tokens[2].type == TokenType.ADD
+        assert tokens[3].raw == '~'
+        assert tokens[3].type == TokenType.NEG
+        assert tokens[4].raw == '2'
+        assert tokens[5].raw == '*'
+        assert tokens[5].type == TokenType.MUL
+        assert tokens[6].raw == '+'
+        assert tokens[6].type == TokenType.ADD
+        assert tokens[7].raw == '3'
+        assert tokens[8].raw == '/'
+        assert tokens[8].type == TokenType.DIV
+        assert tokens[9].raw == '4'
+        assert tokens[10].raw == '%'
+        assert tokens[10].type == TokenType.MOD
+        assert tokens[11].raw == '5'
+
+    def test_combine_op(self):
+        src = "++"
+        tokens = list(self.lexer(src))
+
+        assert len(tokens) == 1
+        assert tokens[0].raw == '++'
+        assert tokens[0].type == TokenType.INC
+
+    def test_func(self):
+        src = "main()"
+        tokens = list(self.lexer(src))
+
+        assert len(tokens) == 3
+        assert tokens[0].raw == 'main'
+        assert tokens[1].raw == '('
+        assert tokens[2].raw == ')'

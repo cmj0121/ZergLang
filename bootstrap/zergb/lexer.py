@@ -2,6 +2,7 @@ import enum
 from typing import Generator
 
 
+@enum.unique
 class TokenType(enum.Enum):
     """The classified token of the zergb"""
     UNKNOWN = enum.auto()
@@ -13,6 +14,40 @@ class TokenType(enum.Enum):
     SPACE = enum.auto()
 
     STRING = enum.auto()
+
+    # known operators
+    ADD = '+'
+    SUB = '-'
+    MUL = '*'
+    DIV = '/'
+    MOD = '%'
+    NEG = '~'
+    INC = '++'
+    DEC = '--'
+    LT = '<'
+    GT = '>'
+    AND = '&'
+    OR = '|'
+    NOT = '!'
+    XOR = '^'
+    LSHIFT = '<<'
+    RSHIFT = '>>'
+    LPARENTHESES = '('
+    RPARENTHESES = ')'
+    LBRACE = '{'
+    RBRACE = '}'
+    LBRACKET = '['
+    RBRACKET = ']'
+
+    @staticmethod
+    def yield_tokens(raw: str) -> Generator['TokenType', None, None]:
+        '''yield the token type from the raw string'''
+        try:
+            yield Token(raw, tt=TokenType(raw))
+        except ValueError:
+            first, remains = raw[0], raw[1:]
+            yield Token(first, tt=TokenType(first))
+            yield from TokenType.yield_tokens(remains)
 
 
 class Token:
@@ -33,6 +68,8 @@ class Token:
 
 
 class Lexer:
+    OPERATORS = '+-*/%<>&|!^~(){}[]'
+
     """The lexer class for the zergb"""
     def lexer(self, src: str) -> Generator[Token, None, None]:
         '''tokenize the source code and return the generator of tokens'''
@@ -40,7 +77,12 @@ class Lexer:
 
     def _lexer(self, src: str) -> Generator[Token, None, None]:
         '''tokenize the source code by several lexers'''
-        yield from self.lexer_by_tokens(src)
+        base = self.lexer_by_tokens(src)
+        base = self.lexer_extract_operator(base)
+        # the latest lexer and remove the unuseful tokens
+        base = self.lexer_remove_unuseful(base)
+
+        yield from base
 
     def lexer_by_tokens(self, src) -> Generator[Token, None, None]:
         '''
@@ -86,3 +128,37 @@ class Lexer:
                     index = stop - 1
 
             index += 1
+
+    def lexer_extract_operator(self, tokens) -> Generator[Token, None, None]:
+        """extract the operator from the unknown tokens"""
+        for token in tokens:
+            match token.type:
+                case TokenType.UNKNOWN:
+                    # only process the token with unknown type
+                    remains, operators = '', ''
+                    for tt in token.raw:
+                        if tt in self.OPERATORS:
+                            if remains:
+                                yield Token(remains)
+                                remains = ''
+                            operators += tt
+                        else:
+                            if operators:
+                                yield from TokenType.yield_tokens(operators)
+                                operators = ''
+                            remains += tt
+
+                    if remains:
+                        yield Token(remains)
+                    if operators:
+                        yield from TokenType.yield_tokens(operators)
+                case _:
+                    yield token
+
+    def lexer_remove_unuseful(self, tokens) -> Generator[Token, None, None]:
+        for token in tokens:
+            match token.type:
+                case TokenType.SPACE | TokenType.COMMENT | TokenType.NEWLINE:
+                    pass
+                case _:
+                    yield token
