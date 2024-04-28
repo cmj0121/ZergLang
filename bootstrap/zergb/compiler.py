@@ -1,9 +1,10 @@
 #! /usr/bin/env python
 import llvmlite.binding as llvm
 import llvmlite.ir
+from zergb.lexer import Lexer
 
 
-class ZergBootstrap:
+class ZergBootstrap(Lexer):
     def compile(self, src: str) -> bytes:
         '''compile source code to object code'''
         ir = self._source_to_ir(src)
