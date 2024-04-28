@@ -60,8 +60,17 @@ class Token:
         self._raw = raw
         self._type = tt
 
+    def __str__(self):
+        match self.type:
+            case TokenType.SPACE:
+                return '[SPACE]'
+            case TokenType.NEWLINE:
+                return '[NEWLINE]'
+            case _:
+                return self._raw
+
     def __repr__(self):
-        return self._raw
+        return str(self)
 
     @property
     def raw(self) -> str:
