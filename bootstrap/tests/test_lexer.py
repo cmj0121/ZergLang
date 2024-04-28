@@ -79,7 +79,7 @@ class TestLexerByToken:
         assert tokens[0].raw == '1+2'
 
 
-class TestLexerByOperator:
+class TestLexer:
     def setup_method(self):
         self.lexer = Lexer().lexer
 
@@ -137,10 +137,13 @@ class TestLexerByOperator:
         assert tokens[0].type == TokenType.INC
 
     def test_func(self):
-        src = "main()"
+        src = "fn main()"
         tokens = list(self.lexer(src))
 
-        assert len(tokens) == 3
-        assert tokens[0].raw == 'main'
-        assert tokens[1].raw == '('
-        assert tokens[2].raw == ')'
+        assert len(tokens) == 4
+        assert tokens[0].raw == 'fn'
+        assert tokens[0].type == TokenType.FN
+        assert tokens[1].raw == 'main'
+        assert tokens[1].type == TokenType.WORD
+        assert tokens[2].raw == '('
+        assert tokens[3].raw == ')'

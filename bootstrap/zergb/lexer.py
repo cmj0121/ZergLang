@@ -14,6 +14,7 @@ class TokenType(enum.Enum):
     SPACE = enum.auto()
 
     STRING = enum.auto()
+    WORD = enum.auto()
 
     # known operators
     ADD = '+'
@@ -38,6 +39,10 @@ class TokenType(enum.Enum):
     RBRACE = '}'
     LBRACKET = '['
     RBRACKET = ']'
+
+    # known reserved keywords
+    FN = 'fn'
+    PRINT = 'print'
 
     @staticmethod
     def yield_tokens(raw: str) -> Generator['TokenType', None, None]:
@@ -79,6 +84,7 @@ class Lexer:
         '''tokenize the source code by several lexers'''
         base = self.lexer_by_tokens(src)
         base = self.lexer_extract_operator(base)
+        base = self.lexer_identify_word(base)
         # the latest lexer and remove the unuseful tokens
         base = self.lexer_remove_unuseful(base)
 
@@ -152,6 +158,17 @@ class Lexer:
                         yield Token(remains)
                     if operators:
                         yield from TokenType.yield_tokens(operators)
+                case _:
+                    yield token
+
+    def lexer_identify_word(self, tokens) -> Generator[Token, None, None]:
+        for token in tokens:
+            match token.type:
+                case TokenType.UNKNOWN:
+                    try:
+                        yield Token(token.raw, tt=TokenType(token.raw))
+                    except ValueError:
+                        yield Token(token.raw, tt=TokenType.WORD)
                 case _:
                     yield token
 
