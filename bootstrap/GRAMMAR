@@ -1,0 +1,66 @@
+# Grammar for Zerg
+#
+# Author cmj <cmj@cmj.tw>
+
+# ======== Start of Grammar ========
+# Grammatical Elements and Rules
+#
+#   - Upper case names (NAME) denote pre-defined token type.
+#   - Strings with single quotes denote KEYWORDS
+#
+# Grammar Syntax
+#
+#   - rule_name ::= expression       The general grammar syntax for rule name and related expression.
+#   - e1 e2                          The expression match e1, then match e2.
+#   - e1 | e2                        The expression match e1 or e2.
+#   - ( e )                          The expression match e which may follow extra notation.
+#   - e?                             The expression optionally match e.
+#   - e*                             The expression match zero or more occurrences of e.
+#   - e+                             The expression match one or more occurrences of e.
+
+# ======== Start of Rules ========
+file   ::= source EOF
+source ::= block*
+scope  ::= '{' source '}'
+
+block         ::= simple_stmt | compound_stmt
+simple_stmt   ::= nop_stmt | return_stmt
+compound_stmt ::= func_stmt
+nop_stmt      ::= 'nop' NEWLINE
+return_stmt   ::= 'return' expression NEWLINE
+
+# the statement to define a routine function which may be called by other
+# functions or expressions.
+#
+# It may be a public function which can be called by other source file.
+func_stmt ::= fn func_head scope
+func_head ::= NAME '(' ')' type_hint
+type_hint ::= '->' NAME
+
+# ======== Start of Expressions ========
+expression  ::= exclusive
+
+# The logical expression which execute from left to right and short-circuit
+# the evaluation if the result is determined.
+exclusive   ::= disjunction 'xor' exclusive | disjunction
+disjunction ::= conjunction 'or' disjunction | conjunction
+conjunction ::= inversion 'and' conjunction | inversion
+inversion   ::= 'not' inversion | comparison
+
+# The comparison expression which execute from left to right and both side
+# are evaluated, compared and return the truth result of comparison.
+comparison ::= bitwise_or compare_op bitwise_or
+compare_op ::= ( '>=' | '>' | '==' | '!=' | '<=' | '<' )
+
+# The bitwise expression which execute from left to right and both side
+# are evaluated, compared and return the result.
+bitwise_or    ::= bitwise_xor '|' bitwise_or | bitwise_xor
+bitwise_xor   ::= bitwise_and '^' bitwise_xor | bitwise_and
+bitwise_and   ::= bitwise_shift '&' bitwise_and | bitwise_shift
+bitwise_shift ::= sum ( '<<' | '>>' ) bitwise_shift | sum
+
+sum     ::= term ( '+' | '-' ) sum | term
+term    ::= factor ( '*' | '/' | '%' ) term | factor
+factor  ::= ( '+' | '-' | '~' ) factor | primary
+primary ::= atom
+atom    ::= NUMBER
