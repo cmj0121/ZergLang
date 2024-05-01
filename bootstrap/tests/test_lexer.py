@@ -144,6 +144,6 @@ class TestLexer:
         assert tokens[0].raw == 'fn'
         assert tokens[0].type == TokenType.FN
         assert tokens[1].raw == 'main'
-        assert tokens[1].type == TokenType.WORD
+        assert tokens[1].type == TokenType.NAME
         assert tokens[2].raw == '('
         assert tokens[3].raw == ')'

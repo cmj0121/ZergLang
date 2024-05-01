@@ -11,7 +11,7 @@ class TestASTNode:
         assert node.token == token
         assert node.parent is None
         assert node.childs == []
-        assert str(node) == '.\n└─  [SPACE]'
+        assert str(node) == '[SPACE]'
 
     def test_add_child(self):
         token = Token(' ', tt=TokenType.SPACE)
@@ -23,7 +23,7 @@ class TestASTNode:
         assert node.childs == [child]
         assert child.parent == node
         assert child in node
-        assert str(node) == '.\n└─  [SPACE]\n    └─  variable'
+        assert str(node) == '[SPACE]\n    └─  variable'
 
     def test_arithmetic(self):
         token = Token('+')
@@ -32,4 +32,4 @@ class TestASTNode:
         node + ASTNode(Token('1'))
         node + ASTNode(Token('2'))
 
-        assert str(node) == '.\n└─  +\n    ├─  1\n    └─  2'
+        assert str(node) == '+\n    ├─  1\n    └─  2'

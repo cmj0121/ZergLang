@@ -5,6 +5,8 @@ from typing import Generator
 @enum.unique
 class TokenType(enum.Enum):
     """The classified token of the zergb"""
+    ROOT = enum.auto()
+
     UNKNOWN = enum.auto()
     NEWLINE = enum.auto()
     COMMENT = enum.auto()
@@ -14,7 +16,7 @@ class TokenType(enum.Enum):
     SPACE = enum.auto()
 
     STRING = enum.auto()
-    WORD = enum.auto()
+    NAME = enum.auto()
 
     # known operators
     ADD = '+'
@@ -39,10 +41,12 @@ class TokenType(enum.Enum):
     RBRACE = '}'
     LBRACKET = '['
     RBRACKET = ']'
+    ARROW = '->'
 
     # known reserved keywords
     FN = 'fn'
     PRINT = 'print'
+    NOP = 'nop'
 
     @staticmethod
     def yield_tokens(raw: str) -> Generator['TokenType', None, None]:
@@ -177,7 +181,7 @@ class Lexer:
                     try:
                         yield Token(token.raw, tt=TokenType(token.raw))
                     except ValueError:
-                        yield Token(token.raw, tt=TokenType.WORD)
+                        yield Token(token.raw, tt=TokenType.NAME)
                 case _:
                     yield token
 
