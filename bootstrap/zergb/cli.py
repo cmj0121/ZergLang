@@ -13,17 +13,14 @@ def main():
 
     bootstrap = ZergBootstrap()
 
-    with open(args.source) as fd:
-        src = fd.read()
+    if args.output is None:
+        path = os.path.basename(args.source)
+        name, _ = os.path.splitext(path)
+        args.output = f'{name}.o'
 
-        if args.output is None:
-            path = os.path.basename(args.source)
-            name, _ = os.path.splitext(path)
-            args.output = f'{name}.o'
-
-        with open(args.output, 'wb') as f:
-            obj = bootstrap.compile(src)
-            f.write(obj)
+    with open(args.output, 'wb') as f:
+        obj = bootstrap.compile(args.source)
+        f.write(obj)
 
 
 if __name__ == '__main__':

@@ -14,8 +14,7 @@ test:			# run test
 	poetry run pytest -v tests/
 
 run: install	# run in the local environment
-	poetry run python zergb/cli.py ../docs/examples/simple/00-hello-world.zg -o demo.obj
-	gcc demo.obj -o demo
+	poetry run python zergb/cli.py ../test.zg -o demo.obj
 
 build:			# build the binary/library
 	poetry build

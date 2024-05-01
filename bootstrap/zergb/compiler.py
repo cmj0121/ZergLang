@@ -1,22 +1,34 @@
 #! /usr/bin/env python
-import llvmlite.binding as llvm
-import llvmlite.ir
-from zergb.lexer import Lexer
+from llvmlite import binding as llvm
+from llvmlite import ir
+from llvmlite.ir import Module
+from zergb.lexer import TokenType
+from zergb.parser import ASTNode
+from zergb.parser import Parser
 
 
-class ZergBootstrap(Lexer):
-    def compile(self, src: str) -> bytes:
-        '''compile source code to object code'''
-        ir = self._source_to_ir(src)
+class ZergBootstrap(Parser):
+    def compile(self, source: str) -> bytes:
+        '''compile source code from filepath to object code'''
+        ir = self._source_to_ir(source)
         return self._ir_to_obj(ir)
 
-    def _source_to_ir(self, src: str) -> str:
-        '''compile source code to LLVM IR'''
+    def _source_to_ir(self, source: str) -> str:
+        '''compile source code from filepath to LLVM IR'''
         llvm.initialize()
         llvm.initialize_native_target()
         llvm.initialize_native_asmprinter()
 
-        return self._compile(src)
+        with open(source) as f:
+            ast = self.parse(f.read())
+            module = Module(name=source)
+            self._compile_ast(ast, module)
+
+            # Create a LLVM module object from the IR
+            mod = llvm.parse_assembly(str(module))
+            mod.verify()
+
+            return mod
 
     def _ir_to_obj(self, ir: str) -> bytes:
         '''compile LLVM IR to object code'''
@@ -25,16 +37,25 @@ class ZergBootstrap(Lexer):
 
         return target_machine.emit_object(ir)
 
-    def _compile(self, src: str) -> str:
-        module = llvmlite.ir.Module(name=__file__)
-        fnty = llvmlite.ir.FunctionType(llvmlite.ir.IntType(32), [])
-        func = llvmlite.ir.Function(module, fnty, name='main')
+    def _compile_ast(self, ast: ASTNode, module: Module | None = None, builder: ir.IRBuilder | None = None):
+        match ast.token.type:
+            case TokenType.ROOT:
+                for child in ast.childs:
+                    self._compile_ast(child, module, builder)
+            case TokenType.FN:
+                name, body = ast.childs
+                assert name.token.type == TokenType.NAME
+                assert body.token.type == TokenType.ROOT
 
-        builder = llvmlite.ir.IRBuilder(func.append_basic_block('entry'))
-        builder.ret(llvmlite.ir.Constant(llvmlite.ir.IntType(32), 4))
+                fnty = ir.FunctionType(ir.VoidType(), [])
+                func = ir.Function(module, fnty, name=name.token.raw)
 
-        # Create a LLVM module object from the IR
-        mod = llvm.parse_assembly(str(module))
-        mod.verify()
+                block = func.append_basic_block(name='entry')
+                builder = ir.IRBuilder(block)
 
-        return mod
+                self._compile_ast(body, module, builder)
+                builder.ret_void()
+            case TokenType.NOP:
+                assert builder is not None, 'NOP outside of function'
+            case _:
+                raise NotImplementedError(f'Unknown token type: {ast.token.type}')
