@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"os"
 
 	"github.com/rs/zerolog"
@@ -39,16 +38,4 @@ func (a *Args) setupLogger() {
 	}
 
 	log.Debug().Msg("completed the setup of the logger")
-}
-
-// setup the output writer
-func (a *Args) setupWriter(output string) (io.WriteCloser, error) {
-	// get the output writer
-	switch output {
-	case "":
-		log.Debug().Msg("using the standard output as the writer")
-		return os.Stdout, nil
-	default:
-		return os.Create(a.Output)
-	}
 }

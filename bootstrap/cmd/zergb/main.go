@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog/log"
 
@@ -10,6 +12,9 @@ import (
 type Args struct {
 	// The verbose level of the command.
 	Verbose int `short:"v" type:"counter" help:"Set the verbose level of the command."`
+
+	// the build option to the target file
+	Build string `short:"b" name:"build" enum:"ir,obj,bin" default:"ir" help:"The build option to the target file."`
 
 	// the output options
 	Output string `short:"o" name:"output" type:"path" help:"The output file to save the result."`
@@ -36,14 +41,17 @@ func (a *Args) Run(ctx *kong.Context) error {
 func (a *Args) run() error {
 	compiler := zerg.NewCompiler()
 
-	writer, err := a.setupWriter(a.Output)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to setup the writer")
-		return err
+	switch a.Build {
+	case "ir":
+		return compiler.ToIR(a.Output)
+	case "obj":
+		return compiler.ToObj(a.Output)
+	case "bin":
+		return compiler.ToBin(a.Output)
+	default:
+		log.Error().Str("build", a.Build).Msg("unknown build option")
+		return fmt.Errorf("unknown build option: %s", a.Build)
 	}
-	defer writer.Close()
-
-	return compiler.ToIR(writer)
 }
 
 func main() {
