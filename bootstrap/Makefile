@@ -16,7 +16,7 @@ run:			# run in the local environment
 
 build:			# build the binary/library
 	@go mod tidy
-	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/main.go
+	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/*.go
 
 upgrade:		# upgrade all the necessary packages
 

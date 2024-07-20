@@ -1,16 +1,18 @@
 package main
 
 import (
-	"os"
-
 	"github.com/alecthomas/kong"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg"
 )
 
 type Args struct {
 	// The verbose level of the command.
 	Verbose int `short:"v" type:"counter" help:"Set the verbose level of the command."`
+
+	// the output options
+	Output string `short:"o" name:"output" type:"path" help:"The output file to save the result."`
 }
 
 // create a new instance of Args with the default settings
@@ -28,26 +30,20 @@ func (a *Args) Run(ctx *kong.Context) error {
 	defer a.epilogue()
 
 	log.Info().Msg("starting the command ...")
-	return nil
+	return a.run()
 }
 
-// setup everything before running the command
-func (a *Args) prologue() {
-	a.setupLogger()
-}
+func (a *Args) run() error {
+	compiler := zerg.NewCompiler()
 
-// cleanup everything after running the command
-func (a *Args) epilogue() {
-	log.Info().Msg("finished the command ...")
-}
+	writer, err := a.setupWriter(a.Output)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to setup the writer")
+		return err
+	}
+	defer writer.Close()
 
-// setup logger by the known settings
-func (a *Args) setupLogger() {
-	// setup the logger
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
-	log.Debug().Msg("completed the setup of the logger")
+	return compiler.ToIR(writer)
 }
 
 func main() {
