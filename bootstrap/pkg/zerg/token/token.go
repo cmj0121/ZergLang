@@ -11,12 +11,19 @@ var (
 	reInt    = regexp.MustCompile(`^\d+$`)
 )
 
+var (
+	EOL = Token{typ: EndOfLine}
+	EOF = Token{typ: EndOfFile}
+)
+
 type TokenType string
 
 const (
 	Unkonwn TokenType = "UNKONWN"
 
 	// The operators
+	EndOfLine      = "EOL"
+	EndOfFile      = "EOF"
 	OpLeftBracket  = "LBracket"
 	OpRightBracket = "RBracket"
 	OpLeftParen    = "LParen"

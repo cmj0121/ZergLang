@@ -46,8 +46,41 @@ func (l *Lexer) Err() error {
 	return l.err
 }
 
-// tokenize the source code and return the valid and processed tokens
+// tokenize the source code that iterate the tokens and merge the
+// multi-tokens into a single token if necessary.
 func (l *Lexer) Iterate(ctx context.Context) <-chan *token.Token {
+	ch := make(chan *token.Token)
+
+	go func() {
+		defer close(ch)
+
+		prev := &token.EOL
+		for tt := range l.iterate(ctx) {
+			switch prev.Type() {
+			case token.EndOfLine:
+				prev = tt
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- prev:
+				prev = tt
+			}
+		}
+
+		// the last token should be EOF
+		if prev.Type() != token.EndOfFile {
+			log.Warn().Str("token", prev.String()).Int("_line", l.line).Msg("the last token is not EOF")
+		}
+	}()
+
+	return ch
+}
+
+// tokenize the source code and return the valid and processed tokens
+func (l *Lexer) iterate(ctx context.Context) <-chan *token.Token {
 	ch := make(chan *token.Token)
 
 	go func() {
@@ -79,7 +112,13 @@ func (l *Lexer) Iterate(ctx context.Context) <-chan *token.Token {
 					log.Debug().Str("token", token.String()).Interface("_typ", token.Type()).Int("_line", l.line).Msg("send the token")
 				}
 			}
+
+			// return the EOL token
+			ch <- &token.EOL
 		}
+
+		// send the EOF token
+		ch <- &token.EOF
 	}()
 
 	return ch
