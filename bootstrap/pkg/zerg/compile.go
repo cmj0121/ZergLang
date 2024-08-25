@@ -13,18 +13,18 @@ import (
 	"github.com/llir/llvm/ir/types"
 	"github.com/rs/zerolog/log"
 
-	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/lexer"
+	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/parser"
 )
 
 type Compiler struct {
-	*lexer.Lexer
+	*parser.Parser
 
 	module *ir.Module
 }
 
 func NewCompiler(r io.Reader) *Compiler {
 	return &Compiler{
-		Lexer:  lexer.New(r),
+		Parser: parser.New(r),
 		module: ir.NewModule(),
 	}
 }
@@ -146,8 +146,9 @@ func (c *Compiler) run(ctx context.Context) error {
 	c.prologue()
 	defer c.epilogue()
 
-	for range c.Iterate(ctx) {
-		//
+	if err := c.Parse(ctx); err != nil {
+		log.Warn().Err(err).Msg("failed to parse the source code")
+		return err
 	}
 
 	if c.Err() != nil {
