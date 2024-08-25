@@ -1,6 +1,7 @@
 package zerg
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -11,14 +12,19 @@ import (
 	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
 	"github.com/rs/zerolog/log"
+
+	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/lexer"
 )
 
 type Compiler struct {
+	*lexer.Lexer
+
 	module *ir.Module
 }
 
-func NewCompiler() *Compiler {
+func NewCompiler(r io.Reader) *Compiler {
 	return &Compiler{
+		Lexer:  lexer.New(r),
 		module: ir.NewModule(),
 	}
 }
@@ -63,8 +69,11 @@ func (c *Compiler) setupTargetTriple() {
 }
 
 // run the compiler from the given source code to the object file
-func (c *Compiler) ToIR(output string) error {
-	c.run()
+func (c *Compiler) ToIR(ctx context.Context, output string) error {
+	if err := c.run(ctx); err != nil {
+		log.Error().Err(err).Msg("failed to compile the source code")
+		return err
+	}
 
 	var w io.WriteCloser
 	switch output {
@@ -86,14 +95,22 @@ func (c *Compiler) ToIR(output string) error {
 }
 
 // run the compiler from the given source code to the object file
-func (c *Compiler) ToObj(output string) error {
-	c.run()
+func (c *Compiler) ToObj(ctx context.Context, output string) error {
+	if err := c.run(ctx); err != nil {
+		log.Error().Err(err).Msg("failed to compile the source code")
+		return err
+	}
+
 	return c.buildTo(output, "-Wno-override-module", "-c")
 }
 
 // run the compiler from the given source code to the binary file
-func (c *Compiler) ToBin(output string) error {
-	c.run()
+func (c *Compiler) ToBin(ctx context.Context, output string) error {
+	if err := c.run(ctx); err != nil {
+		log.Error().Err(err).Msg("failed to compile the source code")
+		return err
+	}
+
 	return c.buildTo(output, "-Wno-override-module")
 }
 
@@ -125,12 +142,23 @@ func (c *Compiler) buildTo(output string, args ...string) error {
 }
 
 // compile the source code
-func (c *Compiler) run() {
+func (c *Compiler) run(ctx context.Context) error {
 	c.prologue()
 	defer c.epilogue()
+
+	for range c.Iterate(ctx) {
+		//
+	}
+
+	if c.Err() != nil {
+		log.Warn().Err(c.Err()).Msg("failed to compile the source code")
+		return c.Err()
+	}
 
 	// define the main function
 	main := c.module.NewFunc("main", types.I32)
 	builder := main.NewBlock("")
 	builder.NewRet(constant.NewInt(types.I32, 0))
+
+	return nil
 }

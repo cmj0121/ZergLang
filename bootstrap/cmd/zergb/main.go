@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog/log"
@@ -18,6 +20,9 @@ type Args struct {
 
 	// the output options
 	Output string `short:"o" name:"output" type:"path" help:"The output file to save the result."`
+
+	// The input file to compile
+	Source *os.File `arg:"" help:"The input file to compile."`
 }
 
 // create a new instance of Args with the default settings
@@ -39,15 +44,18 @@ func (a *Args) Run(ctx *kong.Context) error {
 }
 
 func (a *Args) run() error {
-	compiler := zerg.NewCompiler()
+	compiler := zerg.NewCompiler(a.Source)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	switch a.Build {
 	case "ir":
-		return compiler.ToIR(a.Output)
+		return compiler.ToIR(ctx, a.Output)
 	case "obj":
-		return compiler.ToObj(a.Output)
+		return compiler.ToObj(ctx, a.Output)
 	case "bin":
-		return compiler.ToBin(a.Output)
+		return compiler.ToBin(ctx, a.Output)
 	default:
 		log.Error().Str("build", a.Build).Msg("unknown build option")
 		return fmt.Errorf("unknown build option: %s", a.Build)
