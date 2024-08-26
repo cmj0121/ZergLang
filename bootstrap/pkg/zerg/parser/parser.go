@@ -16,7 +16,7 @@ import (
 type Parser struct {
 	*lexer.Lexer
 
-	ast   *AST
+	root  *Node
 	rules map[token.TokenType]Rule
 }
 
@@ -24,6 +24,8 @@ type Parser struct {
 func New(r io.Reader) *Parser {
 	return &Parser{
 		Lexer: lexer.New(r),
+		root:  &Node{typ: ROOT},
+		rules: make(map[token.TokenType]Rule),
 	}
 }
 
@@ -38,6 +40,9 @@ func (p *Parser) Parse(ctx context.Context) error {
 // setup everything before the parsing, like register the parser rules.
 func (p *Parser) prologue() {
 	log.Debug().Msg("starting the parsing ...")
+
+	// register the parser rules
+	p.rules[token.KeyFn] = RuleFunc
 }
 
 // clean up and release the resources after the parsing.
@@ -59,15 +64,15 @@ func (p *Parser) parse(ctx context.Context) error {
 		case <-ctx.Done():
 			log.Warn().Msg("context is canceled")
 			return p.Lexer.Err()
-		case token := <-holder:
+		case curr := <-holder:
 			// may acquired the nil token from the holder and only process the prev token
-			switch rule, ok := p.rules[prev.Type()]; ok {
+			switch ruleFn, ok := p.rules[prev.Type()]; ok {
 			case false:
-				log.Warn().Str("token", prev.String()).Msg("no rule to handle the token")
+				log.Warn().Str("curr", prev.String()).Msg("no rule to handle the token")
 				return fmt.Errorf("no rule to handle the token: %v", prev)
 			case true:
-				if prev, err = rule.Handle(p.ast, prev, token, holder); err != nil {
-					log.Warn().Err(err).Str("token", token.String()).Msg("failed to handle the token")
+				if prev, err = ruleFn(p.root, prev, curr, holder); err != nil {
+					log.Warn().Err(err).Str("curr", curr.String()).Msg("failed to handle the token")
 					return err
 				}
 
@@ -79,5 +84,6 @@ func (p *Parser) parse(ctx context.Context) error {
 		}
 	}
 
+	log.Debug().Msgf("build the final AST\n%s", p.root.String())
 	return p.Lexer.Err()
 }
