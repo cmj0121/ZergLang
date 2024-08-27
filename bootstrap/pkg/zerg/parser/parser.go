@@ -29,6 +29,11 @@ func New(r io.Reader) *Parser {
 	}
 }
 
+// Get the root of the AST.
+func (p *Parser) Root() *Node {
+	return p.root
+}
+
 // Parse from the tokenlized source code to the parsed AST.
 func (p *Parser) Parse(ctx context.Context) error {
 	p.prologue()

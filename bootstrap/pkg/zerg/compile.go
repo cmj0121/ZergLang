@@ -2,6 +2,7 @@ package zerg
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -9,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/llir/llvm/ir"
-	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
 	"github.com/rs/zerolog/log"
 
@@ -156,10 +156,29 @@ func (c *Compiler) run(ctx context.Context) error {
 		return c.Err()
 	}
 
-	// define the main function
-	main := c.module.NewFunc("main", types.I32)
-	builder := main.NewBlock("")
-	builder.NewRet(constant.NewInt(types.I32, 0))
+	return c.compileAST(ctx, c.Root())
+}
+
+// Compile the AST to the LLVM IR
+func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
+	switch node.Type() {
+	case parser.ROOT:
+		for _, child := range node.Children() {
+			if err := c.compileAST(ctx, child); err != nil {
+				log.Warn().Err(err).Msg("failed to compile the child node")
+				return err
+			}
+		}
+	case parser.FN:
+		name := node.Token().String()
+
+		fn := c.module.NewFunc(name, types.Void)
+		builder := fn.NewBlock("")
+		builder.NewRet(nil)
+	default:
+		log.Warn().Any("type", node.Type()).Msg("unknown node type")
+		return fmt.Errorf("unknown node type: %v", node.Type())
+	}
 
 	return nil
 }
