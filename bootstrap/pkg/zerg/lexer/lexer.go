@@ -54,10 +54,10 @@ func (l *Lexer) Iterate(ctx context.Context) <-chan *token.Token {
 	go func() {
 		defer close(ch)
 
-		prev := &token.EOL
+		prev := &token.EndOfLine
 		for tt := range l.iterate(ctx) {
 			switch prev.Type() {
-			case token.EndOfLine:
+			case token.EOL:
 				prev = tt
 				continue
 			}
@@ -71,7 +71,7 @@ func (l *Lexer) Iterate(ctx context.Context) <-chan *token.Token {
 		}
 
 		// the last token should be EOF
-		if prev.Type() != token.EndOfFile {
+		if prev.Type() != token.EOF {
 			log.Warn().Str("token", prev.String()).Int("_line", l.line).Msg("the last token is not EOF")
 		}
 	}()
@@ -114,11 +114,11 @@ func (l *Lexer) iterate(ctx context.Context) <-chan *token.Token {
 			}
 
 			// return the EOL token
-			ch <- &token.EOL
+			ch <- &token.EndOfLine
 		}
 
 		// send the EOF token
-		ch <- &token.EOF
+		ch <- &token.EndOfFile
 	}()
 
 	return ch

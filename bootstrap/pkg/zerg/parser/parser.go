@@ -17,7 +17,7 @@ type Parser struct {
 	*lexer.Lexer
 
 	root  *Node
-	rules map[token.TokenType]Rule
+	rules map[token.Type]Rule
 }
 
 // Create a new instance of the parser that holds the lexer and the parser rules.
@@ -25,7 +25,7 @@ func New(r io.Reader) *Parser {
 	return &Parser{
 		Lexer: lexer.New(r),
 		root:  &Node{typ: ROOT},
-		rules: make(map[token.TokenType]Rule),
+		rules: make(map[token.Type]Rule),
 	}
 }
 
@@ -47,7 +47,7 @@ func (p *Parser) prologue() {
 	log.Debug().Msg("starting the parsing ...")
 
 	// register the parser rules
-	p.rules[token.KeyFn] = RuleFunc
+	p.rules[token.Fn] = RuleFunc
 }
 
 // clean up and release the resources after the parsing.
@@ -62,7 +62,7 @@ func (p *Parser) parse(ctx context.Context) error {
 	prev := <-holder
 
 	// iterate the tokens until the EOF
-	for prev != nil && prev.Type() != token.EndOfFile {
+	for prev != nil && prev.Type() != token.EOF {
 		var err error
 
 		select {

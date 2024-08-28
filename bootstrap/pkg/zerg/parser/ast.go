@@ -8,6 +8,7 @@ import (
 )
 
 // The type of the AST node.
+//
 //go:generate stringer -type=NodeType
 type NodeType int
 
@@ -71,7 +72,6 @@ func (n *Node) Level() int {
 
 	return level
 }
-
 
 // Get the type of the AST node.
 func (n *Node) Type() NodeType {

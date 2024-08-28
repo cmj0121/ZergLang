@@ -21,11 +21,11 @@ type Rule func(root *Node, prev, token *token.Token, holder <-chan *token.Token)
 func RuleFunc(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
 	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the function")
 
-	if prev.Type() != token.KeyFn {
+	if prev.Type() != token.Fn {
 		return nil, fmt.Errorf("expect the function declaration but got %s", prev)
 	}
 
-	if curr.Type() != token.TypeName {
+	if curr.Type() != token.Name {
 		return nil, fmt.Errorf("expect the function name but got %s", curr)
 	}
 
@@ -59,11 +59,11 @@ func RuleFunc(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (
 func RuleFuncArgs(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
 	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the function arguments")
 
-	if prev.Type() != token.OpLeftParen {
+	if prev.Type() != token.LParen {
 		return nil, fmt.Errorf("expect the left parenthesis but got %s", prev)
 	}
 
-	if curr.Type() != token.OpRightParen {
+	if curr.Type() != token.RParen {
 		return nil, fmt.Errorf("expect the right parenthesis but got %s", curr)
 	}
 
@@ -79,13 +79,13 @@ func RuleFuncArgs(root *Node, prev, curr *token.Token, holder <-chan *token.Toke
 func RuleScope(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
 	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the scope")
 
-	if prev.Type() != token.OpLeftBracket {
+	if prev.Type() != token.LBrace {
 		return nil, fmt.Errorf("expect the left bracket but got %s", prev)
 	}
 
 	prev, curr = curr, <-holder
-	if prev.Type() == token.OpRightBracket {
-		// the final right bracket
+	if prev.Type() == token.RBrace {
+		// the final right Brace
 		return curr, nil
 	}
 

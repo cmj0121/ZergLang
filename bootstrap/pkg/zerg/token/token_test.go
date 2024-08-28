@@ -7,47 +7,47 @@ import (
 func TestToken(t *testing.T) {
 	cases := []struct {
 		Raw  string
-		Type TokenType
+		Type Type
 	}{
 		{
 			Raw:  "fn",
-			Type: KeyFn,
+			Type: Fn,
 		},
 		{
 			Raw:  "print",
-			Type: KeyPrint,
+			Type: Print,
 		},
 		{
 			Raw:  "str",
-			Type: KeyStr,
+			Type: Str,
 		},
 		{
 			Raw:  "(",
-			Type: OpLeftParen,
+			Type: LParen,
 		},
 		{
 			Raw:  ")",
-			Type: OpRightParen,
+			Type: RParen,
 		},
 		{
 			Raw:  "{",
-			Type: OpLeftBracket,
+			Type: LBrace,
 		},
 		{
 			Raw:  "}",
-			Type: OpRightBracket,
+			Type: RBrace,
 		},
 		{
 			Raw:  "123",
-			Type: TypeInt,
+			Type: Int,
 		},
 		{
 			Raw:  "\"hello\"",
-			Type: TypeString,
+			Type: String,
 		},
 		{
 			Raw:  "long_name_123",
-			Type: TypeName,
+			Type: Name,
 		},
 	}
 
@@ -56,7 +56,7 @@ func TestToken(t *testing.T) {
 	}
 }
 
-func testToken(raw string, typ TokenType) func(*testing.T) {
+func testToken(raw string, typ Type) func(*testing.T) {
 	return func(t *testing.T) {
 		token := NewToken(raw)
 
