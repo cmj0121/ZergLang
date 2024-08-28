@@ -7,13 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/llir/llvm/ir"
+	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
 	"github.com/rs/zerolog/log"
 
 	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/parser"
+	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/token"
 )
 
 type Compiler struct {
@@ -172,13 +175,71 @@ func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
 	case parser.Fn:
 		name := node.Token().String()
 
-		fn := c.module.NewFunc(name, types.Void)
+		_, type_hint, stmts := node.Children()[0], node.Children()[1], node.Children()[2]
+
+		typ := c.toLLVMType(type_hint)
+
+		fn := c.module.NewFunc(name, typ)
 		builder := fn.NewBlock("")
-		builder.NewRet(nil)
+
+		switch {
+		case len(stmts.Children()) == 0:
+			switch typ := typ.(type) {
+			case *types.VoidType:
+				builder.NewRet(nil)
+			case *types.IntType:
+				i32_0 := constant.NewInt(typ, 0)
+				builder.NewRet(i32_0)
+			default:
+				log.Warn().Any("type", typ).Msg("unknown return type")
+				return fmt.Errorf("unknown return type: %v", typ)
+			}
+		case stmts.Children()[0].Type() == parser.ReturnStmt:
+			expr := stmts.Children()[0].Children()[0]
+			switch expr.Token().Type() {
+			case token.Int:
+				value, err := strconv.Atoi(expr.Token().String())
+				if err != nil {
+					log.Warn().Err(err).Str("value", expr.Token().String()).Msg("failed to parse the integer value")
+					return err
+				}
+				builder.NewRet(constant.NewInt(typ.(*types.IntType), int64(value)))
+			default:
+				log.Warn().Any("type", expr.Type()).Msg("unknown expression type")
+				return fmt.Errorf("unknown expression type: %v", expr.Type())
+			}
+		default:
+			log.Warn().Msg("not implemented")
+			return fmt.Errorf("not implemented")
+		}
 	default:
 		log.Warn().Any("type", node.Type()).Msg("unknown node type")
 		return fmt.Errorf("unknown node type: %v", node.Type())
 	}
 
 	return nil
+}
+
+// Get the LLVM IR type from the AST type hint
+func (c *Compiler) toLLVMType(node *parser.Node) types.Type {
+	switch node.Type() {
+	case parser.Type:
+		if node.Token() == nil {
+			log.Info().Msg("no type hint, use the default type")
+			return types.Void
+		}
+
+		switch node.Token().String() {
+		case "u32":
+			return types.I32
+		case "void":
+			return types.Void
+		default:
+			log.Warn().Str("type", node.Token().String()).Msg("unknown type hint")
+			return types.Void
+		}
+	default:
+		log.Warn().Any("type", node.Type()).Msg("unknown node type")
+		return types.Void
+	}
 }
