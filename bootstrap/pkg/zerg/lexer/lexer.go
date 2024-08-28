@@ -56,12 +56,16 @@ func (l *Lexer) Iterate(ctx context.Context) <-chan *token.Token {
 
 		prev := &token.EndOfLine
 		for tt := range l.iterate(ctx) {
-			switch prev.Type() {
-			case token.EOL:
+			switch {
+			case prev.Type() == token.EOL:
 				prev = tt
+				continue
+			case prev.Type() == token.Sub && tt.Type() == token.Gt:
+				prev = token.NewToken("->")
 				continue
 			}
 
+			log.Debug().Str("token", prev.String()).Msg("emit the token")
 			select {
 			case <-ctx.Done():
 				return
@@ -109,7 +113,7 @@ func (l *Lexer) iterate(ctx context.Context) <-chan *token.Token {
 				case <-ctx.Done():
 					return
 				case ch <- token:
-					log.Debug().Str("token", token.String()).Interface("_typ", token.Type()).Int("_line", l.line).Msg("send the token")
+					log.Trace().Str("token", token.String()).Interface("_typ", token.Type()).Int("_line", l.line).Msg("send the token")
 				}
 			}
 

@@ -162,14 +162,14 @@ func (c *Compiler) run(ctx context.Context) error {
 // Compile the AST to the LLVM IR
 func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
 	switch node.Type() {
-	case parser.ROOT:
+	case parser.Root:
 		for _, child := range node.Children() {
 			if err := c.compileAST(ctx, child); err != nil {
 				log.Warn().Err(err).Msg("failed to compile the child node")
 				return err
 			}
 		}
-	case parser.FN:
+	case parser.Fn:
 		name := node.Token().String()
 
 		fn := c.module.NewFunc(name, types.Void)

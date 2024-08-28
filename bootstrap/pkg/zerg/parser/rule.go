@@ -19,7 +19,7 @@ type Rule func(root *Node, prev, token *token.Token, holder <-chan *token.Token)
 //
 // func ::= "fn" NAME func_args scope
 func RuleFunc(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
-	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the function")
+	log.Debug().Str("prev", prev.String()).Msg("parse the function")
 
 	if prev.Type() != token.Fn {
 		return nil, fmt.Errorf("expect the function declaration but got %s", prev)
@@ -29,7 +29,7 @@ func RuleFunc(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (
 		return nil, fmt.Errorf("expect the function name but got %s", curr)
 	}
 
-	var node = &Node{typ: FN, token: curr}
+	var node = &Node{typ: Fn, token: curr}
 	var err error
 
 	root.Append(node)
@@ -55,9 +55,9 @@ func RuleFunc(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (
 
 // Parse the function arguments.
 //
-// func_args ::= "(" ")"
+// func_args ::= "(" ")" type_hint?
 func RuleFuncArgs(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
-	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the function arguments")
+	log.Debug().Str("prev", prev.String()).Msg("parse the function arguments")
 
 	if prev.Type() != token.LParen {
 		return nil, fmt.Errorf("expect the left parenthesis but got %s", prev)
@@ -67,31 +67,115 @@ func RuleFuncArgs(root *Node, prev, curr *token.Token, holder <-chan *token.Toke
 		return nil, fmt.Errorf("expect the right parenthesis but got %s", curr)
 	}
 
-	args := &Node{typ: ARGS}
+	args := &Node{typ: Args}
 	root.Append(args)
 
-	return nil, nil
+	switch prev = <-holder; prev.Type() {
+	case token.Arrow:
+		curr = <-holder
+		return RuleTypeHint(root, prev, curr, holder)
+	default:
+		type_hint := &Node{typ: Type}
+		root.Append(type_hint)
+		return prev, nil
+	}
 }
 
 // Parse the scope that contains the statements.
 //
 // scope ::= "{" stmt+ "}"
 func RuleScope(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
-	log.Debug().Any("prev", prev.Type()).Any("curr", curr.Type()).Msg("parse the scope")
+	log.Debug().Str("prev", prev.String()).Msg("parse the scope")
 
 	if prev.Type() != token.LBrace {
 		return nil, fmt.Errorf("expect the left bracket but got %s", prev)
 	}
 
-	prev, curr = curr, <-holder
-	if prev.Type() == token.RBrace {
-		// the final right Brace
-		return curr, nil
-	}
-
-	var scope = &Node{typ: SCOPE}
+	var err error
+	var scope = &Node{typ: Scope}
 	root.Append(scope)
 
-	err := fmt.Errorf("not implemented: %v", prev)
-	return nil, err
+	for {
+		prev, curr = curr, <-holder
+
+		if prev.Type() == token.RBrace {
+			// the final right Brace
+			return curr, nil
+		}
+
+		curr, err = RuleStmt(scope, prev, curr, holder)
+		if err != nil {
+			log.Info().Err(err).Msg("failed to parse the statement")
+			return nil, err
+		}
+	}
+}
+
+// Parse the type hint.
+//
+// type_hint ::= "->" Type
+func RuleTypeHint(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
+	log.Debug().Str("prev", prev.String()).Msg("parse the type hint")
+
+	if prev.Type() != token.Arrow {
+		return nil, fmt.Errorf("expect the arrow but got %s", prev)
+	}
+
+	switch curr.Type() {
+	case token.Name:
+		var node = &Node{typ: Type, token: curr}
+		root.Append(node)
+	default:
+		return nil, fmt.Errorf("expect the type name but got %s", curr)
+	}
+
+	return nil, nil
+}
+
+// Parse the statement.
+//
+// stmt ::= return_stmt
+func RuleStmt(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
+	log.Debug().Str("prev", prev.String()).Msg("parse the statement")
+
+	switch prev.Type() {
+	case token.Return:
+		return RuleReturn(root, prev, curr, holder)
+	default:
+		return nil, fmt.Errorf("unknown statement: %s", prev)
+	}
+}
+
+// Parse the return statement.
+//
+// return_stmt ::= "return" expr
+func RuleReturn(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
+	log.Debug().Str("prev", prev.String()).Msg("parse the return statement")
+
+	if prev.Type() != token.Return {
+		return nil, fmt.Errorf("expect the return statement but got %s", prev)
+	}
+
+	var node = &Node{typ: ReturnStmt, token: prev}
+	root.Append(node)
+
+	prev, curr = curr, <-holder
+	return RuleExpr(node, prev, curr, holder)
+}
+
+// Parse the expression.
+//
+// expr ::= NAME
+func RuleExpr(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
+	log.Debug().Str("prev", prev.String()).Msg("parse the expression")
+
+	switch prev.Type() {
+	case token.Name, token.String, token.Int:
+		var node = &Node{typ: Expression, token: prev}
+		root.Append(node)
+	default:
+		return nil, fmt.Errorf("expect the expression but got %s", prev)
+	}
+
+	return curr, nil
 }

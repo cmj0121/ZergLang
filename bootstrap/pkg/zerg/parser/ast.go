@@ -14,11 +14,14 @@ type NodeType int
 
 const (
 	// The node that represents the root of the AST.
-	ROOT NodeType = iota
+	Root NodeType = iota
 
-	FN
-	ARGS
-	SCOPE
+	Fn
+	Args
+	Scope
+	Type
+	ReturnStmt
+	Expression
 )
 
 // The AST node that generated from the parser.

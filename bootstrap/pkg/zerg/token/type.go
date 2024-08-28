@@ -34,6 +34,8 @@ const (
 	Mul
 	Div
 	Mod
+	Gt
+	Lt
 
 	// The composite operators
 	Arrow
@@ -45,26 +47,30 @@ const (
 	Fn
 	Str
 	Print
+	Return
 )
 
 // Identify the raw token string and return the token type.
 func NewType(raw string) Type {
 	mapping := map[string]Type{
-		"(":     LParen,
-		")":     RParen,
-		"{":     LBrace,
-		"}":     RBrace,
-		"[":     LBracket,
-		"]":     RBracket,
-		"+":     Add,
-		"-":     Sub,
-		"*":     Mul,
-		"/":     Div,
-		"%":     Mod,
-		"->":    Arrow,
-		"str":   Str,
-		"fn":    Fn,
-		"print": Print,
+		"(":      LParen,
+		")":      RParen,
+		"{":      LBrace,
+		"}":      RBrace,
+		"[":      LBracket,
+		"]":      RBracket,
+		"+":      Add,
+		"-":      Sub,
+		"*":      Mul,
+		"/":      Div,
+		"%":      Mod,
+		">":      Gt,
+		"<":      Lt,
+		"->":     Arrow,
+		"str":    Str,
+		"fn":     Fn,
+		"print":  Print,
+		"return": Return,
 	}
 
 	switch typ, ok := mapping[raw]; {

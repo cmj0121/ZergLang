@@ -22,18 +22,21 @@ func _() {
 	_ = x[Mul-11]
 	_ = x[Div-12]
 	_ = x[Mod-13]
-	_ = x[Arrow-14]
-	_ = x[Name-15]
-	_ = x[String-16]
-	_ = x[Int-17]
-	_ = x[Fn-18]
-	_ = x[Str-19]
-	_ = x[Print-20]
+	_ = x[Gt-14]
+	_ = x[Lt-15]
+	_ = x[Arrow-16]
+	_ = x[Name-17]
+	_ = x[String-18]
+	_ = x[Int-19]
+	_ = x[Fn-20]
+	_ = x[Str-21]
+	_ = x[Print-22]
+	_ = x[Return-23]
 }
 
-const _Type_name = "UnknownEOFEOLLBracketRBracketLParenRParenLBraceRBraceAddSubMulDivModArrowNameStringIntFnStrPrint"
+const _Type_name = "UnknownEOFEOLLBracketRBracketLParenRParenLBraceRBraceAddSubMulDivModGtLtArrowNameStringIntFnStrPrintReturn"
 
-var _Type_index = [...]uint8{0, 7, 10, 13, 21, 29, 35, 41, 47, 53, 56, 59, 62, 65, 68, 73, 77, 83, 86, 88, 91, 96}
+var _Type_index = [...]uint8{0, 7, 10, 13, 21, 29, 35, 41, 47, 53, 56, 59, 62, 65, 68, 70, 72, 77, 81, 87, 90, 92, 95, 100, 106}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {

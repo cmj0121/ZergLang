@@ -24,7 +24,7 @@ type Parser struct {
 func New(r io.Reader) *Parser {
 	return &Parser{
 		Lexer: lexer.New(r),
-		root:  &Node{typ: ROOT},
+		root:  &Node{typ: Root},
 		rules: make(map[token.Type]Rule),
 	}
 }
