@@ -6,6 +6,7 @@ BIN := zergb
 all: 			# default action
 
 clean:			# clean-up environment
+	rm -f $(BIN)
 
 test:			# run test
 	@go mod tidy
@@ -15,10 +16,8 @@ test:			# run test
 
 run:			# run in the local environment
 
-build:			# build the binary/library
+build: $(BIN)	# build the binary/library
 	@go mod tidy
-	go generate ./...
-	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/*.go
 
 upgrade:		# upgrade all the necessary packages
 
@@ -27,3 +26,7 @@ help:			# show this message
 	@printf "\n"
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
+
+$(BIN): $(SRC)
+	go generate ./...
+	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/*.go

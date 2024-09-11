@@ -1,4 +1,4 @@
-SUBDIR := docs
+SUBDIR := bootstrap docs
 
 .PHONY: all clean test run build upgrade install help $(SUBDIR)
 

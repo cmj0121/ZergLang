@@ -16,7 +16,7 @@ type Args struct {
 	Verbose int `short:"v" type:"counter" help:"Set the verbose level of the command."`
 
 	// the build option to the target file
-	Build string `short:"b" name:"build" enum:"ir,obj,bin" default:"ir" help:"The build option to the target file."`
+	Build string `short:"b" name:"build" enum:"ir,obj,bin" default:"ir" help:"The build option to the target file [ir,obj,bin]."`
 
 	// the output options
 	Output string `short:"o" name:"output" type:"path" help:"The output file to save the result."`
