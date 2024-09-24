@@ -1,5 +1,5 @@
 SRC := $(shell find . -name "*.go" -type f)
-BIN := zergb
+BIN := bin/zergb
 
 .PHONY: all clean test run build upgrade help
 
@@ -29,4 +29,4 @@ help:			# show this message
 
 $(BIN): $(SRC)
 	go generate ./...
-	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/*.go
+	go build -o $(BIN) -ldflags "-s -w" cmd/zergb/*.go
