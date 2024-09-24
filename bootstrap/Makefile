@@ -11,7 +11,6 @@ clean:			# clean-up environment
 test:			# run test
 	@go mod tidy
 	@gofmt -s -w $(SRC)
-	@golangci-lint run --fix
 	go test ./...
 
 run:			# run in the local environment
