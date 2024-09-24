@@ -1,5 +1,5 @@
 SRC := $(shell find . -name "*.go" -type f)
-BIN := zergb
+BIN := bin/zergb
 
 .PHONY: all clean test run build upgrade help
 
@@ -11,7 +11,6 @@ clean:			# clean-up environment
 test:			# run test
 	@go mod tidy
 	@gofmt -s -w $(SRC)
-	@golangci-lint run --fix
 	go test ./...
 
 run:			# run in the local environment
@@ -29,4 +28,4 @@ help:			# show this message
 
 $(BIN): $(SRC)
 	go generate ./...
-	go build -o $(BIN) -ldflags "-s -w" cmd/$(BIN)/*.go
+	go build -o $(BIN) -ldflags "-s -w" cmd/zergb/*.go
