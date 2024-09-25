@@ -13,10 +13,21 @@ import (
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
+	"github.com/llir/llvm/ir/value"
 	"github.com/rs/zerolog/log"
 
 	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/parser"
 	"github.com/cmj0121/zerglang/bootstrap/pkg/zerg/token"
+)
+
+// The context key that hold the LLVM context
+type ContextKey string
+
+var (
+	BuilderKey    ContextKey = "builder"
+	ReturnTypeKey ContextKey = "return_type"
+	ReturnedKey   ContextKey = "returned"
+	ValueKey	  ContextKey = "value"
 )
 
 type Compiler struct {
@@ -173,50 +184,122 @@ func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
 			}
 		}
 	case parser.Fn:
-		name := node.Token().String()
-
-		_, type_hint, stmts := node.Children()[0], node.Children()[1], node.Children()[2]
-
-		typ := c.toLLVMType(type_hint)
-
-		fn := c.module.NewFunc(name, typ)
-		builder := fn.NewBlock("")
-
-		switch {
-		case len(stmts.Children()) == 0:
-			switch typ := typ.(type) {
-			case *types.VoidType:
-				builder.NewRet(nil)
-			case *types.IntType:
-				i32_0 := constant.NewInt(typ, 0)
-				builder.NewRet(i32_0)
-			default:
-				log.Warn().Any("type", typ).Msg("unknown return type")
-				return fmt.Errorf("unknown return type: %v", typ)
-			}
-		case stmts.Children()[0].Type() == parser.ReturnStmt:
-			expr := stmts.Children()[0].Children()[0]
-			switch expr.Token().Type() {
-			case token.Int:
-				value, err := strconv.Atoi(expr.Token().String())
-				if err != nil {
-					log.Warn().Err(err).Str("value", expr.Token().String()).Msg("failed to parse the integer value")
-					return err
-				}
-				builder.NewRet(constant.NewInt(typ.(*types.IntType), int64(value)))
-			default:
-				log.Warn().Any("type", expr.Type()).Msg("unknown expression type")
-				return fmt.Errorf("unknown expression type: %v", expr.Type())
-			}
-		default:
-			log.Warn().Msg("not implemented")
-			return fmt.Errorf("not implemented")
+		return c.compileFunction(ctx, node)
+	case parser.PrintStmt:
+		return c.compilePrintStmt(ctx, node)
+	case parser.ReturnStmt:
+		expr := node.Children()[0]
+		if err := c.compileAST(ctx, expr); err != nil {
+			log.Warn().Err(err).Msg("failed to compile the expression")
+			return err
 		}
 	default:
 		log.Warn().Any("type", node.Type()).Msg("unknown node type")
 		return fmt.Errorf("unknown node type: %v", node.Type())
 	}
 
+	return nil
+}
+
+// Compile function and related statements.
+func (c *Compiler) compileFunction(ctx context.Context, node *parser.Node) error {
+	name := node.Token().String()
+
+	_, type_hint, stmts := node.Children()[0], node.Children()[1], node.Children()[2]
+
+	typ := c.toLLVMType(type_hint)
+
+	fn := c.module.NewFunc(name, typ)
+	builder := fn.NewBlock("")
+
+	// set the builder to the context
+	ctx = context.WithValue(ctx, BuilderKey, builder)
+	ctx = context.WithValue(ctx, ReturnTypeKey, typ)
+
+	for _, child := range stmts.Children() {
+		if err := c.compileAST(ctx, child); err != nil {
+			log.Warn().Err(err).Msg("failed to compile the child node")
+			return err
+		}
+	}
+
+	// check the return statement called or not
+	if _, ok := ctx.Value(ReturnedKey).(bool); !ok {
+		log.Debug().Msg("function does not have the return statement, add the default return")
+		if err := c.compileReturn(ctx, nil); err != nil {
+			log.Warn().Err(err).Msg("failed to add the default return statement")
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Compile the print statement
+func (c *Compiler) compilePrintStmt(ctx context.Context, node *parser.Node) error {
+	expr := node.Children()[0]
+	value, err := c.compileExpression(ctx, expr)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to compile the expression")
+		return err
+	}
+
+	typ := value.Type();
+	switch typ := typ.(type) {
+	case *types.PointerType:
+	default:
+		err := fmt.Errorf("unsupport print type: %T", typ)
+		log.Warn().Err(err).Any("type", typ).Msg("failed to print the value")
+		return err
+	}
+
+	return c.showString(ctx, value)
+}
+
+// Compile the current function tnat return the zero value of the return type.
+func (c *Compiler) compileReturn(ctx context.Context, value any) error {
+	builder := ctx.Value(BuilderKey).(*ir.Block)
+	typ := ctx.Value(ReturnTypeKey).(types.Type)
+
+	v, err := c.toLLVMValue(typ, value)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to convert the value to the LLVM value")
+		return err
+	}
+
+	builder.NewRet(v)
+	return nil
+}
+
+// Compile the expression
+func (c *Compiler) compileExpression(ctx context.Context, node *parser.Node) (value.Value, error) {
+	switch typ := node.Token().Type(); typ {
+	case token.Int:
+		raw := node.Token().String()
+		v, err := strconv.Atoi(raw)
+		if err != nil {
+			log.Warn().Err(err).Str("raw", raw).Msg("failed to convert the raw token to the integer")
+			return nil, err
+		}
+
+		return c.toLLVMValue(types.I32, v)
+	case token.String:
+		raw := node.Token().String()
+		str := constant.NewCharArrayFromString(raw)
+
+		// create the global variable
+		global := c.module.NewGlobalDef("", str)
+		return global, nil
+	default:
+		err := fmt.Errorf("unknown token type: %v", typ)
+		log.Warn().Err(err).Msg("failed to compile the expression")
+		return nil, err
+	}
+}
+
+// Show the string to the STDOUT
+func (c *Compiler) showString(ctx context.Context, v value.Value) error {
+	log.Info().Str("value", v.Ident()).Msg("show the string")
 	return nil
 }
 
@@ -241,5 +324,25 @@ func (c *Compiler) toLLVMType(node *parser.Node) types.Type {
 	default:
 		log.Warn().Any("type", node.Type()).Msg("unknown node type")
 		return types.Void
+	}
+}
+
+// Get the LLVM value from the passed value
+func (c *Compiler) toLLVMValue(typ types.Type, v any) (value.Value, error) {
+	switch typ := typ.(type) {
+	case *types.VoidType:
+		// always return the void type
+		return nil, nil
+	case *types.IntType:
+		switch v := v.(type) {
+		case int:
+			return constant.NewInt(typ, int64(v)), nil
+		default:
+			log.Warn().Any("value", v).Msg("unknown value type")
+			return nil, fmt.Errorf("unknown value type: %v", v)
+		}
+	default:
+		log.Warn().Any("type", typ).Msg("unsupport LLVM type")
+		return nil, fmt.Errorf("unsupport LLVM type: %v", typ)
 	}
 }
