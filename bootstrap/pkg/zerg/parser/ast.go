@@ -21,6 +21,7 @@ const (
 	Scope
 	Type
 	ReturnStmt
+	PrintStmt
 	Expression
 )
 
