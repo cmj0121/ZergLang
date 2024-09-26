@@ -36,28 +36,30 @@ type Node struct {
 
 // Show the AST tree in the human-readable format as the tree.
 func (n *Node) String() string {
-	prefix, indent := "└── ", "    "
-	return n.showIndentString(prefix, indent, 0)
+	prefix := "."
+	indent := "    "
+	return n.showIndentString(prefix, indent)
 }
 
-func (n *Node) showIndentString(prefix, indent string, level int) string {
+func (n *Node) showIndentString(prefix, indent string) string {
 	builder := strings.Builder{}
 
+	builder.WriteString(indent[:len(indent)-4])
 	builder.WriteString(prefix)
 	builder.WriteString(fmt.Sprintf("%s: %v", n.typ, n.token))
-
-	level += 1
 
 	for idx, child := range n.childs {
 		builder.WriteString("\n")
 
 		switch {
 		case idx == len(n.childs)-1:
-			pre := strings.Repeat(indent, level) + "└── "
-			builder.WriteString(child.showIndentString(pre, indent, level))
+			pre :=  "└── "
+			ind := indent + "    "
+			builder.WriteString(child.showIndentString(pre, ind))
 		default:
-			pre := strings.Repeat(indent, level) + "├── "
-			builder.WriteString(child.showIndentString(pre, indent, level))
+			pre := "├── "
+			ind := indent + "|   "
+			builder.WriteString(child.showIndentString(pre, ind))
 		}
 	}
 
