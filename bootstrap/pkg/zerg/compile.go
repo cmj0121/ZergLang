@@ -175,7 +175,7 @@ func (c *Compiler) run(ctx context.Context) error {
 
 // Compile the AST to the LLVM IR
 func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
-	switch node.Type() {
+	switch typ := node.Type(); typ {
 	case parser.Root:
 		for _, child := range node.Children() {
 			if err := c.compileAST(ctx, child); err != nil {
@@ -189,13 +189,16 @@ func (c *Compiler) compileAST(ctx context.Context, node *parser.Node) error {
 		return c.compilePrintStmt(ctx, node)
 	case parser.ReturnStmt:
 		expr := node.Children()[0]
-		if err := c.compileAST(ctx, expr); err != nil {
+		switch value,  err := c.compileExpression(ctx, expr); err {
+		case nil:
+			return c.compileReturn(ctx, value)
+		default:
 			log.Warn().Err(err).Msg("failed to compile the expression")
 			return err
 		}
 	default:
-		log.Warn().Any("type", node.Type()).Msg("unknown node type")
-		return fmt.Errorf("unknown node type: %v", node.Type())
+		log.Warn().Str("type", typ.String()).Msg("unknown node type")
+		return fmt.Errorf("unknown node type: %v", typ)
 	}
 
 	return nil
@@ -291,8 +294,8 @@ func (c *Compiler) compileExpression(ctx context.Context, node *parser.Node) (va
 		global := c.module.NewGlobalDef("", str)
 		return global, nil
 	default:
-		err := fmt.Errorf("unknown token type: %v", typ)
-		log.Warn().Err(err).Msg("failed to compile the expression")
+		err := fmt.Errorf("unknown token type: %v", typ.String())
+		log.Warn().Err(err).Str("type", typ.String()).Msg("failed to compile the expression")
 		return nil, err
 	}
 }
@@ -305,7 +308,7 @@ func (c *Compiler) showString(ctx context.Context, v value.Value) error {
 
 // Get the LLVM IR type from the AST type hint
 func (c *Compiler) toLLVMType(node *parser.Node) types.Type {
-	switch node.Type() {
+	switch typ := node.Type(); typ{
 	case parser.Type:
 		if node.Token() == nil {
 			log.Info().Msg("no type hint, use the default type")
@@ -322,19 +325,31 @@ func (c *Compiler) toLLVMType(node *parser.Node) types.Type {
 			return types.Void
 		}
 	default:
-		log.Warn().Any("type", node.Type()).Msg("unknown node type")
+		log.Warn().Str("type", typ.String()).Msg("unknown node type to LLVM type")
 		return types.Void
 	}
 }
 
 // Get the LLVM value from the passed value
 func (c *Compiler) toLLVMValue(typ types.Type, v any) (value.Value, error) {
+	if value, ok := v.(value.Value); ok {
+		log.Debug().Any("value", value).Msg("use the passed value")
+		if value.Type() != typ {
+			log.Warn().Any("value", value).Any("type", typ).Msg("mismatched type")
+			return nil, fmt.Errorf("mismatched type: %v != %v", value.Type(), typ)
+		}
+
+		return value, nil
+	}
+
 	switch typ := typ.(type) {
 	case *types.VoidType:
 		// always return the void type
 		return nil, nil
 	case *types.IntType:
 		switch v := v.(type) {
+		case nil:
+			return constant.NewInt(typ, 0), nil
 		case int:
 			return constant.NewInt(typ, int64(v)), nil
 		default:
