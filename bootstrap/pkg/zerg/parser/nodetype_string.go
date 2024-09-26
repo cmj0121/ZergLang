@@ -14,12 +14,13 @@ func _() {
 	_ = x[Scope-3]
 	_ = x[Type-4]
 	_ = x[ReturnStmt-5]
-	_ = x[Expression-6]
+	_ = x[PrintStmt-6]
+	_ = x[Expression-7]
 }
 
-const _NodeType_name = "RootFnArgsScopeTypeReturnStmtExpression"
+const _NodeType_name = "RootFnArgsScopeTypeReturnStmtPrintStmtExpression"
 
-var _NodeType_index = [...]uint8{0, 4, 6, 10, 15, 19, 29, 39}
+var _NodeType_index = [...]uint8{0, 4, 6, 10, 15, 19, 29, 38, 48}
 
 func (i NodeType) String() string {
 	if i < 0 || i >= NodeType(len(_NodeType_index)-1) {

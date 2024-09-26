@@ -141,6 +141,8 @@ func RuleStmt(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (
 	switch prev.Type() {
 	case token.Return:
 		return RuleReturn(root, prev, curr, holder)
+	case token.Print:
+		return RulePrint(root, prev, curr, holder)
 	default:
 		return nil, fmt.Errorf("unknown statement: %s", prev)
 	}
@@ -157,6 +159,23 @@ func RuleReturn(root *Node, prev, curr *token.Token, holder <-chan *token.Token)
 	}
 
 	var node = &Node{typ: ReturnStmt, token: prev}
+	root.Append(node)
+
+	prev, curr = curr, <-holder
+	return RuleExpr(node, prev, curr, holder)
+}
+
+// Parse the print statement.
+//
+// print_stmt ::= "print" expr
+func RulePrint(root *Node, prev, curr *token.Token, holder <-chan *token.Token) (*token.Token, error) {
+	log.Debug().Str("prev", prev.String()).Msg("parse the print statement")
+
+	if prev.Type() != token.Print {
+		return nil, fmt.Errorf("expect the print statement but got %s", prev)
+	}
+
+	var node = &Node{typ: PrintStmt, token: prev}
 	root.Append(node)
 
 	prev, curr = curr, <-holder

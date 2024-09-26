@@ -29,3 +29,6 @@ jobs:
 
           make -C bootstrap test
           make -C bootstrap build
+      - name: build the examples
+        run: |
+          bootstrap/bin/zergb -vv docs/examples/simple/00-hello-world.zg
