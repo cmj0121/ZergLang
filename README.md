@@ -1,8 +1,11 @@
 # Zerg
 
-> A programming language for binary manipulation
+> Write your programs as zerg-rush
 
-Zerg is designed as the programming language and tool for binary manipulation.
+Zerg is the open source programming language for you to write your programs as zerg-rush.
+It help you to easyly write your ideas into programs, with simple and clear syntax without
+complicated rules.
+
 
 ## DDD (Dream-Driven Development)
 

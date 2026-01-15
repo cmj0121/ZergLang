@@ -1,0 +1,79 @@
+# The Zerg Programming Language Specification
+#
+# Author: 2026 <cmj@cmj.tw>
+#
+# This document defines the syntax and semantics of the Zerg programming language.
+#
+# The syntax is specified using Extended Backus-Naur Form (EBNF), which provides a
+# formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
+# starting point for parsing Zerg source code.
+PROGRAM    ::= STATEMENTS EOF
+STATEMENTS ::= ( STATEMENT | COMMENT )*
+STATEMENT  ::= ( NOP | EXPRESSION ) NEWLINE
+EXPRESSION ::= LITERAL
+
+
+# Lexical Elements
+# -----------------
+# The following lexical elements are defined for Zerg:
+#
+#   - EOF           Indicates the end of the source code.
+#   - NEWLINE       The end of a line in the source code.
+#   - WHITESPACE    Spaces and tabs used to separate tokens (skipped).
+#   - COMMENT       Human-readable annotations in the source code.
+#   - KEYWORD       Reserved words (nop, nil, true, false).
+#   - LITERAL       Atomic values: NUMBER, STRING, KEYWORD, or IDENTIFIER.
+
+EOF           ::= <end of file>
+NEWLINE       ::= '\n' | '\r\n'
+WHITESPACE    ::= ' ' | '\t'
+COMMENT       ::= '#' <any character except NEWLINE>* (NEWLINE | EOF)
+
+# Keywords
+# --------
+# Reserved words matched before IDENTIFIER. The lexer must check if an
+# IDENTIFIER pattern matches a KEYWORD and emit the keyword token instead.
+KEYWORD       ::= NOP | NIL | TRUTHY
+NOP           ::= 'nop'
+NIL           ::= 'nil'
+TRUTHY        ::= 'true' | 'false'
+
+LITERAL       ::= NUMBER | STRING | KEYWORD | IDENTIFIER
+
+# Character Classes
+# -----------------
+# Lexical patterns that define how source text is tokenized.
+#
+#  - NUMBER        Numeric literals (decimal, hex, octal, binary, float).
+#  - STRING        Text literals (simple and multiline).
+#  - IDENTIFIER    Names for variables, functions, and other entities.
+NUMBER          ::= FLOAT | HEX_NUMBER | OCT_NUMBER | BIN_NUMBER | DEC_NUMBER
+STRING          ::= MULTILINE_STR | SIMPLE_STR
+IDENTIFIER      ::= LETTER ( LETTER | DIGIT )*
+
+DEC_NUMBER      ::= DEC_DIGITS
+HEX_NUMBER      ::= '0x' HEX_DIGITS
+OCT_NUMBER      ::= '0o' OCT_DIGITS
+BIN_NUMBER      ::= '0b' BIN_DIGITS
+FLOAT           ::= DEC_DIGITS '.' DEC_DIGITS EXPONENT?
+EXPONENT        ::= ('e' | 'E') ('+' | '-')? DEC_DIGITS
+DEC_DIGITS      ::= DIGIT ('_'? DIGIT)*
+HEX_DIGITS      ::= HEX ('_'? HEX)*
+OCT_DIGITS      ::= OCT ('_'? OCT)*
+BIN_DIGITS      ::= BIN ('_'? BIN)*
+OCT             ::= '0'..'7'
+BIN             ::= '0' | '1'
+
+SIMPLE_STR      ::= '"' STRING_CHAR* '"'
+MULTILINE_STR   ::= '"""' MULTILINE_CHAR* '"""'
+STRING_CHAR     ::= ESCAPE_SEQ | PLAIN_CHAR
+PLAIN_CHAR      ::= <any character except '"', '\', and NEWLINE>
+MULTILINE_CHAR  ::= ESCAPE_SEQ | MULTILINE_PLAIN
+MULTILINE_PLAIN ::= <any character except '\' and '"""'>
+ESCAPE_SEQ      ::= '\\' ESCAPE_CODE
+ESCAPE_CODE     ::= '"' | '\\' | 'n' | 'r' | 't' | '0' | HEX_BYTE
+HEX_BYTE        ::= 'x' HEX HEX
+HEX             ::= DIGIT | 'a'..'f' | 'A'..'F'
+
+LETTER          ::= 'a'..'z' | 'A'..'Z' | '_'
+DIGIT           ::= '0'..'9'
