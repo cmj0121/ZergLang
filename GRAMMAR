@@ -9,7 +9,18 @@
 # starting point for parsing Zerg source code.
 PROGRAM      ::= STATEMENTS EOF
 STATEMENTS   ::= ( STATEMENT | COMMENT )*
-STATEMENT    ::= ( NOP | EXPRESSION ) NEWLINE
+STATEMENT    ::= FOR_STMT | SIMPLE_STMT NEWLINE
+SIMPLE_STMT  ::= 'nop' | EXPRESSION
+
+# Control Flow
+# ------------
+# Loop statements with break and continue support.
+#   - for { ... }              Infinite loop
+#   - for x in EXPR { ... }    Iteration loop
+# CONDI_FLOW (break/continue) is only valid inside FOR_BLOCK.
+FOR_STMT     ::= 'for' (IDENTIFIER 'in' EXPRESSION)? FOR_BLOCK
+FOR_BLOCK    ::= '{' ( STATEMENT | CONDI_FLOW | COMMENT )* '}'
+CONDI_FLOW   ::= ('break' | 'continue') NEWLINE
 
 # Expression Grammar
 # ------------------
@@ -19,31 +30,33 @@ STATEMENT    ::= ( NOP | EXPRESSION ) NEWLINE
 EXPRESSION   ::= ASSIGNMENT | OR_EXPR
 
 # Assignment (right-associative)
-ASSIGNMENT   ::= IDENTIFIER ASSIGN EXPRESSION
+ASSIGNMENT   ::= IDENTIFIER ':=' EXPRESSION
 
 # Logical Operators (left-associative, short-circuit evaluation)
-OR_EXPR      ::= XOR_EXPR (OR XOR_EXPR)*
-XOR_EXPR     ::= AND_EXPR (XOR AND_EXPR)*
-AND_EXPR     ::= BIT_OR_EXPR (AND BIT_OR_EXPR)*
+OR_EXPR      ::= XOR_EXPR ('or' XOR_EXPR)*
+XOR_EXPR     ::= AND_EXPR ('xor' AND_EXPR)*
+AND_EXPR     ::= BIT_OR_EXPR ('and' BIT_OR_EXPR)*
 
 # Bitwise Operators
-BIT_OR_EXPR  ::= BIT_XOR_EXPR (BIT_OR BIT_XOR_EXPR)*
-BIT_XOR_EXPR ::= BIT_AND_EXPR (BIT_XOR BIT_AND_EXPR)*
-BIT_AND_EXPR ::= NOT_EXPR (BIT_AND NOT_EXPR)*
+BIT_OR_EXPR  ::= BIT_XOR_EXPR ('|' BIT_XOR_EXPR)*
+BIT_XOR_EXPR ::= BIT_AND_EXPR ('^' BIT_AND_EXPR)*
+BIT_AND_EXPR ::= NOT_EXPR ('&' NOT_EXPR)*
 
 # Logical NOT (lower precedence than comparison)
 # This allows `not 1 == 2` to parse as `not (1 == 2)` instead of `(not 1) == 2`
-NOT_EXPR     ::= NOT NOT_EXPR | COMPARISON
+NOT_EXPR     ::= 'not' NOT_EXPR | COMPARISON
 
 # Comparison Operators
-COMPARISON   ::= SHIFT_EXPR ((EQ | NE | LT | GT | LE | GE) SHIFT_EXPR)?
-SHIFT_EXPR   ::= ADD_EXPR ((SHL | SHR) ADD_EXPR)*
-ADD_EXPR     ::= MUL_EXPR ((ADD | SUB) MUL_EXPR)*
-MUL_EXPR     ::= POW_EXPR ((MUL | DIV | FLOORDIV | MOD) POW_EXPR)*
-POW_EXPR     ::= UNARY (POW UNARY)?
+COMPARISON   ::= SHIFT_EXPR (('==' | '!=' | '<' | '>' | '<=' | '>=') SHIFT_EXPR)?
+
+# Arithmetic Operators
+SHIFT_EXPR   ::= ADD_EXPR (('<<' | '>>') ADD_EXPR)*
+ADD_EXPR     ::= MUL_EXPR (('+' | '-') MUL_EXPR)*
+MUL_EXPR     ::= POW_EXPR (('*' | '/' | '//' | '%') POW_EXPR)*
+POW_EXPR     ::= UNARY ('**' UNARY)?
 
 # Unary Operators (high precedence: bitwise NOT, negation)
-UNARY        ::= (BIT_NOT | SUB) UNARY | LITERAL
+UNARY        ::= ('~' | '-') UNARY | LITERAL
 
 
 # Lexical Elements
@@ -66,17 +79,13 @@ COMMENT       ::= '#' <any character except NEWLINE>* (NEWLINE | EOF)
 # Keywords
 # --------
 # Reserved words matched before IDENTIFIER. The lexer must check if an
-# IDENTIFIER pattern matches a KEYWORD and emit the keyword token instead.
-KEYWORD       ::= NOP | NIL | TRUTHY
-NOP           ::= 'nop'
-NIL           ::= 'nil'
-TRUTHY        ::= 'true' | 'false'
-NOT           ::= 'not'
-AND           ::= 'and'
-OR            ::= 'or'
-XOR           ::= 'xor'
+# IDENTIFIER pattern matches a keyword and emit the keyword token instead.
+#
+# Value keywords:    nop, nil, true, false
+# Logical keywords:  not, and, or, xor
+# Control keywords:  for, in, break, continue
 
-LITERAL       ::= NUMBER | STRING | KEYWORD | IDENTIFIER
+LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 
 # Operators
 # ---------
@@ -111,42 +120,6 @@ LITERAL       ::= NUMBER | STRING | KEYWORD | IDENTIFIER
 #  15. or                        - Logical OR
 #  16. :=                        - Assignment (right-associative)
 #
-ASSIGN        ::= ':='
-
-# Comparison
-EQ            ::= '=='
-NE            ::= '!='
-LT            ::= '<'
-GT            ::= '>'
-LE            ::= '<='
-GE            ::= '>='
-
-# Arithmetic
-ADD           ::= '+'
-SUB           ::= '-'
-MUL           ::= '*'
-DIV           ::= '/'
-FLOORDIV      ::= '//'
-MOD           ::= '%'
-POW           ::= '**'
-
-# Bitwise
-BIT_AND       ::= '&'
-BIT_OR        ::= '|'
-BIT_XOR       ::= '^'
-BIT_NOT       ::= '~'
-SHL           ::= '<<'
-SHR           ::= '>>'
-
-# Delimiters
-LPAREN        ::= '('
-RPAREN        ::= ')'
-LBRACE        ::= '{'
-RBRACE        ::= '}'
-LBRACKET      ::= '['
-RBRACKET      ::= ']'
-COMMA         ::= ','
-COLON         ::= ':'
 
 # Character Classes
 # -----------------
