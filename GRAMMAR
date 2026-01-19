@@ -9,7 +9,7 @@
 # starting point for parsing Zerg source code.
 PROGRAM      ::= STATEMENTS EOF
 STATEMENTS   ::= ( STATEMENT | COMMENT )*
-STATEMENT    ::= FOR_STMT | SIMPLE_STMT NEWLINE
+STATEMENT    ::= FOR_STMT | FN_STMT | SIMPLE_STMT NEWLINE
 SIMPLE_STMT  ::= 'nop' | EXPRESSION
 
 # Control Flow
@@ -21,6 +21,20 @@ SIMPLE_STMT  ::= 'nop' | EXPRESSION
 FOR_STMT     ::= 'for' (IDENTIFIER 'in' EXPRESSION)? FOR_BLOCK
 FOR_BLOCK    ::= '{' ( STATEMENT | CONDI_FLOW | COMMENT )* '}'
 CONDI_FLOW   ::= ('break' | 'continue') NEWLINE
+
+# Function Definition
+# -------------------
+# Function with typed parameters and optional return type.
+#   - fn name(a: int, b: int) -> int { ... }
+#   - fn name() { ... }
+# RETURN_STMT is only valid inside FN_BLOCK.
+FN_STMT      ::= 'fn' IDENTIFIER '(' PARAMS? ')' RETURN_TYPE? FN_BLOCK
+PARAMS       ::= PARAM (',' PARAM)*
+PARAM        ::= IDENTIFIER ':' TYPE
+RETURN_TYPE  ::= '->' TYPE
+TYPE         ::= IDENTIFIER
+FN_BLOCK     ::= '{' ( STATEMENT | RETURN_STMT | COMMENT )* '}'
+RETURN_STMT  ::= 'return' EXPRESSION? NEWLINE
 
 # Expression Grammar
 # ------------------
@@ -83,7 +97,8 @@ COMMENT       ::= '#' <any character except NEWLINE>* (NEWLINE | EOF)
 #
 # Value keywords:    nop, nil, true, false
 # Logical keywords:  not, and, or, xor
-# Control keywords:  for, in, break, continue
+# Control keywords:  for, in, break, continue, return
+# Function keywords: fn
 
 LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 
