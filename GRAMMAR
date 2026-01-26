@@ -9,7 +9,7 @@
 # starting point for parsing Zerg source code.
 PROGRAM      ::= STATEMENTS EOF
 STATEMENTS   ::= ( STATEMENT | COMMENT )*
-STATEMENT    ::= FOR_STMT | FN_STMT | SIMPLE_STMT NEWLINE
+STATEMENT    ::= FOR_STMT | IF_STMT | FN_STMT | SIMPLE_STMT NEWLINE
 SIMPLE_STMT  ::= 'nop' | EXPRESSION
 
 # Control Flow
@@ -21,6 +21,18 @@ SIMPLE_STMT  ::= 'nop' | EXPRESSION
 FOR_STMT     ::= 'for' (IDENTIFIER 'in' EXPRESSION)? FOR_BLOCK
 FOR_BLOCK    ::= '{' ( STATEMENT | CONDI_FLOW | COMMENT )* '}'
 CONDI_FLOW   ::= ('break' | 'continue') NEWLINE
+
+# Control Flow - If Statement
+# ---------------------------
+# Conditional execution with optional elif and else branches.
+#   - if EXPR { ... }
+#   - if EXPR { ... } else { ... }
+#   - if EXPR { ... } elif EXPR { ... } else { ... }
+# CONDI_FLOW and RETURN_STMT validity is checked during semantic analysis.
+IF_STMT      ::= 'if' EXPRESSION IF_BLOCK ELIF_CLAUSE* ELSE_CLAUSE?
+ELIF_CLAUSE  ::= 'elif' EXPRESSION IF_BLOCK
+ELSE_CLAUSE  ::= 'else' IF_BLOCK
+IF_BLOCK     ::= '{' ( STATEMENT | CONDI_FLOW | RETURN_STMT | COMMENT )* '}'
 
 # Function Definition
 # -------------------
@@ -97,7 +109,7 @@ COMMENT       ::= '#' <any character except NEWLINE>* (NEWLINE | EOF)
 #
 # Value keywords:    nop, nil, true, false
 # Logical keywords:  not, and, or, xor
-# Control keywords:  for, in, break, continue, return
+# Control keywords:  for, in, break, continue, return, if, elif, else
 # Function keywords: fn
 
 LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
