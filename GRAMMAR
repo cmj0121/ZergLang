@@ -9,43 +9,55 @@
 # starting point for parsing Zerg source code.
 PROGRAM      ::= STATEMENTS EOF
 STATEMENTS   ::= ( STATEMENT | COMMENT )*
-STATEMENT    ::= FOR_STMT | IF_STMT | FN_STMT | SIMPLE_STMT NEWLINE
+STATEMENT    ::= FOR_STMT | IF_STMT | MATCH_STMT | FN_STMT | SIMPLE_STMT NEWLINE
 SIMPLE_STMT  ::= 'nop' | EXPRESSION
 
-# Control Flow
-# ------------
+# Block
+# -----
+# A unified block structure used by all compound statements (for, if, fn, match).
+# All block items are allowed syntactically; semantic analysis validates context
+# (e.g., break/continue only inside for loops, return only inside functions).
+BLOCK        ::= '{' BLOCK_ITEM* '}'
+BLOCK_ITEM   ::= STATEMENT | CONDI_FLOW | RETURN_STMT | COMMENT
+
+# Control Flow - Loop
+# -------------------
 # Loop statements with break and continue support.
 #   - for { ... }              Infinite loop
 #   - for x in EXPR { ... }    Iteration loop
-# CONDI_FLOW (break/continue) is only valid inside FOR_BLOCK.
-FOR_STMT     ::= 'for' (IDENTIFIER 'in' EXPRESSION)? FOR_BLOCK
-FOR_BLOCK    ::= '{' ( STATEMENT | CONDI_FLOW | COMMENT )* '}'
+# CONDI_FLOW (break/continue) is only valid inside loop context.
+FOR_STMT     ::= 'for' (IDENTIFIER 'in' EXPRESSION)? BLOCK
 CONDI_FLOW   ::= ('break' | 'continue') NEWLINE
 
 # Control Flow - If Statement
 # ---------------------------
-# Conditional execution with optional elif and else branches.
+# Conditional execution with optional else branch.
 #   - if EXPR { ... }
 #   - if EXPR { ... } else { ... }
-#   - if EXPR { ... } elif EXPR { ... } else { ... }
-# CONDI_FLOW and RETURN_STMT validity is checked during semantic analysis.
-IF_STMT      ::= 'if' EXPRESSION IF_BLOCK ELIF_CLAUSE* ELSE_CLAUSE?
-ELIF_CLAUSE  ::= 'elif' EXPRESSION IF_BLOCK
-ELSE_CLAUSE  ::= 'else' IF_BLOCK
-IF_BLOCK     ::= '{' ( STATEMENT | CONDI_FLOW | RETURN_STMT | COMMENT )* '}'
+IF_STMT      ::= 'if' EXPRESSION BLOCK ('else' BLOCK)?
+
+# Pattern Matching
+# ----------------
+# Match expression against patterns with Rust-style syntax.
+#   - match EXPR { PATTERN => { ... } }
+#   - match EXPR { PATTERN => STMT }
+# Patterns: literals or wildcard (_). The _ wildcard matches any value.
+MATCH_STMT   ::= 'match' EXPRESSION '{' MATCH_ARM+ '}'
+MATCH_ARM    ::= PATTERN '=>' MATCH_BODY
+PATTERN      ::= '_' | LITERAL
+MATCH_BODY   ::= BLOCK | SIMPLE_STMT NEWLINE
 
 # Function Definition
 # -------------------
 # Function with typed parameters and optional return type.
 #   - fn name(a: int, b: int) -> int { ... }
 #   - fn name() { ... }
-# RETURN_STMT is only valid inside FN_BLOCK.
-FN_STMT      ::= 'fn' IDENTIFIER '(' PARAMS? ')' RETURN_TYPE? FN_BLOCK
+# RETURN_STMT is only valid inside function context.
+FN_STMT      ::= 'fn' IDENTIFIER '(' PARAMS? ')' RETURN_TYPE? BLOCK
 PARAMS       ::= PARAM (',' PARAM)*
 PARAM        ::= IDENTIFIER ':' TYPE
 RETURN_TYPE  ::= '->' TYPE
 TYPE         ::= IDENTIFIER
-FN_BLOCK     ::= '{' ( STATEMENT | RETURN_STMT | COMMENT )* '}'
 RETURN_STMT  ::= 'return' EXPRESSION? NEWLINE
 
 # Expression Grammar
@@ -109,8 +121,9 @@ COMMENT       ::= '#' <any character except NEWLINE>* (NEWLINE | EOF)
 #
 # Value keywords:    nop, nil, true, false
 # Logical keywords:  not, and, or, xor
-# Control keywords:  for, in, break, continue, return, if, elif, else
+# Control keywords:  for, in, break, continue, return, if, else, match
 # Function keywords: fn
+# Special keywords:  _
 
 LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 
@@ -120,6 +133,7 @@ LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 # before single-character ones (e.g., ':=' before ':').
 #
 # Lexer Priority (match longest first):
+#   =>  before  =
 #   **  before  *
 #   //  before  /
 #   <<  before  <
