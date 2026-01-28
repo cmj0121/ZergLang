@@ -63,8 +63,8 @@ RETURN_STMT  ::= 'return' EXPRESSION? NEWLINE
 # Expression Grammar
 # ------------------
 # Each level references the next higher precedence level.
-# Precedence (high to low): LITERAL → PRIMARY → UNARY → POW → MUL → ADD → SHIFT →
-#                           COMPARE → NOT → BIT_AND → BIT_XOR → BIT_OR → AND → XOR → OR → ASSIGN
+# Precedence (high to low): LITERAL → ATOM → PRIMARY(postfix) → UNARY → POW → MUL → ADD →
+#                           SHIFT → COMPARE → NOT → BIT_AND → BIT_XOR → BIT_OR → AND → XOR → OR → ASSIGN
 EXPRESSION   ::= ASSIGNMENT | OR_EXPR
 
 # Assignment (right-associative)
@@ -96,8 +96,14 @@ POW_EXPR     ::= UNARY ('**' UNARY)?
 # Unary Operators (high precedence: bitwise NOT, negation)
 UNARY        ::= ('~' | '-') UNARY | PRIMARY
 
-# Primary Expressions (grouping and atomic values)
-PRIMARY      ::= '(' EXPRESSION ')' | LITERAL
+# Primary Expressions (grouping, calls, indexing, and atomic values)
+#   - foo(1, 2)       Function call
+#   - x[0]            Index access
+#   - foo(1)[0]       Chained postfix
+PRIMARY      ::= ATOM POSTFIX*
+ATOM         ::= '(' EXPRESSION ')' | LITERAL
+POSTFIX      ::= '(' ARGUMENTS? ')' | '[' EXPRESSION ']'
+ARGUMENTS    ::= EXPRESSION (',' EXPRESSION)*
 
 
 # Lexical Elements
@@ -148,9 +154,9 @@ LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 #
 # Parser Precedence (highest to lowest):
 #   1. ()                        - Grouping
-#   2. []                        - Index
-#   3. **                        - Power (right-associative)
-#   4. ~ -                       - Unary (bitwise NOT, negation)
+#   2. () []                     - Call, Index (postfix)
+#   3. ~ -                       - Unary (bitwise NOT, negation)
+#   4. **                        - Power (right-associative)
 #   5. * / // %                  - Multiplicative
 #   6. + -                       - Additive
 #   7. << >>                     - Shift
