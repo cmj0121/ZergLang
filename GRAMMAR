@@ -63,7 +63,7 @@ RETURN_STMT  ::= 'return' EXPRESSION? NEWLINE
 # Expression Grammar
 # ------------------
 # Each level references the next higher precedence level.
-# Precedence (high to low): LITERAL → UNARY → POW → MUL → ADD → SHIFT →
+# Precedence (high to low): LITERAL → PRIMARY → UNARY → POW → MUL → ADD → SHIFT →
 #                           COMPARE → NOT → BIT_AND → BIT_XOR → BIT_OR → AND → XOR → OR → ASSIGN
 EXPRESSION   ::= ASSIGNMENT | OR_EXPR
 
@@ -94,7 +94,10 @@ MUL_EXPR     ::= POW_EXPR (('*' | '/' | '//' | '%') POW_EXPR)*
 POW_EXPR     ::= UNARY ('**' UNARY)?
 
 # Unary Operators (high precedence: bitwise NOT, negation)
-UNARY        ::= ('~' | '-') UNARY | LITERAL
+UNARY        ::= ('~' | '-') UNARY | PRIMARY
+
+# Primary Expressions (grouping and atomic values)
+PRIMARY      ::= '(' EXPRESSION ')' | LITERAL
 
 
 # Lexical Elements
