@@ -101,7 +101,7 @@ UNARY        ::= ('~' | '-') UNARY | PRIMARY
 #   - x[0]            Index access
 #   - foo(1)[0]       Chained postfix
 PRIMARY      ::= ATOM POSTFIX*
-ATOM         ::= '(' EXPRESSION ')' | ARRAY_LITERAL | LITERAL
+ATOM         ::= '(' EXPRESSION ')' | ARRAY_LITERAL | SET_OR_DICT | LITERAL
 POSTFIX      ::= '(' ARGUMENTS? ')' | '[' EXPRESSION ']'
 ARGUMENTS    ::= EXPRESSION (',' EXPRESSION)*
 
@@ -113,6 +113,19 @@ ARGUMENTS    ::= EXPRESSION (',' EXPRESSION)*
 ARRAY_LITERAL ::= '[' ARRAY_CONTENT? ']'
 ARRAY_CONTENT ::= LIST_COMP | EXPRESSION (',' EXPRESSION)*
 LIST_COMP     ::= EXPRESSION 'for' IDENTIFIER 'in' EXPRESSION ('if' EXPRESSION)?
+
+# Set and Dictionary Literals
+#   - {}                          Empty set (in expression context)
+#   - {1, 2, 3}                   Set literal
+#   - {:}                         Empty dictionary
+#   - {"a": 1, "b": 2}            Dictionary literal
+#   - {key: value}                Expression keys allowed
+# Note: {} is BLOCK in statement context (for/if/fn/match), SET in expression context.
+# Parser disambiguates by looking for ':' after first expression to choose set vs dict.
+SET_OR_DICT      ::= '{' SET_DICT_CONTENT? '}'
+SET_DICT_CONTENT ::= ':' | EXPRESSION SET_DICT_TAIL?
+SET_DICT_TAIL    ::= ':' EXPRESSION (',' DICT_ENTRY)* | (',' EXPRESSION)*
+DICT_ENTRY       ::= EXPRESSION ':' EXPRESSION
 
 
 # Lexical Elements
@@ -162,7 +175,7 @@ LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 #   :=  before  :
 #
 # Parser Precedence (highest to lowest):
-#   1. () []                     - Grouping, Array literal
+#   1. () [] {}                  - Grouping, Array, Set, Dict
 #   2. () []                     - Call, Index (postfix)
 #   3. ~ -                       - Unary (bitwise NOT, negation)
 #   4. **                        - Power (right-associative)
