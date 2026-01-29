@@ -101,9 +101,18 @@ UNARY        ::= ('~' | '-') UNARY | PRIMARY
 #   - x[0]            Index access
 #   - foo(1)[0]       Chained postfix
 PRIMARY      ::= ATOM POSTFIX*
-ATOM         ::= '(' EXPRESSION ')' | LITERAL
+ATOM         ::= '(' EXPRESSION ')' | ARRAY_LITERAL | LITERAL
 POSTFIX      ::= '(' ARGUMENTS? ')' | '[' EXPRESSION ']'
 ARGUMENTS    ::= EXPRESSION (',' EXPRESSION)*
+
+# Array Literals and List Comprehensions
+#   - []                          Empty array
+#   - [1, 2, 3]                   Array literal
+#   - [x * 2 for x in items]      List comprehension
+#   - [x for x in items if x > 0] Filtered comprehension
+ARRAY_LITERAL ::= '[' ARRAY_CONTENT? ']'
+ARRAY_CONTENT ::= LIST_COMP | EXPRESSION (',' EXPRESSION)*
+LIST_COMP     ::= EXPRESSION 'for' IDENTIFIER 'in' EXPRESSION ('if' EXPRESSION)?
 
 
 # Lexical Elements
@@ -153,7 +162,7 @@ LITERAL       ::= NUMBER | STRING | 'nil' | 'true' | 'false' | IDENTIFIER
 #   :=  before  :
 #
 # Parser Precedence (highest to lowest):
-#   1. ()                        - Grouping
+#   1. () []                     - Grouping, Array literal
 #   2. () []                     - Call, Index (postfix)
 #   3. ~ -                       - Unary (bitwise NOT, negation)
 #   4. **                        - Power (right-associative)
