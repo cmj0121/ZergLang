@@ -27,6 +27,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
                | "return" EXPRESSION? | "break" | "continue"
                | "del" IDENTIFIER | "raise" EXPRESSION?
                | "yield" EXPRESSION | "go" EXPRESSION
+               | EXPRESSION "<-" EXPRESSION
                | "assert" EXPRESSION ( "," EXPRESSION )?
                | "import" STRING
 
@@ -93,7 +94,7 @@ SHIFT      ::= RANGE ( ( "<<" | ">>" ) RANGE )*
 RANGE      ::= ADDITION ( ( ".." | "..=" ) ADDITION )?
 ADDITION   ::= MULTIPLY ( ( "+" | "-" ) MULTIPLY )*
 MULTIPLY   ::= UNARY ( ( "*" | "/" | "//" | "%" ) UNARY )*
-UNARY      ::= ( "-" | "not" | "~" ) UNARY | POWER
+UNARY      ::= ( "-" | "not" | "~" | "<-" ) UNARY | POWER
 POWER      ::= POSTFIX ( "**" UNARY )?
 ARGUMENT   ::= ( IDENTIFIER "=" )? EXPRESSION
 POSTFIX    ::= PRIMARY ( "(" ( ARGUMENT ( "," ARGUMENT )* ","? )? ")"

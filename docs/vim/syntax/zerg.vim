@@ -68,6 +68,7 @@ syn match   zergOperatorSym   /\*\*/
 syn match   zergOperatorSym   /\/\//
 syn match   zergOperatorSym   /\.\.=/
 syn match   zergOperatorSym   /\.\./
+syn match   zergOperatorSym   /<-/
 
 " --- Function declaration ---
 syn match   zergFunction      /\<fn\s\+\zs\w\+\ze\s*(/

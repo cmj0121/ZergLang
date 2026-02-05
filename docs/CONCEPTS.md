@@ -378,11 +378,32 @@ keyword, which runs the given function concurrently without blocking the current
 tasks are managed by the Zerg runtime and are multiplexed onto system threads automatically, making them
 cheap to create.
 
+### Task Lifetime
+
+The program exits when `main()` returns. All `go` tasks still running at that point are terminated
+immediately -- they do not run to completion. If a task must finish its work before the program exits, the
+caller should wait for it explicitly using a channel or other synchronization mechanism.
+
 ### Channels
 
 Concurrent tasks communicate through `chan[T]`, which are typed conduits for sending and receiving values
 between tasks. A channel can be unbuffered (sender blocks until receiver is ready) or buffered (sender blocks
-only when the buffer is full).
+only when the buffer is full). Buffered channels are created with a capacity: `chan[int](10)`.
+
+The `<-` operator is used for channel send and receive:
+
+```txt
+done := chan[bool]()
+go fn() {
+    done <- true           # send a value into the channel
+}()
+result := <-done           # receive a value from the channel
+```
+
+- **Send**: `ch <- value` sends `value` into channel `ch`. Blocks if the channel is full (or unbuffered and
+  no receiver is ready). Raises `ChannelClosedError` if the channel is closed.
+- **Receive**: `<-ch` receives a value from channel `ch`. Blocks until a value is available. Returns the
+  received value.
 
 The `chan` itself is a shared handle -- assigning or passing a `chan` shares the underlying conduit, not
 copies it. However, the data sent through a `chan` is **copied** (consistent with Zerg's value semantics).

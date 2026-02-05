@@ -22,7 +22,7 @@ evaluated **left to right** (left-associative), except for unary operators which
 | 10           | `..` `..=`                       | Range                  | None          |
 | 11           | `+` `-`                          | Addition, Subtraction  | Left          |
 | 12           | `*` `/` `//` `%`                 | Multiply, Divide, Mod  | Left          |
-| 13           | `-` `not` `~`                    | Negation, NOT, Bit NOT | Right         |
+| 13           | `-` `not` `~` `<-`               | Negation, NOT, Receive | Right         |
 | 14           | `**`                             | Power                  | Right         |
 | 15 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member    | Left          |
 
@@ -175,6 +175,7 @@ See [BUILTINS.md](BUILTINS.md#range) for details on the `range` type.
 |          |                  | `float`      | `float`     |
 | `not`    | Logical negation | `bool`       | `bool`      |
 | `~`      | Bitwise NOT      | `int`        | `int`       |
+| `<-`     | Channel receive  | `chan[T]`    | `T`         |
 
 ## Function Calls
 
