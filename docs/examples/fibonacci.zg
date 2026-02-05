@@ -1,6 +1,6 @@
 #! /usr/bin/env zerg
 #
-# Fibonacci sequence -- demonstrates functions, recursion, range, and main().
+# Fibonacci sequence -- demonstrates functions, recursion, range, and lambdas.
 
 fn fib(n: int) : int {
     if n <= 1 { return n }
@@ -28,4 +28,8 @@ fn main() {
     for i in 0..=20 {
         print("  fib({i}) = {fib_iter(i)}")
     }
+
+    # Lambda for quick one-liner formulas
+    cube := |x: int| => x ** 3
+    print("5 cubed = {cube(5)}")
 }

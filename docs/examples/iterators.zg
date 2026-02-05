@@ -1,20 +1,12 @@
 #! /usr/bin/env zerg
 #
-# Iterators -- demonstrates coroutines with yield, for loop, and range.
+# Iterators -- demonstrates coroutines with yield, for loop, range, and lambdas.
 
 fn countdown(start: int) : iter[int] {
     mut n := start
     while n > 0 {
         yield n
         n = n - 1
-    }
-}
-
-fn evens(limit: int) : iter[int] {
-    for i in 0..limit {
-        if i % 2 == 0 {
-            yield i
-        }
     }
 }
 
@@ -30,13 +22,20 @@ fn main() {
         print("  {n}")
     }
 
-    print("Even numbers below 10:")
-    for n in evens(10) {
-        print("  {n}")
-    }
-
     print("First 6 squares:")
     for n in squares(6) {
         print("  {n}")
     }
+
+    # Lambdas with higher-order functions
+    numbers := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    evens := numbers.filter(|x| => x % 2 == 0)
+    print("Evens:", evens)
+
+    doubled := numbers.map(|x| => x * 2)
+    print("Doubled:", doubled)
+
+    sum := numbers.reduce(|a, b| => a + b)
+    print("Sum:", sum)
 }

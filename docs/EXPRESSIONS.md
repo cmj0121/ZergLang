@@ -177,6 +177,39 @@ See [BUILTINS.md](BUILTINS.md#range) for details on the `range` type.
 | `~`      | Bitwise NOT      | `int`        | `int`       |
 | `<-`     | Channel receive  | `chan[T]`    | `T`         |
 
+## Lambda Expressions
+
+A lambda is a lightweight anonymous function that evaluates a single expression. The syntax uses `|` to
+delimit parameters and `=>` to introduce the body:
+
+```txt
+|x| => x ** 2
+|a, b| => a + b
+|| => 42
+```
+
+Parameter types can be omitted when the compiler can infer them from context:
+
+```txt
+numbers.map(|x| => x ** 2)              # type of x inferred from list element
+numbers.filter(|x| => x > 0)
+```
+
+Explicit type annotations are also allowed:
+
+```txt
+|x: int, y: int| => x + y
+```
+
+The body must be a single expression or `nop` (a no-operation that returns nothing):
+
+```txt
+callbacks.each(|_| => nop)
+```
+
+Lambdas are expressions and can be assigned to variables, passed as arguments, or returned from functions.
+For multi-statement bodies, use `fn` instead.
+
 ## Function Calls
 
 A function call applies arguments to a callable expression. The syntax is:

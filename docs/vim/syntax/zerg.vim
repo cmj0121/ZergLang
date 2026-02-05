@@ -8,13 +8,16 @@ if exists("b:current_syntax")
 endif
 
 " --- Keywords ---
-syn keyword zergKeyword       pub mut impl this
+syn keyword zergKeyword       pub mut this
+syn keyword zergKeyword       impl nextgroup=zergClassName skipwhite
 syn keyword zergFnDecl        fn nextgroup=zergFnName skipwhite
 syn keyword zergConditional   if else match
 syn keyword zergRepeat        for while in
-syn keyword zergStatement     return break continue del raise yield go import assert
+syn keyword zergStatement     return break continue del raise yield go import assert nop
 syn keyword zergException     try expect finally with as
-syn keyword zergStructure     class spec enum
+syn keyword zergStructure     class nextgroup=zergClassName skipwhite
+syn keyword zergStructure     spec nextgroup=zergSpecName skipwhite
+syn keyword zergStructure     enum nextgroup=zergEnumName skipwhite
 syn keyword zergOperator      and or xor not is
 
 " --- Constants ---
@@ -70,10 +73,20 @@ syn match   zergOperatorSym   /\*\*/
 syn match   zergOperatorSym   /\/\//
 syn match   zergOperatorSym   /\.\.=/
 syn match   zergOperatorSym   /\.\./
-syn match   zergOperatorSym   /<-/
+syn match   zergChanOp        /<-/
 
-" --- Function name (chained from fn keyword via nextgroup) ---
+" --- Declaration names (chained via nextgroup) ---
 syn match   zergFnName        /\w\+/ contained
+syn match   zergClassName     /\w\+/ contained
+syn match   zergSpecName      /\w\+/ contained
+syn match   zergEnumName      /\w\+/ contained
+
+" --- Lambda |params| => expr ---
+syn match   zergLambdaPipe    /|/ contained
+syn match   zergLambdaArrow   /=>/ contained
+syn region  zergLambdaParams  start=/|/ end=/|/ contains=zergLambdaPipe,zergType,zergOperatorSym
+                              \ nextgroup=zergLambdaArrow skipwhite
+                              \ oneline
 
 " --- Highlight links ---
 hi def link zergKeyword       Keyword
@@ -98,6 +111,13 @@ hi def link zergComment       Comment
 hi def link zergTodo          Todo
 hi def link zergFnDecl        Keyword
 hi def link zergFnName        Function
+hi def link zergClassName     Function
+hi def link zergSpecName      Function
+hi def link zergEnumName      Function
+hi def link zergChanOp        Special
+hi def link zergLambdaPipe    Delimiter
+hi def link zergLambdaArrow   Operator
+hi def link zergLambdaParams  Normal
 hi def link zergBuiltin       Function
 
 let b:current_syntax = "zerg"

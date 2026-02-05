@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 49 production rules.
+# 52 production rules.
 
 # ============================================================================
 # Program Structure
@@ -109,6 +109,11 @@ PRIMARY    ::= LITERAL | IDENTIFIER | "(" EXPRESSION ")"
              | "{" EXPRESSION ":" EXPRESSION ( "," EXPRESSION ":" EXPRESSION )* ","? "}"
              | "{" EXPRESSION ( "," EXPRESSION )* ","? "}"
              | "{" "}"
+             | LAMBDA
+
+LAMBDA       ::= "|" LAMBDA_PARAMS? "|" "=>" ( EXPRESSION | "nop" )
+LAMBDA_PARAM ::= IDENTIFIER ( ":" TYPE )?
+LAMBDA_PARAMS::= LAMBDA_PARAM ( "," LAMBDA_PARAM )* ","?
 
 # ============================================================================
 # Built-in Functions (see BUILTINS.md)

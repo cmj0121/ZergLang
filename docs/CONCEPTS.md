@@ -155,6 +155,20 @@ on every code path. A function with no return type annotation returns nothing --
 (e.g., `x := foo()`) is a compile-time error. A bare `return` (with no expression) is valid inside a
 void-returning function.
 
+### Lambda Expressions
+
+For short, single-expression functions, Zerg provides lambda syntax using `|params| => expression`. Lambdas
+are anonymous and can only contain one expression (or `nop` for a no-op). Parameter types are inferred from
+context when possible. For multi-statement logic, use a full `fn` declaration instead.
+
+```txt
+square := |x: int| => x ** 2
+add := |a, b| => a + b
+items.filter(|x| => x > 0)
+```
+
+See [EXPRESSIONS.md](EXPRESSIONS.md#lambda-expressions) for full details.
+
 ### Function Types
 
 Function types are expressed using the `fn` keyword directly, describing the parameter types and return type
