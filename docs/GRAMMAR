@@ -105,7 +105,10 @@ POSTFIX    ::= PRIMARY ( "(" ( ARGUMENT ( "," ARGUMENT )* ","? )? ")"
                         )*
 PRIMARY    ::= LITERAL | IDENTIFIER | "(" EXPRESSION ")"
              | "[" ( EXPRESSION ( "," EXPRESSION )* ","? )? "]"
-             | "{" ( EXPRESSION ":" EXPRESSION ( "," EXPRESSION ":" EXPRESSION )* ","? )? "}"
+             | "{" ":" "}"
+             | "{" EXPRESSION ":" EXPRESSION ( "," EXPRESSION ":" EXPRESSION )* ","? "}"
+             | "{" EXPRESSION ( "," EXPRESSION )* ","? "}"
+             | "{" "}"
 
 # ============================================================================
 # Built-in Functions (see BUILTINS.md)

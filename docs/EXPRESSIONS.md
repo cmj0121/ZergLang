@@ -231,21 +231,40 @@ raises an exception.
 
 ## Collection Literals
 
-Zerg supports inline literals for `list` and `map`:
+Zerg supports inline literals for `list`, `map`, and `set`. The type of a `{}` literal is disambiguated by
+its contents:
 
 ```txt
+# List literals
 [1, 2, 3]                    # list[int]
 ["a", "b", "c"]              # list[string]
 []                           # empty list (requires type annotation)
 
-{"name": "zerg", "ver": 1}   # map[string, int] -- compile error, mixed value types
-{"name": "zerg"}             # map[string, string]
-{}                           # empty map (requires type annotation)
+# Map literals (key: value pairs)
+{"name": "zerg", "ver": "1"} # map[string, string]
+{:}                          # empty map (requires type annotation)
+
+# Set literals (values only, no colons)
+{1, 2, 3}                   # set[int]
+{"a", "b", "c"}              # set[string]
+{}                           # empty set (requires type annotation)
 ```
 
-A trailing comma after the last element is permitted. The element type for lists and the key/value types for
-maps are inferred from the contents. Empty collection literals (`[]`, `{}`) require an explicit type
-annotation on the variable since the compiler cannot infer the element type.
+The distinction between `set` and `map` is syntactic: if elements contain `:` separators, it is a `map`;
+otherwise it is a `set`. The special `{:}` syntax creates an empty map, while `{}` creates an empty set.
+Both require an explicit type annotation on the variable.
+
+Type constructors can also be used to create collections:
+
+```txt
+list[int]()
+map[string, int]()
+set[string]()
+chan[int](10)                 # buffered channel with capacity 10
+```
+
+A trailing comma after the last element is permitted. The element type for lists, the key/value types for
+maps, and the element type for sets are inferred from the contents.
 
 ## Null-Safe Operators
 
