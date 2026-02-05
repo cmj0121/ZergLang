@@ -29,7 +29,7 @@ syn keyword zergNil           nil
 syn keyword zergType          int float bool string list map set chan object iter range Self
 
 " --- Built-in functions ---
-syn keyword zergBuiltin       print len input str type
+syn keyword zergBuiltin       print len input str typeof
 
 " --- Wildcard pattern ---
 syn match   zergWildcard      /\<_\>/

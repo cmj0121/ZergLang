@@ -13,7 +13,7 @@ Zerg runtime and cannot be shadowed or redefined.
 | `float(v)`       | function  | Convert to float                          |
 | `str(v)`         | function  | Convert to string (calls `string()`)      |
 | `input(prompt?)` | function  | Read line from stdin                      |
-| `type(v)`        | function  | Return the type of v                      |
+| `typeof(v)`      | function  | Return the type of v                      |
 | `assert`         | statement | Raise `AssertionError` if condition false |
 | `range`          | type      | Built-in iterable range type              |
 
@@ -135,20 +135,20 @@ line := input()
 - **Parameters**: optional prompt string
 - **Returns**: `string` -- the line read (without trailing newline)
 
-## type
+## typeof
 
 ```txt
-type(v)
+typeof(v)
 ```
 
 Returns the runtime type of a value. The returned value can be compared using `==` or used with `is`.
 
 ```txt
-type(42) == int            # true
-type("hello") == string    # true
+typeof(42) == int            # true
+typeof("hello") == string    # true
 ```
 
-**Signature**: `fn type(v: any) : type`
+**Signature**: `fn typeof(v: any) : type`
 
 ## assert
 

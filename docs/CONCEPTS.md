@@ -245,6 +245,25 @@ types, such as `list[int]`, `map[string, int]`, or `set[string]`. User-defined c
 parameters in the same way, allowing reusable and type-safe data structures while preserving compile-time type
 checking.
 
+### Type Aliases
+
+The `type` keyword creates a named alias for an existing type. The alias and the original type are fully
+interchangeable -- no new type is created.
+
+```txt
+type Handler = fn(int) : string
+type StringMap = map[string, string]
+```
+
+Type aliases can be generic using type parameters:
+
+```txt
+type Pair[T] = list[T]
+type Result2[T] = Result[T, string]
+```
+
+Aliases can be marked `pub` to export them from the module.
+
 ## Memory Management
 
 Zerg uses value semantics with garbage collection (see [Assignment Semantics](#assignment-semantics) for
