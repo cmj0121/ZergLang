@@ -259,6 +259,18 @@ Enum variants are handled using the `match` statement, which requires all varian
 exhaustively. The compiler rejects any `match` that does not handle every variant, ensuring no case is
 silently ignored. Each branch can destructure the variant's associated data and bind it to local variables.
 
+A match branch can include a **guard** (`if` condition) to further constrain when the branch matches. The
+guard can reference variables bound by the pattern. The branch matches only if the pattern matches AND the
+guard is true.
+
+```txt
+match result {
+    Ok(v) if v > 0 => { print("positive: {v}") }
+    Ok(v) => { print("non-positive: {v}") }
+    Err(e) => { print(e.message) }
+}
+```
+
 The built-in `Result[T, E]` enum has two variants: `Ok(value: T)` representing success, and `Err(error: E)`
 representing failure. `Ok` and `Err` are built-in keywords -- they do not need to be imported or defined.
 The caller must `match` both variants before accessing the inner value.

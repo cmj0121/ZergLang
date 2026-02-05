@@ -49,7 +49,7 @@ COMPOUND_STMT::= IF_STMT | MATCH_STMT
 
 IF_STMT    ::= "if" EXPRESSION BLOCK ( "else" "if" EXPRESSION BLOCK )* ( "else" BLOCK )?
 
-MATCH_STMT ::= "match" EXPRESSION "{" ( PATTERN ( "," PATTERN )* "=>" BLOCK )+ "}"
+MATCH_STMT ::= "match" EXPRESSION "{" ( PATTERN ( "," PATTERN )* ( "if" EXPRESSION )? "=>" BLOCK )+ "}"
 PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
              | LITERAL | "_"
 
