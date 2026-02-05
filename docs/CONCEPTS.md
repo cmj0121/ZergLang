@@ -126,9 +126,16 @@ which means functions can be passed as arguments, returned from other functions,
 
 ### Built-in Functions
 
-Zerg provides built-in functions that are available in every module without importing. See
-[BUILTINS.md](BUILTINS.md) for the complete reference. The most common built-in is `print`, which writes
-its arguments to standard output followed by a newline.
+Zerg provides built-in functions and statements that are available in every module without importing. See
+[BUILTINS.md](BUILTINS.md) for the complete reference, including `print`, `len`, `str`, type conversion
+functions, `assert`, and `range`.
+
+### Return Type
+
+A function that declares a return type (`: type` after the parameter list) must return a value of that type
+on every code path. A function with no return type annotation returns nothing -- attempting to use its result
+(e.g., `x := foo()`) is a compile-time error. A bare `return` (with no expression) is valid inside a
+void-returning function.
 
 ### Function Types
 
@@ -164,6 +171,7 @@ own types by `class` with your properties and `impl` methods. The built-in types
 | `set`    | Unordered unique elements                     | No                  |
 | `chan`   | Typed channel for concurrency (shared handle) | No                  |
 | `iter`   | Iterator over a sequence of values            | No                  |
+| `range`  | Integer range (created with `..` or `..=`)    | No                  |
 
 Note: `nil` is a value representing the absence of data, not a type. It can only be assigned to variables
 whose type is explicitly declared as nullable.
@@ -427,6 +435,7 @@ The following built-in types implement `Iterable` and can be used directly with 
 | `string`    | Each character                                      |
 | `iter[T]`   | Itself (already an iterator)                        |
 | `chan[T]`   | Values received from the channel until it is closed |
+| `range`     | Each integer in the range                           |
 
 Because coroutines return `iter[T]`, a coroutine acts as a generator -- the `for` loop drives the coroutine,
 resuming it to produce the next value on each iteration. Similarly, a `for` loop over a `chan` receives

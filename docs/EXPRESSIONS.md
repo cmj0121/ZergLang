@@ -19,11 +19,12 @@ evaluated **left to right** (left-associative), except for unary operators which
 | 7            | `^`                              | Bitwise XOR            | Left          |
 | 8            | `&`                              | Bitwise AND            | Left          |
 | 9            | `<<` `>>`                        | Bit shift              | Left          |
-| 10           | `+` `-`                          | Addition, Subtraction  | Left          |
-| 11           | `*` `/` `//` `%`                 | Multiply, Divide, Mod  | Left          |
-| 12           | `-` `not` `~`                    | Negation, NOT, Bit NOT | Right         |
-| 13           | `**`                             | Power                  | Right         |
-| 14 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member    | Left          |
+| 10           | `..` `..=`                       | Range                  | None          |
+| 11           | `+` `-`                          | Addition, Subtraction  | Left          |
+| 12           | `*` `/` `//` `%`                 | Multiply, Divide, Mod  | Left          |
+| 13           | `-` `not` `~`                    | Negation, NOT, Bit NOT | Right         |
+| 14           | `**`                             | Power                  | Right         |
+| 15 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member    | Left          |
 
 Parentheses `( )` can be used to override the default precedence.
 
@@ -153,6 +154,18 @@ All bitwise operators require `int` operands and produce an `int` result. They a
 
 The shift amount must be a non-negative `int`. Shifting by a negative amount or by more than 63 bits raises
 an exception.
+
+## Range Operators
+
+The range operators create `range` values representing sequences of integers.
+
+| Operator | Description   | Example | Result        |
+| -------- | ------------- | ------- | ------------- |
+| `..`     | Exclusive end | `1..5`  | 1, 2, 3, 4    |
+| `..=`    | Inclusive end | `1..=5` | 1, 2, 3, 4, 5 |
+
+Both operands must be `int`. Range operators are non-associative -- `a..b..c` is a syntax error.
+See [BUILTINS.md](BUILTINS.md#range) for details on the `range` type.
 
 ## Unary Operators
 

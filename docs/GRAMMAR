@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 48 production rules.
+# 49 production rules.
 
 # ============================================================================
 # Program Structure
@@ -27,6 +27,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
                | "return" EXPRESSION? | "break" | "continue"
                | "del" IDENTIFIER | "raise" EXPRESSION?
                | "yield" EXPRESSION | "go" EXPRESSION
+               | "assert" EXPRESSION ( "," EXPRESSION )?
                | "import" STRING
 
 COMPOUND_STMT::= IF_STMT | MATCH_STMT
@@ -53,7 +54,7 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 
 FN_DECL    ::= VIS "mut"? "fn" FN_SIG BLOCK
 FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( ":" TYPE )?
-PARAM      ::= IDENTIFIER ":" "mut"? TYPE
+PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE
 PARAMS     ::= PARAM ( "," PARAM )* ","?
 
 CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
@@ -88,7 +89,8 @@ COMPARISON ::= BIT_OR ( ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) BIT_OR | "is" 
 BIT_OR     ::= BIT_XOR ( "|" BIT_XOR )*
 BIT_XOR    ::= BIT_AND ( "^" BIT_AND )*
 BIT_AND    ::= SHIFT ( "&" SHIFT )*
-SHIFT      ::= ADDITION ( ( "<<" | ">>" ) ADDITION )*
+SHIFT      ::= RANGE ( ( "<<" | ">>" ) RANGE )*
+RANGE      ::= ADDITION ( ( ".." | "..=" ) ADDITION )?
 ADDITION   ::= MULTIPLY ( ( "+" | "-" ) MULTIPLY )*
 MULTIPLY   ::= UNARY ( ( "*" | "/" | "//" | "%" ) UNARY )*
 UNARY      ::= ( "-" | "not" | "~" ) UNARY | POWER

@@ -11,7 +11,7 @@ endif
 syn keyword zergKeyword       fn pub mut impl this
 syn keyword zergConditional   if else match
 syn keyword zergRepeat        for while in
-syn keyword zergStatement     return break continue del raise yield go import
+syn keyword zergStatement     return break continue del raise yield go import assert
 syn keyword zergException     try expect finally with
 syn keyword zergStructure     class spec enum
 syn keyword zergOperator      and or xor not is
@@ -21,10 +21,10 @@ syn keyword zergBoolean       true false
 syn keyword zergNil           nil
 
 " --- Built-in types ---
-syn keyword zergType          int float bool string list map set chan object
+syn keyword zergType          int float bool string list map set chan object iter range
 
 " --- Built-in functions ---
-syn keyword zergBuiltin       print
+syn keyword zergBuiltin       print len input str type
 
 " --- Wildcard pattern ---
 syn match   zergWildcard      /\<_\>/
@@ -66,6 +66,8 @@ syn match   zergOperatorSym   /<</
 syn match   zergOperatorSym   />>/
 syn match   zergOperatorSym   /\*\*/
 syn match   zergOperatorSym   /\/\//
+syn match   zergOperatorSym   /\.\.=/
+syn match   zergOperatorSym   /\.\./
 
 " --- Function declaration ---
 syn match   zergFunction      /\<fn\s\+\zs\w\+\ze\s*(/
