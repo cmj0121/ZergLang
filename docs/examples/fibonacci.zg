@@ -11,9 +11,7 @@ fn fib_iter(n: int) : int {
     mut a := 0
     mut b := 1
     for _ in 0..n {
-        temp := a
-        a = b
-        b = temp + b
+        a, b = b, a + b
     }
     return a
 }

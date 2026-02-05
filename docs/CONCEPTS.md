@@ -21,6 +21,22 @@ Zerg supports two ways to declare a variable:
 
 The `=` symbol alone is used to update a mutable variable that has already been declared.
 
+### Multi-Value Assignment
+
+Multiple variables can be assigned in a single statement using comma-separated lists. Both sides must have
+the same number of values. All right-hand-side expressions are evaluated before any assignment occurs,
+enabling idiomatic swap without a temporary variable.
+
+```txt
+mut a := 10
+mut b := 20
+
+# Multi-value assignment (swap)
+a, b = b, a
+```
+
+Multi-value declaration is not supported -- declare each variable on its own line.
+
 ### Mutable
 
 You can specify the variable with `mut` keyword to make it mutable, which means you can change the value of
@@ -495,17 +511,27 @@ The `for` loop is the standard way to iterate. When given an `Iterable`, it call
 an `iter[T]`, then repeatedly calls `next()` and binds each value to the loop variable until `StopIteration`
 is raised.
 
+The `for` loop supports multiple loop variables separated by commas. The number of variables determines what
+is bound on each iteration:
+
+```txt
+for item in items {}           # element only
+for i, item in items {}        # index + element
+for key in scores {}           # key only (maps)
+for i, ch in "hello" {}        # index + character
+```
+
 The following built-in types implement `Iterable` and can be used directly with `for`:
 
-| Type        | Iterates Over                                       |
-| ----------- | --------------------------------------------------- |
-| `list[T]`   | Each element in order                               |
-| `map[K, V]` | Each key-value pair                                 |
-| `set[T]`    | Each element (unordered)                            |
-| `string`    | Each character                                      |
-| `iter[T]`   | Itself (already an iterator)                        |
-| `chan[T]`   | Values received from the channel until it is closed |
-| `range`     | Each integer in the range                           |
+| Type        | 1 Variable | 2 Variables         |
+| ----------- | ---------- | ------------------- |
+| `list[T]`   | element    | index, element      |
+| `map[K, V]` | key        | _(compile error)_   |
+| `set[T]`    | element    | _(compile error)_   |
+| `string`    | character  | index, character    |
+| `range`     | value      | index, value        |
+| `chan[T]`   | value      | _(compile error)_   |
+| `iter[T]`   | value      | _(depends on iter)_ |
 
 Because coroutines return `iter[T]`, a coroutine acts as a generator -- the `for` loop drives the coroutine,
 resuming it to produce the next value on each iteration. Similarly, a `for` loop over a `chan` receives

@@ -7,6 +7,16 @@ fn main() {
     scores := {"alice": 95, "bob": 87, "carol": 92} # Map
     tags := {"go", "rust", "zerg"}                  # Set
 
+    # Multi-value for loop (index + element)
+    for i, num in numbers {
+        print("  [{i}] = {num}")
+    }
+
+    # Map iterates keys only
+    for name in scores {
+        print("  {name}: {scores[name]}")
+    }
+
     # Lambda with collections
     high_scores := scores.filter(|k, v| => v >= 90)
     print("High scores:", high_scores)

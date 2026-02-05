@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 53 production rules.
+# 54 production rules.
 
 # ============================================================================
 # Program Structure
@@ -22,7 +22,7 @@ BLOCK      ::= "{" STATEMENT* "}"
 STATEMENT  ::= SIMPLE_STMT | COMPOUND_STMT
 
 SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSION )
-               | EXPRESSION "=" EXPRESSION
+               | EXPR_LIST "=" EXPR_LIST
                | EXPRESSION ASSIGN_OP EXPRESSION
                | EXPRESSION ( "++" | "--" )
                | EXPRESSION
@@ -34,7 +34,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
                | "import" STRING
 
 COMPOUND_STMT::= IF_STMT | MATCH_STMT
-               | "for" IDENTIFIER "in" EXPRESSION BLOCK
+               | "for" IDENTIFIER ( "," IDENTIFIER )* "in" EXPRESSION BLOCK
                | "while" EXPRESSION BLOCK
                | "try" BLOCK ( "expect" TYPE "as" IDENTIFIER BLOCK )+ ( "finally" BLOCK )?
                | "with" IDENTIFIER ":=" EXPRESSION BLOCK
@@ -79,6 +79,8 @@ TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
              | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( ":" TYPE )?
 TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
 TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
+
+EXPR_LIST  ::= EXPRESSION ( "," EXPRESSION )*
 
 ASSIGN_OP  ::= "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**="
              | "&=" | "|=" | "^=" | "<<=" | ">>="
