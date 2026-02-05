@@ -157,6 +157,22 @@ function's parameter list at compile time.
 
 Since functions are first-class values, any expression that evaluates to a function type can be called.
 
+### Named Arguments
+
+Arguments can be passed by name using `name=value` syntax. Named arguments can appear in any order, but all
+positional arguments must come before any named arguments. This works for all function calls, including class
+constructors.
+
+```txt
+print("hello", end="\n")
+Animal(name="Rex", age=3)
+Animal("Rex", age=3)           # mixed: positional first, then named
+```
+
+A named argument binds the value to the parameter with the matching name. It is a compile-time error to pass
+a named argument that does not correspond to any parameter, or to provide the same parameter both positionally
+and by name.
+
 ## Member Access
 
 The dot operator `.` accesses a property or method on an object:

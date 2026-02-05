@@ -8,7 +8,7 @@ if exists("b:current_syntax")
 endif
 
 " --- Keywords ---
-syn keyword zergKeyword       fn pub mut impl
+syn keyword zergKeyword       fn pub mut impl this
 syn keyword zergConditional   if else match
 syn keyword zergRepeat        for while in
 syn keyword zergStatement     return break continue del raise yield go import

@@ -254,6 +254,48 @@ If multiple embedded types provide public members with the same name, the compil
 embedding class must resolve the conflict by overriding the ambiguous member explicitly in its own `impl`
 block.
 
+### Class Instantiation
+
+Class instances are created by calling the class name as a constructor. Arguments are matched to properties
+by name using named-argument syntax (`name=value`). Positional arguments are matched in declaration order.
+Positional and named arguments can be mixed, but all positional arguments must come before any named ones.
+
+```txt
+animal := Animal(name="Rex", age=3)
+dog := Dog(Animal=Animal(name="Rex", age=3), breed="Labrador")
+
+# Positional, named, or mixed (positional first)
+Animal("Rex", 3)
+Animal("Rex", age=3)
+```
+
+Embedded types are initialized by passing the embedded value using the type name as the argument name.
+
+### Methods and `this`
+
+Methods are defined inside `impl` blocks and have implicit access to the current instance through the `this`
+keyword. Inside a method, `this` refers to the receiver object and can be used to access its properties and
+call its other methods.
+
+By default, methods cannot modify the receiver. A method that needs to mutate `this` must be declared with
+`mut fn`. The compiler enforces this -- calling a `mut fn` method on an immutable variable is a compile-time
+error.
+
+Parameters can also be declared mutable using `fn foo(x: mut int)`, allowing the function body to reassign
+the parameter. This only affects the local copy -- it does not modify the caller's value (consistent with
+Zerg's value semantics).
+
+```txt
+impl Animal {
+    fn greet() : string {
+        return "Hi, I am {this.name}"
+    }
+    mut fn birthday() {
+        this.age = this.age + 1
+    }
+}
+```
+
 ### Spec (Interface)
 
 Zerg uses `spec` to define the interface contract. A class must explicitly declare its spec implementation

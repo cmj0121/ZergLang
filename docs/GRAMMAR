@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 46 production rules.
+# 48 production rules.
 
 # ============================================================================
 # Program Structure
@@ -51,9 +51,10 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 # Declarations
 # ============================================================================
 
-FN_DECL    ::= VIS "fn" FN_SIG BLOCK
+FN_DECL    ::= VIS "mut"? "fn" FN_SIG BLOCK
 FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( ":" TYPE )?
-PARAMS     ::= IDENTIFIER ":" TYPE ( "," IDENTIFIER ":" TYPE )* ","?
+PARAM      ::= IDENTIFIER ":" "mut"? TYPE
+PARAMS     ::= PARAM ( "," PARAM )* ","?
 
 CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
 CLASS_MEMBER::= VIS "mut"? IDENTIFIER ":" TYPE
@@ -92,7 +93,8 @@ ADDITION   ::= MULTIPLY ( ( "+" | "-" ) MULTIPLY )*
 MULTIPLY   ::= UNARY ( ( "*" | "/" | "//" | "%" ) UNARY )*
 UNARY      ::= ( "-" | "not" | "~" ) UNARY | POWER
 POWER      ::= POSTFIX ( "**" UNARY )?
-POSTFIX    ::= PRIMARY ( "(" ( EXPRESSION ( "," EXPRESSION )* ","? )? ")"
+ARGUMENT   ::= ( IDENTIFIER "=" )? EXPRESSION
+POSTFIX    ::= PRIMARY ( "(" ( ARGUMENT ( "," ARGUMENT )* ","? )? ")"
                         | "[" EXPRESSION "]"
                         | "." IDENTIFIER
                         | "?." IDENTIFIER
