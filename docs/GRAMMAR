@@ -84,7 +84,7 @@ EXPRESSION ::= OR_EXPR ( "??" OR_EXPR )*
 OR_EXPR    ::= XOR_EXPR ( "or" XOR_EXPR )*
 XOR_EXPR   ::= AND_EXPR ( "xor" AND_EXPR )*
 AND_EXPR   ::= COMPARISON ( "and" COMPARISON )*
-COMPARISON ::= BIT_OR ( ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) BIT_OR )*
+COMPARISON ::= BIT_OR ( ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) BIT_OR | "is" TYPE )*
 BIT_OR     ::= BIT_XOR ( "|" BIT_XOR )*
 BIT_XOR    ::= BIT_AND ( "^" BIT_AND )*
 BIT_AND    ::= SHIFT ( "&" SHIFT )*

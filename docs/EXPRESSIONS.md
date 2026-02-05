@@ -8,22 +8,22 @@ time. This document describes the available operators, their behavior, and their
 Operators are listed from **lowest** to **highest** precedence. Operators at the same precedence level are
 evaluated **left to right** (left-associative), except for unary operators which are right-associative.
 
-| Precedence   | Operator                    | Description            | Associativity |
-| ------------ | --------------------------- | ---------------------- | ------------- |
-| 1 (lowest)   | `??`                        | Nil coalescing         | Left          |
-| 2            | `or`                        | Logical OR             | Left          |
-| 3            | `xor`                       | Logical XOR            | Left          |
-| 4            | `and`                       | Logical AND            | Left          |
-| 5            | `==` `!=` `<` `>` `<=` `>=` | Comparison (chainable) | Left          |
-| 6            | `\|`                        | Bitwise OR             | Left          |
-| 7            | `^`                         | Bitwise XOR            | Left          |
-| 8            | `&`                         | Bitwise AND            | Left          |
-| 9            | `<<` `>>`                   | Bit shift              | Left          |
-| 10           | `+` `-`                     | Addition, Subtraction  | Left          |
-| 11           | `*` `/` `//` `%`            | Multiply, Divide, Mod  | Left          |
-| 12           | `-` `not` `~`               | Negation, NOT, Bit NOT | Right         |
-| 13           | `**`                        | Power                  | Right         |
-| 14 (highest) | `()` `[]` `.` `?.` `?[]`    | Call, Index, Member    | Left          |
+| Precedence   | Operator                         | Description            | Associativity |
+| ------------ | -------------------------------- | ---------------------- | ------------- |
+| 1 (lowest)   | `??`                             | Nil coalescing         | Left          |
+| 2            | `or`                             | Logical OR             | Left          |
+| 3            | `xor`                            | Logical XOR            | Left          |
+| 4            | `and`                            | Logical AND            | Left          |
+| 5            | `==` `!=` `<` `>` `<=` `>=` `is` | Comparison (chainable) | Left          |
+| 6            | `\|`                             | Bitwise OR             | Left          |
+| 7            | `^`                              | Bitwise XOR            | Left          |
+| 8            | `&`                              | Bitwise AND            | Left          |
+| 9            | `<<` `>>`                        | Bit shift              | Left          |
+| 10           | `+` `-`                          | Addition, Subtraction  | Left          |
+| 11           | `*` `/` `//` `%`                 | Multiply, Divide, Mod  | Left          |
+| 12           | `-` `not` `~`                    | Negation, NOT, Bit NOT | Right         |
+| 13           | `**`                             | Power                  | Right         |
+| 14 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member    | Left          |
 
 Parentheses `( )` can be used to override the default precedence.
 
@@ -96,6 +96,25 @@ a == b == c          # equivalent to: a == b and b == c
 
 The chain short-circuits: if any comparison in the chain is `false`, the remaining comparisons are not
 evaluated. For example, in `a < b < c`, if `a < b` is `false`, `c` is never evaluated.
+
+### Type Checking with `is`
+
+The `is` operator checks whether a value is of a given type or implements a given spec. It returns a `bool`
+and shares the same precedence level as comparison operators.
+
+```txt
+x is int              # true if x is type int
+x is Comparable       # true if x implements Comparable
+```
+
+The right-hand side of `is` must be a type name or spec name (not an expression). The `is` operator can be
+combined with `not` for negative checks:
+
+```txt
+if not x is string {
+    print("x is not a string")
+}
+```
 
 ## Logical Operators
 

@@ -14,7 +14,7 @@ syn keyword zergRepeat        for while in
 syn keyword zergStatement     return break continue del raise yield go import
 syn keyword zergException     try expect finally with
 syn keyword zergStructure     class spec enum
-syn keyword zergOperator      and or xor not
+syn keyword zergOperator      and or xor not is
 
 " --- Constants ---
 syn keyword zergBoolean       true false
