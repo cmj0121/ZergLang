@@ -33,7 +33,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
 COMPOUND_STMT::= IF_STMT | MATCH_STMT
                | "for" IDENTIFIER "in" EXPRESSION BLOCK
                | "while" EXPRESSION BLOCK
-               | "try" BLOCK ( "expect" IDENTIFIER ":" TYPE BLOCK )+ ( "finally" BLOCK )?
+               | "try" BLOCK ( "expect" TYPE "as" IDENTIFIER BLOCK )+ ( "finally" BLOCK )?
                | "with" IDENTIFIER ":=" EXPRESSION BLOCK
                | FN_DECL | CLASS_DECL | IMPL_BLOCK
                | SPEC_DECL | ENUM_DECL

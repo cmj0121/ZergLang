@@ -346,11 +346,24 @@ and `Err` variants before accessing the value, ensuring errors are never silentl
 ### Exceptions
 
 For unexpected or unrecoverable errors, Zerg supports exceptions. You can `raise` an exception to interrupt
-the current execution, and handle it using the `try-expect-finally` statement. The `try` block contains the
-code that may raise an exception, the `expect` block handles the raised exception, and the `finally` block
-runs regardless of whether an exception was raised, typically used for cleanup. Inside an `expect` block, a
-bare `raise` (with no expression) re-raises the current exception, allowing partial handling or logging
-before propagating the error upward.
+the current execution, and handle it using the `try-expect-finally` statement. The `expect` clause catches
+exceptions by type using the `as` keyword:
+
+```txt
+try {
+    items[100]
+} expect IndexError as e {
+    print(e.message)
+} expect Exception as e {
+    print("unexpected: {e.message}")
+} finally {
+    cleanup()
+}
+```
+
+The `finally` block runs regardless of whether an exception was raised. Inside an `expect` block, a bare
+`raise` (with no expression) re-raises the current exception. See [ERRORS.md](ERRORS.md) for the full
+exception hierarchy and user-defined exceptions.
 
 **Guideline**: Prefer `Result` for operations where failure is a normal, expected outcome (file not found,
 invalid input, network timeout). Use exceptions for programming errors or truly unexpected situations

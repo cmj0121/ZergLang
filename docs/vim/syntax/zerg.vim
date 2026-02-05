@@ -12,7 +12,7 @@ syn keyword zergKeyword       fn pub mut impl this
 syn keyword zergConditional   if else match
 syn keyword zergRepeat        for while in
 syn keyword zergStatement     return break continue del raise yield go import assert
-syn keyword zergException     try expect finally with
+syn keyword zergException     try expect finally with as
 syn keyword zergStructure     class spec enum
 syn keyword zergOperator      and or xor not is
 
