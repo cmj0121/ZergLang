@@ -32,6 +32,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
                | EXPRESSION "<-" EXPRESSION
                | "assert" EXPRESSION ( "," EXPRESSION )?
                | "import" STRING
+               | "nop"
                | VIS "type" IDENTIFIER TYPE_PARAMS? "=" TYPE
                | VIS "const" IDENTIFIER "=" EXPRESSION
 
@@ -155,6 +156,11 @@ STRING     ::= '"' ( <any Unicode char except "\", '"', "{", and "}">
 RAW_STRING ::= 'r"' ( <any Unicode char except '"'> )* '"'
 
 IDENTIFIER ::= ( "a"..."z" | "A"..."Z" | "_" ) ( "a"..."z" | "A"..."Z" | DIGIT | "_" )*
+
+# The following words are reserved and cannot be used as identifiers:
+#   pub mut const this fn return break continue del raise yield go assert import nop
+#   if else match for while in try expect finally with class impl spec enum type
+#   and or xor not is true false nil Ok Err Self
 
 COMMENT    ::= "#" <any char except newline>*
 
