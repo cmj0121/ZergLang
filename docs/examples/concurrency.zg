@@ -1,0 +1,38 @@
+#! /usr/bin/env zerg
+#
+# Concurrency -- demonstrates go, chan, <- operator, and task synchronization.
+
+fn producer(ch: chan[int], count: int) {
+    for i in 1..=count {
+        ch <- i
+    }
+    ch.close()
+}
+
+fn worker(id: int, jobs: chan[int], results: chan[string]) {
+    for job in jobs {
+        results <- "worker {id} processed job {job}"
+    }
+}
+
+fn main() {
+    # Simple send/receive
+    done := chan[bool]()
+    go fn() {
+        print("background task running")
+        done <- true
+    }()
+    <-done
+
+    # Producer-consumer
+    jobs := chan[int](5)
+    results := chan[string](5)
+
+    go producer(jobs, 5)
+    go worker(1, jobs, results)
+
+    for _ in 1..=5 {
+        msg := <-results
+        print(msg)
+    }
+}

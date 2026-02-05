@@ -1,0 +1,31 @@
+#! /usr/bin/env zerg
+#
+# Fibonacci sequence -- demonstrates functions, recursion, range, and main().
+
+fn fib(n: int) : int {
+    if n <= 1 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn fib_iter(n: int) : int {
+    mut a := 0
+    mut b := 1
+    for _ in 0..n {
+        temp := a
+        a = b
+        b = temp + b
+    }
+    return a
+}
+
+fn main() {
+    print("Recursive:")
+    for i in 0..10 {
+        print("  fib({i}) = {fib(i)}")
+    }
+
+    print("Iterative:")
+    for i in 0..=20 {
+        print("  fib({i}) = {fib_iter(i)}")
+    }
+}

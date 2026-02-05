@@ -1,0 +1,18 @@
+#! /usr/bin/env zerg
+#
+# Collections -- demonstrates list, map, set, and nullable collections.
+
+fn main() {
+    numbers := [1, 2, 3, 4, 5]                      # List
+    scores := {"alice": 95, "bob": 87, "carol": 92} # Map
+    tags := {"go", "rust", "zerg"}                  # Set
+
+    # Empty collections
+    empty_list: list[int] = []
+    empty_map: map[string, int] = {:}
+    empty_set: set[string] = {}
+
+    # Nullable collections
+    data: list[string?] = ["hello", nil, "world"]
+    maybe_list: list[int]? = nil
+}

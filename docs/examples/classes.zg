@@ -1,0 +1,39 @@
+#! /usr/bin/env zerg
+#
+# Classes -- demonstrates class, impl, this, instantiation, and embedding.
+
+class Animal {
+    pub name: string
+    pub age: int
+}
+
+impl Animal {
+    fn greet() : string {
+        return "Hi, I am {this.name}, age {this.age}"
+    }
+    mut fn birthday() {
+        this.age = this.age + 1
+    }
+}
+
+class Dog {
+    Animal
+    pub breed: string
+}
+
+impl Dog {
+    fn describe() : string {
+        return "{this.name} is a {this.breed}, age {this.age}"
+    }
+}
+
+fn main() {
+    mut cat := Animal(name="Whiskers", age=3)
+    print(cat.greet())
+
+    cat.birthday()
+    print(cat.greet())
+
+    dog := Dog(Animal=Animal(name="Rex", age=5), breed="Labrador")
+    print(dog.describe())
+}

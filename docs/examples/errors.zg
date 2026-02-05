@@ -1,0 +1,36 @@
+#! /usr/bin/env zerg
+#
+# Error handling -- demonstrates Result type, try/expect, and assert.
+
+fn divide(a: int, b: int) : Result[float, string] {
+    if b == 0 {
+        return Err(error="division by zero")
+    }
+    return Ok(value=float(a) / float(b))
+}
+
+fn main() {
+    # Result type
+    match divide(10, 3) {
+        Ok(value) => { print("10 / 3 = {value}") }
+        Err(error) => { print("Error: {error}") }
+    }
+
+    match divide(10, 0) {
+        Ok(value) => { print("10 / 0 = {value}") }
+        Err(error) => { print("Error: {error}") }
+    }
+
+    # try/expect
+    items := [10, 20, 30]
+    try {
+        print(items[100])
+    } expect IndexError as e {
+        print("Caught: {e.message}")
+    }
+
+    # assert
+    x := 42
+    assert x > 0, "x must be positive"
+    print("x = {x}, assertion passed")
+}

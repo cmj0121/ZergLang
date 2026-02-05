@@ -8,7 +8,8 @@ if exists("b:current_syntax")
 endif
 
 " --- Keywords ---
-syn keyword zergKeyword       fn pub mut impl this
+syn keyword zergKeyword       pub mut impl this
+syn keyword zergFnDecl        fn nextgroup=zergFnName skipwhite
 syn keyword zergConditional   if else match
 syn keyword zergRepeat        for while in
 syn keyword zergStatement     return break continue del raise yield go import assert
@@ -18,6 +19,7 @@ syn keyword zergOperator      and or xor not is
 
 " --- Constants ---
 syn keyword zergBoolean       true false
+syn keyword zergKeyword       Ok Err
 syn keyword zergNil           nil
 
 " --- Built-in types ---
@@ -70,8 +72,8 @@ syn match   zergOperatorSym   /\.\.=/
 syn match   zergOperatorSym   /\.\./
 syn match   zergOperatorSym   /<-/
 
-" --- Function declaration ---
-syn match   zergFunction      /\<fn\s\+\zs\w\+\ze\s*(/
+" --- Function name (chained from fn keyword via nextgroup) ---
+syn match   zergFnName        /\w\+/ contained
 
 " --- Highlight links ---
 hi def link zergKeyword       Keyword
@@ -94,7 +96,8 @@ hi def link zergEscape        SpecialChar
 hi def link zergInterpolation Special
 hi def link zergComment       Comment
 hi def link zergTodo          Todo
+hi def link zergFnDecl        Keyword
+hi def link zergFnName        Function
 hi def link zergBuiltin       Function
-hi def link zergFunction      Function
 
 let b:current_syntax = "zerg"

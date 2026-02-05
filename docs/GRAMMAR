@@ -59,7 +59,7 @@ PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE
 PARAMS     ::= PARAM ( "," PARAM )* ","?
 
 CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
-CLASS_MEMBER::= VIS "mut"? IDENTIFIER ":" TYPE
+CLASS_MEMBER::= VIS IDENTIFIER ":" TYPE
               | TYPE
 
 IMPL_BLOCK ::= "impl" IDENTIFIER ( "for" IDENTIFIER )? "{" FN_DECL* "}"

@@ -205,7 +205,8 @@ exhaustively. The compiler rejects any `match` that does not handle every varian
 silently ignored. Each branch can destructure the variant's associated data and bind it to local variables.
 
 The built-in `Result[T, E]` enum has two variants: `Ok(value: T)` representing success, and `Err(error: E)`
-representing failure. The caller must `match` both variants before accessing the inner value.
+representing failure. `Ok` and `Err` are built-in keywords -- they do not need to be imported or defined.
+The caller must `match` both variants before accessing the inner value.
 
 ### Type Parameters
 
@@ -422,6 +423,9 @@ result := <-done           # receive a value from the channel
   no receiver is ready). Raises `ChannelClosedError` if the channel is closed.
 - **Receive**: `<-ch` receives a value from channel `ch`. Blocks until a value is available. Returns the
   received value.
+
+Sending and receiving do not modify the channel itself -- they pass data _through_ it. Therefore a `chan`
+does not require `mut` to be used. An immutable channel variable can still send and receive freely.
 
 The `chan` itself is a shared handle -- assigning or passing a `chan` shares the underlying conduit, not
 copies it. However, the data sent through a `chan` is **copied** (consistent with Zerg's value semantics).
