@@ -64,7 +64,7 @@ CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
 CLASS_MEMBER::= VIS IDENTIFIER ":" TYPE
               | TYPE
 
-IMPL_BLOCK ::= "impl" IDENTIFIER ( "for" IDENTIFIER )? "{" FN_DECL* "}"
+IMPL_BLOCK ::= "impl" IDENTIFIER ( "for" IDENTIFIER TYPE_ARGS? )? "{" FN_DECL* "}"
 
 SPEC_DECL  ::= VIS "spec" IDENTIFIER "{" ( "fn" FN_SIG )* "}"
 

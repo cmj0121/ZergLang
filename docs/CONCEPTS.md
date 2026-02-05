@@ -360,6 +360,16 @@ using `impl ClassName for SpecName`, and provide all the methods defined in the 
 that do not belong to any spec are defined using `impl ClassName` without the `for` clause. This provides
 interface-based polymorphism without class hierarchy complexity.
 
+For generic specs, the `impl` declaration specifies the concrete type argument:
+
+```txt
+impl Dog for Comparable[Dog] {
+    fn compare(other: Dog) : int {
+        return this.age - other.age
+    }
+}
+```
+
 You can check whether a value implements a spec at runtime using the `is` operator (e.g., `x is Comparable`).
 See [EXPRESSIONS.md](EXPRESSIONS.md#type-checking-with-is) for details. For the complete list of built-in
 specs, see [SPECS.md](SPECS.md).
