@@ -2,12 +2,12 @@
 #
 # Fibonacci sequence -- demonstrates functions, recursion, range, and lambdas.
 
-fn fib(n: int) : int {
+fn fib(n: int) -> int {
     if n <= 1 { return n }
     return fib(n - 1) + fib(n - 2)
 }
 
-fn fib_iter(n: int) : int {
+fn fib_iter(n: int) -> int {
     mut a := 0
     mut b := 1
     for _ in 0..n {

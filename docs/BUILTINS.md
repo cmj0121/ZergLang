@@ -55,7 +55,7 @@ len("hello")               # 5
 len("")                    # 0
 ```
 
-**Signature**: `fn len(c: any) : int`
+**Signature**: `fn len(c: any) ->int`
 
 - **Parameters**: a `string`, `list`, `map`, or `set`
 - **Returns**: `int` -- the number of elements (or bytes for strings)
@@ -76,7 +76,7 @@ int("42")      # 42
 int(true)      # 1
 ```
 
-**Signature**: `fn int(v: any) : int`
+**Signature**: `fn int(v: any) ->int`
 
 - **Raises**: `ValueError` if the value cannot be converted
 
@@ -94,7 +94,7 @@ float(42)       # 42.0
 float("3.14")   # 3.14
 ```
 
-**Signature**: `fn float(v: any) : float`
+**Signature**: `fn float(v: any) ->float`
 
 - **Raises**: `ValueError` if the value cannot be converted
 
@@ -114,7 +114,7 @@ str(true)       # "true"
 str(nil)        # "nil"
 ```
 
-**Signature**: `fn str(v: any) : string`
+**Signature**: `fn str(v: any) ->string`
 
 ## input
 
@@ -130,7 +130,7 @@ name := input("What is your name? ")
 line := input()
 ```
 
-**Signature**: `fn input(prompt: string?) : string`
+**Signature**: `fn input(prompt: string?) ->string`
 
 - **Parameters**: optional prompt string
 - **Returns**: `string` -- the line read (without trailing newline)
@@ -148,7 +148,7 @@ typeof(42) == int            # true
 typeof("hello") == string    # true
 ```
 
-**Signature**: `fn typeof(v: any) : type`
+**Signature**: `fn typeof(v: any) ->type`
 
 ## assert
 

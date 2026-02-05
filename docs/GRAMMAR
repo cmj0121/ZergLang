@@ -59,7 +59,7 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 # ============================================================================
 
 FN_DECL    ::= VIS "mut"? "fn" FN_SIG BLOCK
-FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( ":" TYPE )?
+FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( "->" TYPE )?
 PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE ( "=" EXPRESSION )?
 PARAMS     ::= PARAM ( "," PARAM )* ","?
 
@@ -79,7 +79,7 @@ VARIANT    ::= IDENTIFIER ( "(" PARAMS? ")" )?
 # ============================================================================
 
 TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
-             | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( ":" TYPE )?
+             | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( "->" TYPE )?
 TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
 TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
 

@@ -2,7 +2,7 @@
 #
 # Iterators -- demonstrates coroutines with yield, for loop, range, and lambdas.
 
-fn countdown(start: int) : iter[int] {
+fn countdown(start: int) -> iter[int] {
     mut n := start
     while n > 0 {
         yield n
@@ -10,7 +10,7 @@ fn countdown(start: int) : iter[int] {
     }
 }
 
-fn squares(n: int) : iter[int] {
+fn squares(n: int) -> iter[int] {
     for i in 1..=n {
         yield i ** 2
     }

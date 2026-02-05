@@ -16,7 +16,7 @@ Converts a value to its string representation. All types implement `Stringable` 
 
 ```txt
 spec Stringable {
-    fn string() : string
+    fn string() -> string
 }
 ```
 
@@ -28,7 +28,7 @@ Defines equality comparison between values of the same type.
 
 ```txt
 spec Equatable {
-    fn equals(other: Self) : bool
+    fn equals(other: Self) -> bool
 }
 ```
 
@@ -41,7 +41,7 @@ Produces an integer hash for use in `map` keys and `set` elements.
 
 ```txt
 spec Hashable {
-    fn hash() : int
+    fn hash() -> int
 }
 ```
 
@@ -55,7 +55,7 @@ needed, though most implementations compare against their own type.
 
 ```txt
 spec Comparable[T] {
-    fn compare(other: T) : int
+    fn compare(other: T) -> int
 }
 ```
 
@@ -84,7 +84,7 @@ Produces an iterator for sequential access to elements. Any type implementing `I
 
 ```txt
 spec Iterable[T] {
-    fn iterator() : iter[T]
+    fn iterator() -> iter[T]
 }
 ```
 
@@ -98,7 +98,7 @@ Produces values one at a time from a sequence. When the sequence is exhausted, `
 
 ```txt
 spec Iterator[T] {
-    fn next() : T
+    fn next() -> T
 }
 ```
 
@@ -112,8 +112,8 @@ calls to `inc()` and `dec()` respectively.
 
 ```txt
 spec Incremental {
-    mut fn inc() : Self
-    mut fn dec() : Self
+    mut fn inc() -> Self
+    mut fn dec() -> Self
 }
 ```
 

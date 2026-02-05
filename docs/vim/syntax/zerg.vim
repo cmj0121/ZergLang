@@ -62,6 +62,7 @@ syn match   zergOperatorSym   /??/
 syn match   zergOperatorSym   /?\./
 syn match   zergOperatorSym   /?\[/
 syn match   zergOperatorSym   /=>/
+syn match   zergOperatorSym   /->/
 syn match   zergOperatorSym   /:=/
 syn match   zergOperatorSym   /==/
 syn match   zergOperatorSym   /!=/

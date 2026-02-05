@@ -2,7 +2,7 @@
 #
 # Error handling -- demonstrates Result type, try/expect, and assert.
 
-fn divide(a: int, b: int) : Result[float, string] {
+fn divide(a: int, b: int) -> Result[float, string] {
     if b == 0 {
         return Err(error="division by zero")
     }

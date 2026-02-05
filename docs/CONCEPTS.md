@@ -111,7 +111,7 @@ comment:
 
 ```txt
 "This function computes the factorial of n."
-fn factorial(n: int) : int {
+fn factorial(n: int) -> int {
     if n <= 1 { return 1 }
     return n * factorial(n - 1)
 }
@@ -191,7 +191,7 @@ greet("Alice")   # Hello, Alice!
 
 ### Return Type
 
-A function that declares a return type (`: type` after the parameter list) must return a value of that type
+A function that declares a return type (`-> type` after the parameter list) must return a value of that type
 on every code path. A function with no return type annotation returns nothing -- attempting to use its result
 (e.g., `x := foo()`) is a compile-time error. A bare `return` (with no expression) is valid inside a
 void-returning function.
@@ -288,7 +288,7 @@ The `type` keyword creates a named alias for an existing type. The alias and the
 interchangeable -- no new type is created.
 
 ```txt
-type Handler = fn(int) : string
+type Handler = fn(int) -> string
 type StringMap = map[string, string]
 ```
 
@@ -400,7 +400,7 @@ Zerg's value semantics).
 
 ```txt
 impl Animal {
-    fn greet() : string {
+    fn greet() -> string {
         return "Hi, I am {this.name}"
     }
     mut fn birthday() {
@@ -423,7 +423,7 @@ For generic specs, the `impl` declaration specifies the concrete type argument:
 
 ```txt
 impl Dog for Comparable[Dog] {
-    fn compare(other: Dog) : int {
+    fn compare(other: Dog) -> int {
         return this.age - other.age
     }
 }

@@ -8,7 +8,7 @@ class Animal {
 }
 
 impl Animal {
-    fn greet() : string {
+    fn greet() -> string {
         return "Hi, I am {this.name}, age {this.age}"
     }
     mut fn birthday() {
@@ -22,7 +22,7 @@ class Dog {
 }
 
 impl Dog {
-    fn describe() : string {
+    fn describe() -> string {
         return "{this.name} is a {this.breed}, age {this.age}"
     }
 }
