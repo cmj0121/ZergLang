@@ -37,6 +37,24 @@ to access the property or method of the nullable variable. You can also use `??`
 for a nullable variable, which means if the variable is `nil`, it will return the default value instead of
 throwing an exception.
 
+### Nullable Collections
+
+The `?` suffix applies to the complete type. Its position relative to type parameters determines what is
+nullable:
+
+```txt
+list[string]?          # nullable list -- the list itself can be nil
+list[string?]          # list of nullable strings -- elements can be nil
+list[string?]?         # nullable list of nullable strings
+map[string, int?]      # map with nullable values
+```
+
+Placing `?` between the type name and its parameters is a syntax error:
+
+```txt
+list?[string]          # syntax error -- ? must come after the complete type
+```
+
 ### Assignment Semantics
 
 All assignment in Zerg produces an independent copy of the value (value semantics). Whether the target is
