@@ -59,7 +59,7 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 
 FN_DECL    ::= VIS "mut"? "fn" FN_SIG BLOCK
 FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( ":" TYPE )?
-PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE
+PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE ( "=" EXPRESSION )?
 PARAMS     ::= PARAM ( "," PARAM )* ","?
 
 CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"

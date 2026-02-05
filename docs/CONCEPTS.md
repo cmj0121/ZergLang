@@ -175,6 +175,20 @@ Zerg provides built-in functions and statements that are available in every modu
 [BUILTINS.md](BUILTINS.md) for the complete reference, including `print`, `len`, `str`, type conversion
 functions, `assert`, and `range`.
 
+### Default Parameters
+
+Parameters can have default values. When a default is provided, the caller may omit that argument. Parameters
+with defaults must come after all parameters without defaults.
+
+```txt
+fn greet(name: string = "world") {
+    print("Hello, {name}!")
+}
+
+greet()          # Hello, world!
+greet("Alice")   # Hello, Alice!
+```
+
 ### Return Type
 
 A function that declares a return type (`: type` after the parameter list) must return a value of that type
