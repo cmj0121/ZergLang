@@ -6,9 +6,13 @@ are available without importing and form the foundation of Zerg's type system. S
 
 ## `Self` Type
 
-Inside a spec definition, `Self` refers to the type that implements the spec. For example, when `Dog`
-implements `Equatable`, `Self` resolves to `Dog`. This allows specs to define methods that accept or return
-the implementing type without knowing it in advance.
+`Self` refers to the type of the current instance. Inside a spec definition, `Self` resolves to the class
+that implements the spec. For example, when `Dog` implements `Equatable`, `Self` resolves to `Dog`. This
+allows specs to define methods that accept or return the implementing type without knowing it in advance.
+
+A method that uses `Self` in its signature (as a parameter type or return type) is always an instance method
+-- it must be called on an instance and has access to `this`. `Self` cannot be used in standalone functions
+or static contexts; it is only valid inside `spec` definitions and `impl` blocks.
 
 ## Stringable
 

@@ -80,6 +80,7 @@ VARIANT    ::= IDENTIFIER ( "(" PARAMS? ")" )?
 
 TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
              | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( "->" TYPE )?
+             | "Self"
 TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
 TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
 

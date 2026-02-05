@@ -417,7 +417,9 @@ that do not belong to any spec are defined using `impl ClassName` without the `f
 interface-based polymorphism without class hierarchy complexity.
 
 All methods in a spec are implicitly `pub` -- no visibility modifier is needed or allowed. Methods can be
-marked `mut fn` to indicate they mutate the receiver.
+marked `mut fn` to indicate they mutate the receiver. The special type `Self` refers to the type of the
+current instance -- a method using `Self` is always an instance method with access to `this`. See
+[SPECS.md](SPECS.md#self-type) for details.
 
 For generic specs, the `impl` declaration specifies the concrete type argument:
 
