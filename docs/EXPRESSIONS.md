@@ -1,0 +1,232 @@
+# Expressions
+
+Expressions are constructs that produce a value. Every expression in Zerg has a type determined at compile
+time. This document describes the available operators, their behavior, and their precedence.
+
+## Operator Precedence
+
+Operators are listed from **lowest** to **highest** precedence. Operators at the same precedence level are
+evaluated **left to right** (left-associative), except for unary operators which are right-associative.
+
+| Precedence   | Operator                    | Description            | Associativity |
+| ------------ | --------------------------- | ---------------------- | ------------- |
+| 1 (lowest)   | `??`                        | Nil coalescing         | Left          |
+| 2            | `or`                        | Logical OR             | Left          |
+| 3            | `xor`                       | Logical XOR            | Left          |
+| 4            | `and`                       | Logical AND            | Left          |
+| 5            | `==` `!=` `<` `>` `<=` `>=` | Comparison (chainable) | Left          |
+| 6            | `\|`                        | Bitwise OR             | Left          |
+| 7            | `^`                         | Bitwise XOR            | Left          |
+| 8            | `&`                         | Bitwise AND            | Left          |
+| 9            | `<<` `>>`                   | Bit shift              | Left          |
+| 10           | `+` `-`                     | Addition, Subtraction  | Left          |
+| 11           | `*` `/` `//` `%`            | Multiply, Divide, Mod  | Left          |
+| 12           | `-` `not` `~`               | Negation, NOT, Bit NOT | Right         |
+| 13           | `**`                        | Power                  | Right         |
+| 14 (highest) | `()` `[]` `.` `?.` `?[]`    | Call, Index, Member    | Left          |
+
+Parentheses `( )` can be used to override the default precedence.
+
+## Arithmetic Operators
+
+Arithmetic operators work on numeric types (`int` and `float`).
+
+| Operator | Operation      | Operand Types     | Result Type |
+| -------- | -------------- | ----------------- | ----------- |
+| `+`      | Addition       | `int + int`       | `int`       |
+|          |                | `float + float`   | `float`     |
+|          | Concatenation  | `string + string` | `string`    |
+| `-`      | Subtraction    | `int - int`       | `int`       |
+|          |                | `float - float`   | `float`     |
+| `*`      | Multiplication | `int * int`       | `int`       |
+|          |                | `float * float`   | `float`     |
+| `/`      | Division       | `int / int`       | `float`     |
+|          |                | `float / float`   | `float`     |
+| `//`     | Floor division | `int // int`      | `int`       |
+|          |                | `float // float`  | `float`     |
+| `%`      | Modulo         | `int % int`       | `int`       |
+| `**`     | Power          | `int ** int`      | `int`       |
+|          |                | `float ** float`  | `float`     |
+
+Division (`/`) always returns a `float`, even when both operands are `int`. For example, `7 / 2` produces
+`3.5`. Floor division (`//`) rounds the result down toward negative infinity and preserves the operand type.
+For example, `7 // 2` produces `3` and `-7 // 2` produces `-4`.
+
+The power operator (`**`) is **right-associative**: `2 ** 3 ** 2` is evaluated as `2 ** (3 ** 2)` = `512`.
+It binds tighter than unary negation, so `-2 ** 3` is evaluated as `-(2 ** 3)` = `-8`. The exponent for
+`int ** int` must be non-negative; a negative exponent raises an exception (use `float` for fractional
+results).
+
+Division, floor division, or modulo by zero raises an exception.
+
+There is **no implicit type coercion** between `int` and `float`. Mixing `int` and `float` operands in an
+arithmetic expression is a compile-time error. Use explicit conversion functions to convert between types.
+
+## Comparison Operators
+
+Comparison operators return a `bool` value. All comparison operators share the same precedence level.
+
+| Operator | Description              |
+| -------- | ------------------------ |
+| `==`     | Equal to                 |
+| `!=`     | Not equal to             |
+| `<`      | Less than                |
+| `>`      | Greater than             |
+| `<=`     | Less than or equal to    |
+| `>=`     | Greater than or equal to |
+
+Equality (`==`, `!=`) is determined by the `Equatable` spec. All types embed a default structural equality
+from `object`, but classes can override `equals(other)` in their `impl` block to customize behavior.
+
+Ordering operators (`<`, `>`, `<=`, `>=`) require both operands to be of the same type and the type must
+support ordering. The built-in numeric types (`int`, `float`) and `string` (lexicographic) support ordering
+natively.
+
+### Comparison Chaining
+
+Comparisons can be **chained** to express range checks and multi-way equality concisely. A chained
+comparison `a op1 b op2 c` is equivalent to `a op1 b and b op2 c`, except that each intermediate operand
+is evaluated only once.
+
+```txt
+1 <= x < 10          # equivalent to: 1 <= x and x < 10
+a < b <= c < d       # equivalent to: a < b and b <= c and c < d
+a == b == c          # equivalent to: a == b and b == c
+```
+
+The chain short-circuits: if any comparison in the chain is `false`, the remaining comparisons are not
+evaluated. For example, in `a < b < c`, if `a < b` is `false`, `c` is never evaluated.
+
+## Logical Operators
+
+Logical operators work on `bool` values and return a `bool`.
+
+| Operator | Description | Behavior                                                      |
+| -------- | ----------- | ------------------------------------------------------------- |
+| `or`     | Logical OR  | Returns `true` if either operand is `true`                    |
+| `xor`    | Logical XOR | Returns `true` if exactly one operand is `true`, but not both |
+| `and`    | Logical AND | Returns `true` if both operands are `true`                    |
+| `not`    | Logical NOT | Returns `true` if the operand is `false`                      |
+
+Both `or` and `and` use **short-circuit evaluation**: the right operand is not evaluated if the result can
+be determined from the left operand alone. Specifically:
+
+- `a or b` -- if `a` is `true`, `b` is not evaluated.
+- `a and b` -- if `a` is `false`, `b` is not evaluated.
+
+The `xor` operator always evaluates both operands, since the result cannot be determined from one side alone.
+
+## Bitwise Operators
+
+Bitwise operators work on `int` values and perform bit-level manipulation.
+
+| Operator | Operation   | Description                                     |
+| -------- | ----------- | ----------------------------------------------- |
+| `\|`     | Bitwise OR  | Sets each bit to 1 if either bit is 1           |
+| `^`      | Bitwise XOR | Sets each bit to 1 if exactly one bit is 1      |
+| `&`      | Bitwise AND | Sets each bit to 1 only if both bits are 1      |
+| `~`      | Bitwise NOT | Flips every bit (unary)                         |
+| `<<`     | Left shift  | Shifts bits left, filling with zeros            |
+| `>>`     | Right shift | Arithmetic right shift, preserving the sign bit |
+
+All bitwise operators require `int` operands and produce an `int` result. They are not defined for `float`,
+`bool`, or any other type.
+
+The shift amount must be a non-negative `int`. Shifting by a negative amount or by more than 63 bits raises
+an exception.
+
+## Unary Operators
+
+| Operator | Description      | Operand Type | Result Type |
+| -------- | ---------------- | ------------ | ----------- |
+| `-`      | Numeric negation | `int`        | `int`       |
+|          |                  | `float`      | `float`     |
+| `not`    | Logical negation | `bool`       | `bool`      |
+| `~`      | Bitwise NOT      | `int`        | `int`       |
+
+## Function Calls
+
+A function call applies arguments to a callable expression. The syntax is:
+
+```txt
+expression(arg1, arg2, ...)
+```
+
+A trailing comma after the last argument is permitted. The number and types of arguments must match the
+function's parameter list at compile time.
+
+Since functions are first-class values, any expression that evaluates to a function type can be called.
+
+## Member Access
+
+The dot operator `.` accesses a property or method on an object:
+
+```txt
+expression.name
+```
+
+This is used to access class properties and call methods defined in `impl` blocks.
+
+## Subscript Access
+
+The bracket operator `[]` accesses an element by index or key:
+
+```txt
+items[0]           # list element by index
+table["key"]       # map value by key
+matrix[i][j]       # chained subscript
+```
+
+The index expression can be any expression. Out-of-bounds access on a `list` or a missing key on a `map`
+raises an exception.
+
+## Collection Literals
+
+Zerg supports inline literals for `list` and `map`:
+
+```txt
+[1, 2, 3]                    # list[int]
+["a", "b", "c"]              # list[string]
+[]                           # empty list (requires type annotation)
+
+{"name": "zerg", "ver": 1}   # map[string, int] -- compile error, mixed value types
+{"name": "zerg"}             # map[string, string]
+{}                           # empty map (requires type annotation)
+```
+
+A trailing comma after the last element is permitted. The element type for lists and the key/value types for
+maps are inferred from the contents. Empty collection literals (`[]`, `{}`) require an explicit type
+annotation on the variable since the compiler cannot infer the element type.
+
+## Null-Safe Operators
+
+For nullable types (declared with `?`), Zerg provides three special operators:
+
+| Operator | Name            | Description                                                                      |
+| -------- | --------------- | -------------------------------------------------------------------------------- |
+| `?.`     | Safe navigation | Accesses a member only if the receiver is not `nil`; returns `nil` otherwise     |
+| `?[]`    | Safe subscript  | Accesses an element only if the receiver is not `nil`; returns `nil` otherwise   |
+| `??`     | Nil coalescing  | Returns the left operand if it is not `nil`; otherwise returns the right operand |
+
+The safe navigation operator `?.` and safe subscript operator `?[]` short-circuit the entire chain. If any
+part of a chain like `a?.b?[0]?.c` evaluates to `nil`, the rest of the chain is skipped and the result is
+`nil`.
+
+The nil coalescing operator `??` provides a default value for nullable expressions:
+
+```txt
+name ?? "anonymous"
+items?[0] ?? default_item
+```
+
+The right operand of `??` is only evaluated if the left operand is `nil`.
+
+## Grouping
+
+Parentheses `( )` override the default operator precedence:
+
+```txt
+(a + b) * c
+```
+
+A grouped expression evaluates to the same type and value as the inner expression.

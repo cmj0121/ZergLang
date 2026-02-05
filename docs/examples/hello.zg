@@ -1,0 +1,4 @@
+#! /usr/bin/env zerg
+#
+# This is the minimal Zerg language to run and show the message
+print("Hello, Zerg!")

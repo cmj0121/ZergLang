@@ -58,11 +58,20 @@ inside classes. Classes and OOP features are optional tools for structuring data
 
 Code written directly in a file (outside any function) is wrapped by the compiler into a built-in `_init()`
 function. This `_init()` is executed once and only once when the module is first imported. The Zerg compiler
-detects circular imports at compile time and rejects them. If run as a script, Zerg calls the `main` function
-as the entry point.
+detects circular imports at compile time and rejects them.
+
+When run as a script, Zerg executes the file sequentially: `_init()` runs first (top-level code), then
+`main()` is called if it exists. The `main` function is **not required** -- a script with only top-level
+code is valid and will execute via `_init()` alone.
 
 Functions can be called with parameters and return values. They are considered as first-class citizens in Zerg,
 which means functions can be passed as arguments, returned from other functions, and assigned to variables.
+
+### Built-in Functions
+
+Zerg provides built-in functions that are available in every module without importing. See
+[BUILTINS.md](BUILTINS.md) for the complete reference. The most common built-in is `print`, which writes
+its arguments to standard output followed by a newline.
 
 ### Function Types
 
@@ -162,15 +171,31 @@ Zerg is a semi-OOP programming language with the smallest core possible. Each cl
 `class` body defines **properties only** (data shape), and all **methods** are implemented inside a separate
 `impl` block. This separates what the object holds from what the object can do.
 
-### Inheritance (Composition-based)
+### Embedding (Composition-based)
 
-A class can `inherit` from one or more existing classes to compose and reuse their public properties and
-methods. Only `pub` members of the inherited class are accessible to the inheriting class -- private members
-remain invisible.
+A class can embed one or more existing types by listing the type name without a field name in the class body.
+Embedding promotes the embedded type's `pub` properties and methods to the outer class, allowing direct access
+without explicit delegation. Private members of the embedded type remain invisible.
 
-If multiple inherited classes provide public members (properties or methods) with the same name, the compiler
-raises an error. The inheriting class must resolve the conflict by overriding the ambiguous member explicitly
-in its own `impl` block.
+```txt
+class Animal {
+    pub name: string
+    pub age: int
+}
+
+class Dog {
+    Animal                  # embed Animal -- promotes name and age
+    pub breed: string
+}
+```
+
+The embedded type is stored as an anonymous field. Its promoted members can be accessed directly on the outer
+class (e.g. `dog.name`), and the embedded value itself can be accessed using the type name as a field
+(e.g. `dog.Animal`).
+
+If multiple embedded types provide public members with the same name, the compiler raises an error. The
+embedding class must resolve the conflict by overriding the ambiguous member explicitly in its own `impl`
+block.
 
 ### Spec (Interface)
 
@@ -181,8 +206,8 @@ interface-based polymorphism without class hierarchy complexity.
 
 ### Object Root
 
-All types inherit from the `object` root class. The `object` class holds no properties, and provides default
-implementations for the basic specs:
+All types implicitly embed the `object` root class. The `object` class holds no properties, and provides
+default implementations for the basic specs:
 
 | Spec         | Method          | Default Behavior                     |
 | ------------ | --------------- | ------------------------------------ |
@@ -193,9 +218,9 @@ implementations for the basic specs:
 The `Disposable` spec (`open()` and `close()`) is not universal -- it is an opt-in spec that only resource
 types implement. See [Resource Management](#resource-management) for details.
 
-Built-in types (`int`, `bool`, `string`, etc.) also inherit from `object` but are sealed -- users cannot
-inherit from or modify them. The compiler may optimize their internal representation, but they behave as
-objects in all other respects.
+Built-in types (`int`, `bool`, `string`, etc.) also embed `object` implicitly but are sealed -- users cannot
+embed or modify them. The compiler may optimize their internal representation, but they behave as objects in
+all other respects.
 
 ## Error Handling
 
@@ -212,7 +237,9 @@ and `Err` variants before accessing the value, ensuring errors are never silentl
 For unexpected or unrecoverable errors, Zerg supports exceptions. You can `raise` an exception to interrupt
 the current execution, and handle it using the `try-expect-finally` statement. The `try` block contains the
 code that may raise an exception, the `expect` block handles the raised exception, and the `finally` block
-runs regardless of whether an exception was raised, typically used for cleanup.
+runs regardless of whether an exception was raised, typically used for cleanup. Inside an `expect` block, a
+bare `raise` (with no expression) re-raises the current exception, allowing partial handling or logging
+before propagating the error upward.
 
 **Guideline**: Prefer `Result` for operations where failure is a normal, expected outcome (file not found,
 invalid input, network timeout). Use exceptions for programming errors or truly unexpected situations
@@ -311,8 +338,17 @@ Zerg is a compiled programming language that can also be executed like an interp
 source code directly without a separate compilation step -- the compiler compiles and runs in one action. It
 detects the `main` function and uses it as the entry point.
 
-A directory of `.zerg` files forms a **package**. Each file in a package is a **module**. You can expose your
-code as a package either as a local directory or through a remote git repository. The root folder name is the
-package name, and sub-folders are sub-modules accessed via dot notation.
+A directory of `.zg` files forms a **package**. Each file in a package is a **module**. You can expose your
+code as a package either as a local directory or through a remote git repository. Packages are imported using
+string paths:
+
+```txt
+import "io"                  # stdlib or local package
+import "example.com/utils"   # remote package (fetched from git repository)
+```
+
+A bare name like `"io"` resolves to the standard library or a local package. A domain-prefixed path like
+`"example.com/utils"` refers to a remote package. The last segment of the path becomes the local name used
+to access the package's public members (e.g. `utils.read()`).
 
 Circular imports between packages are detected at compile time and rejected by the compiler.

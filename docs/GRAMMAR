@@ -1,0 +1,134 @@
+# The Zerg Programming Language Specification
+#
+# Author: 2026 <cmj@cmj.tw>
+#
+# This document defines the syntax and semantics of the Zerg programming language.
+#
+# The syntax is specified using Extended Backus-Naur Form (EBNF), which provides a
+# formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
+# starting point for parsing Zerg source code.
+#
+# 44 production rules.
+
+# ============================================================================
+# Program Structure
+# ============================================================================
+
+VIS        ::= "pub"?
+
+PROGRAM    ::= STATEMENT* EOF
+BLOCK      ::= "{" STATEMENT* "}"
+
+STATEMENT  ::= SIMPLE_STMT | COMPOUND_STMT
+
+SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSION )
+               | EXPRESSION "=" EXPRESSION
+               | EXPRESSION
+               | "return" EXPRESSION? | "break" | "continue"
+               | "del" IDENTIFIER | "raise" EXPRESSION?
+               | "yield" EXPRESSION | "go" EXPRESSION
+               | "import" STRING
+
+COMPOUND_STMT::= IF_STMT | MATCH_STMT
+               | "for" IDENTIFIER "in" EXPRESSION BLOCK
+               | "while" EXPRESSION BLOCK
+               | "try" BLOCK ( "expect" IDENTIFIER ":" TYPE BLOCK )+ ( "finally" BLOCK )?
+               | "with" IDENTIFIER ":=" EXPRESSION BLOCK
+               | FN_DECL | CLASS_DECL | IMPL_BLOCK
+               | SPEC_DECL | ENUM_DECL
+
+# ============================================================================
+# Control Flow
+# ============================================================================
+
+IF_STMT    ::= "if" EXPRESSION BLOCK ( "else" "if" EXPRESSION BLOCK )* ( "else" BLOCK )?
+
+MATCH_STMT ::= "match" EXPRESSION "{" ( PATTERN ( "," PATTERN )* "=>" BLOCK )+ "}"
+PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
+             | LITERAL | "_"
+
+# ============================================================================
+# Declarations
+# ============================================================================
+
+FN_DECL    ::= VIS "fn" FN_SIG BLOCK
+FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( ":" TYPE )?
+PARAMS     ::= IDENTIFIER ":" TYPE ( "," IDENTIFIER ":" TYPE )* ","?
+
+CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
+CLASS_MEMBER::= VIS "mut"? IDENTIFIER ":" TYPE
+              | TYPE
+
+IMPL_BLOCK ::= "impl" IDENTIFIER ( "for" IDENTIFIER )? "{" FN_DECL* "}"
+
+SPEC_DECL  ::= VIS "spec" IDENTIFIER "{" ( "fn" FN_SIG )* "}"
+
+ENUM_DECL  ::= VIS "enum" IDENTIFIER TYPE_PARAMS? "{" VARIANT ( "," VARIANT )* ","? "}"
+VARIANT    ::= IDENTIFIER ( "(" PARAMS? ")" )?
+
+# ============================================================================
+# Types
+# ============================================================================
+
+TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
+             | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( ":" TYPE )?
+TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
+TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
+
+# ============================================================================
+# Expressions (from lowest to highest precedence)
+# ============================================================================
+
+EXPRESSION ::= OR_EXPR ( "??" OR_EXPR )*
+OR_EXPR    ::= XOR_EXPR ( "or" XOR_EXPR )*
+XOR_EXPR   ::= AND_EXPR ( "xor" AND_EXPR )*
+AND_EXPR   ::= COMPARISON ( "and" COMPARISON )*
+COMPARISON ::= BIT_OR ( ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) BIT_OR )*
+BIT_OR     ::= BIT_XOR ( "|" BIT_XOR )*
+BIT_XOR    ::= BIT_AND ( "^" BIT_AND )*
+BIT_AND    ::= SHIFT ( "&" SHIFT )*
+SHIFT      ::= ADDITION ( ( "<<" | ">>" ) ADDITION )*
+ADDITION   ::= MULTIPLY ( ( "+" | "-" ) MULTIPLY )*
+MULTIPLY   ::= UNARY ( ( "*" | "/" | "//" | "%" ) UNARY )*
+UNARY      ::= ( "-" | "not" | "~" ) UNARY | POWER
+POWER      ::= POSTFIX ( "**" UNARY )?
+POSTFIX    ::= PRIMARY ( "(" ( EXPRESSION ( "," EXPRESSION )* ","? )? ")"
+                        | "[" EXPRESSION "]"
+                        | "." IDENTIFIER
+                        | "?." IDENTIFIER
+                        | "?[" EXPRESSION "]"
+                        )*
+PRIMARY    ::= LITERAL | IDENTIFIER | "(" EXPRESSION ")"
+             | "[" ( EXPRESSION ( "," EXPRESSION )* ","? )? "]"
+             | "{" ( EXPRESSION ":" EXPRESSION ( "," EXPRESSION ":" EXPRESSION )* ","? )? "}"
+
+# ============================================================================
+# Built-in Functions (see BUILTINS.md)
+# ============================================================================
+
+# print(args...) -- write arguments to stdout, space-separated, with newline.
+
+# ============================================================================
+# Lexical Rules
+# ============================================================================
+
+LITERAL    ::= INTEGER | FLOAT | STRING | "true" | "false" | "nil"
+
+DEC_INT    ::= ( "1"..."9" ) ( DIGIT | "_" )* | "0"
+INTEGER    ::= DEC_INT
+             | "0" ( "x" | "X" ) HEX ( HEX | "_" )*
+             | "0" ( "o" | "O" ) ( "0"..."7" ) ( ( "0"..."7" ) | "_" )*
+             | "0" ( "b" | "B" ) ( "0" | "1" ) ( ( "0" | "1" ) | "_" )*
+
+FLOAT      ::= DEC_INT "." DIGIT ( DIGIT | "_" )* ( ( "e" | "E" ) ( "+" | "-" )? DIGIT ( DIGIT | "_" )* )?
+             | DEC_INT ( "e" | "E" ) ( "+" | "-" )? DIGIT ( DIGIT | "_" )*
+
+STRING     ::= '"' ( <any Unicode char except "\" and '"'>
+                   | "\" ( "n" | "t" | "r" | "\\" | '"' | "0" )
+                   | "\x" HEX HEX
+                   | "\u{" HEX+ "}" )* '"'
+
+IDENTIFIER ::= ( "a"..."z" | "A"..."Z" | "_" ) ( "a"..."z" | "A"..."Z" | DIGIT | "_" )*
+
+DIGIT      ::= "0"..."9"
+HEX        ::= "0"..."9" | "a"..."f" | "A"..."F"
