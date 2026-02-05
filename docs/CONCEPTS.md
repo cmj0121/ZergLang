@@ -43,6 +43,17 @@ You can specify the variable with `mut` keyword to make it mutable, which means 
 the variable after it is assigned. However, the mutable variable should be used sparingly, and you should
 prefer to use the immutable variable whenever possible.
 
+### Constants
+
+The `const` keyword declares a compile-time constant. The value must be known at compile time -- literals,
+arithmetic on literals, or references to other constants. Constants cannot be reassigned or shadowed.
+
+```txt
+const PI = 3.14159
+const MAX_SIZE = 1024
+pub const VERSION = "1.0.0"
+```
+
 ### Null-safety
 
 Zerg is designed to be a null-safe programming language. Variables are non-nullable by default, which means

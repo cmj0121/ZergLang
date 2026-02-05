@@ -8,7 +8,7 @@ if exists("b:current_syntax")
 endif
 
 " --- Keywords ---
-syn keyword zergKeyword       pub mut this
+syn keyword zergKeyword       pub mut const this
 syn keyword zergKeyword       impl nextgroup=zergClassName skipwhite
 syn keyword zergFnDecl        fn nextgroup=zergFnName skipwhite
 syn keyword zergConditional   if else match

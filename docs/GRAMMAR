@@ -33,6 +33,7 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
                | "assert" EXPRESSION ( "," EXPRESSION )?
                | "import" STRING
                | VIS "type" IDENTIFIER TYPE_PARAMS? "=" TYPE
+               | VIS "const" IDENTIFIER "=" EXPRESSION
 
 COMPOUND_STMT::= IF_STMT | MATCH_STMT
                | "for" IDENTIFIER ( "," IDENTIFIER )* "in" EXPRESSION BLOCK
