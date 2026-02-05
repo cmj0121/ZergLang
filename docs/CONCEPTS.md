@@ -51,6 +51,63 @@ shares the underlying conduit rather than copying it, so that multiple tasks can
 same channel. Resources bound in a `with` statement transfer ownership into the scope rather than copy.
 See [Concurrency](#concurrency) and [Resource Management](#resource-management) for details.
 
+## Comments
+
+Zerg supports line comments starting with `#`. Everything from `#` to the end of the line is ignored by the
+compiler. The `#!` shebang on the first line of a script is treated as a regular comment.
+
+```txt
+# this is a line comment
+x := 42  # inline comment
+```
+
+A bare string literal used as a statement is also discarded by the compiler and can serve as a documentation
+comment:
+
+```txt
+"This function computes the factorial of n."
+fn factorial(n: int) : int {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+```
+
+There are no block comments. Use multiple `#` lines for longer explanations.
+
+## Strings
+
+Strings in Zerg are UTF-8 encoded and delimited by double quotes. They support escape sequences and string
+interpolation.
+
+### String Interpolation
+
+Any expression enclosed in `{}` inside a string is evaluated and its string representation is inserted
+in place. The expression's type must implement `Stringable` (all types do via `object`).
+
+```txt
+name := "Zerg"
+print("Hello, {name}!")           # Hello, Zerg!
+print("1 + 2 = {1 + 2}")         # 1 + 2 = 3
+```
+
+To include a literal `{` or `}` in a string, escape it with a backslash:
+
+```txt
+print("Use \{braces\} for interpolation")  # Use {braces} for interpolation
+```
+
+### Raw Strings
+
+A raw string is prefixed with `r` and does not process escape sequences or interpolation. Everything
+between the quotes is taken literally.
+
+```txt
+path := r"C:\Users\name\docs"
+pattern := r"(\d+)\s+{not interpolated}"
+```
+
+Raw strings cannot contain a double-quote character, since there is no escape mechanism inside them.
+
 ## Functions
 
 Zerg is a procedural-first language. Functions are defined at the module level as standalone routines, not

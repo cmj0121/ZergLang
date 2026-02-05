@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 44 production rules.
+# 46 production rules.
 
 # ============================================================================
 # Program Structure
@@ -123,12 +123,18 @@ INTEGER    ::= DEC_INT
 FLOAT      ::= DEC_INT "." DIGIT ( DIGIT | "_" )* ( ( "e" | "E" ) ( "+" | "-" )? DIGIT ( DIGIT | "_" )* )?
              | DEC_INT ( "e" | "E" ) ( "+" | "-" )? DIGIT ( DIGIT | "_" )*
 
-STRING     ::= '"' ( <any Unicode char except "\" and '"'>
-                   | "\" ( "n" | "t" | "r" | "\\" | '"' | "0" )
+STRING     ::= '"' ( <any Unicode char except "\", '"', "{", and "}">
+                   | "\" ( "n" | "t" | "r" | "\\" | '"' | "0" | "{" | "}" )
                    | "\x" HEX HEX
-                   | "\u{" HEX+ "}" )* '"'
+                   | "\u{" HEX+ "}"
+                   | "{" EXPRESSION "}" )* '"'
+             | RAW_STRING
+
+RAW_STRING ::= 'r"' ( <any Unicode char except '"'> )* '"'
 
 IDENTIFIER ::= ( "a"..."z" | "A"..."Z" | "_" ) ( "a"..."z" | "A"..."Z" | DIGIT | "_" )*
+
+COMMENT    ::= "#" <any char except newline>*
 
 DIGIT      ::= "0"..."9"
 HEX        ::= "0"..."9" | "a"..."f" | "A"..."F"

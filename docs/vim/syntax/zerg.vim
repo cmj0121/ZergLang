@@ -43,10 +43,14 @@ syn match   zergFloat         /\<[0-9][0-9_]*\.[0-9][0-9_]*\([eE][+-]\?[0-9][0-9
 syn match   zergFloat         /\<[0-9][0-9_]*[eE][+-]\?[0-9][0-9_]*\>/
 
 " --- Strings ---
-syn region  zergString        start=/"/ skip=/\\./ end=/"/ contains=zergEscape
-syn match   zergEscape        contained /\\[ntr\\"0]/
+syn region  zergString        start=/"/ skip=/\\./ end=/"/ contains=zergEscape,zergInterpolation
+syn match   zergEscape        contained /\\[ntr\\"0{}]/
 syn match   zergEscape        contained /\\x[0-9a-fA-F]\{2}/
 syn match   zergEscape        contained /\\u{[0-9a-fA-F]\+}/
+" Note: keepend means nested {} (e.g. map literals) will end interpolation early.
+" This is a known Vim limitation; simple expressions highlight correctly.
+syn region  zergInterpolation contained start=/{/ end=/}/ contains=TOP keepend
+syn region  zergRawString     start=/\<r"/ end=/"/
 
 " --- Operators ---
 syn match   zergOperatorSym   /??/
@@ -82,7 +86,9 @@ hi def link zergWildcard      Special
 hi def link zergNumber        Number
 hi def link zergFloat         Float
 hi def link zergString        String
+hi def link zergRawString     String
 hi def link zergEscape        SpecialChar
+hi def link zergInterpolation Special
 hi def link zergComment       Comment
 hi def link zergTodo          Todo
 hi def link zergBuiltin       Function
