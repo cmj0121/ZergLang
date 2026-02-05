@@ -416,6 +416,9 @@ using `impl ClassName for SpecName`, and provide all the methods defined in the 
 that do not belong to any spec are defined using `impl ClassName` without the `for` clause. This provides
 interface-based polymorphism without class hierarchy complexity.
 
+All methods in a spec are implicitly `pub` -- no visibility modifier is needed or allowed. Methods can be
+marked `mut fn` to indicate they mutate the receiver.
+
 For generic specs, the `impl` declaration specifies the concrete type argument:
 
 ```txt

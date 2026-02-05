@@ -68,7 +68,7 @@ CLASS_MEMBER::= VIS IDENTIFIER ":" TYPE
 
 IMPL_BLOCK ::= "impl" IDENTIFIER ( "for" IDENTIFIER TYPE_ARGS? )? "{" FN_DECL* "}"
 
-SPEC_DECL  ::= VIS "spec" IDENTIFIER "{" ( "fn" FN_SIG )* "}"
+SPEC_DECL  ::= VIS "spec" IDENTIFIER TYPE_PARAMS? "{" ( "mut"? "fn" FN_SIG )* "}"
 
 ENUM_DECL  ::= VIS "enum" IDENTIFIER TYPE_PARAMS? "{" VARIANT ( "," VARIANT )* ","? "}"
 VARIANT    ::= IDENTIFIER ( "(" PARAMS? ")" )?
