@@ -26,7 +26,7 @@ syn keyword zergKeyword       Ok Err
 syn keyword zergNil           nil
 
 " --- Built-in types ---
-syn keyword zergType          int float bool string list map set chan object iter range
+syn keyword zergType          int float bool string list map set chan object iter range Self
 
 " --- Built-in functions ---
 syn keyword zergBuiltin       print len input str type
@@ -74,6 +74,20 @@ syn match   zergOperatorSym   /\/\//
 syn match   zergOperatorSym   /\.\.=/
 syn match   zergOperatorSym   /\.\./
 syn match   zergChanOp        /<-/
+syn match   zergOperatorSym   /+=/
+syn match   zergOperatorSym   /-=/
+syn match   zergOperatorSym   /\*=/
+syn match   zergOperatorSym   /\/=/
+syn match   zergOperatorSym   /\/\/=/
+syn match   zergOperatorSym   /%=/
+syn match   zergOperatorSym   /\*\*=/
+syn match   zergOperatorSym   /&=/
+syn match   zergOperatorSym   /|=/
+syn match   zergOperatorSym   /\^=/
+syn match   zergOperatorSym   /<<=/
+syn match   zergOperatorSym   />>=/
+syn match   zergOperatorSym   /++/
+syn match   zergOperatorSym   /--/
 
 " --- Declaration names (chained via nextgroup) ---
 syn match   zergFnName        /\w\+/ contained

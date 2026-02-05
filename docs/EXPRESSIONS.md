@@ -63,6 +63,35 @@ Division, floor division, or modulo by zero raises an exception.
 There is **no implicit type coercion** between `int` and `float`. Mixing `int` and `float` operands in an
 arithmetic expression is a compile-time error. Use explicit conversion functions to convert between types.
 
+## Compound Assignment
+
+Compound assignment operators combine an arithmetic or bitwise operation with assignment. The variable must
+be `mut`. The expression `x += y` is equivalent to `x = x + y`.
+
+| Operator | Equivalent   | Operator | Equivalent   |
+| -------- | ------------ | -------- | ------------ |
+| `+=`     | `x = x + y`  | `&=`     | `x = x & y`  |
+| `-=`     | `x = x - y`  | `\|=`    | `x = x \| y` |
+| `*=`     | `x = x * y`  | `^=`     | `x = x ^ y`  |
+| `/=`     | `x = x / y`  | `<<=`    | `x = x << y` |
+| `//=`    | `x = x // y` | `>>=`    | `x = x >> y` |
+| `%=`     | `x = x % y`  |          |              |
+| `**=`    | `x = x ** y` |          |              |
+
+## Increment and Decrement
+
+The `++` and `--` postfix operators are **statements**, not expressions. They require the variable to be
+`mut` and the type to implement the `Incremental` spec (see [SPECS.md](SPECS.md#incremental)).
+
+```txt
+mut i := 0
+i++            # equivalent to: i.inc()
+i--            # equivalent to: i.dec()
+```
+
+The built-in `int` and `float` types implement `Incremental`. Because `++` and `--` are statements, they
+cannot be used inside expressions -- `x := i++` is a syntax error.
+
 ## Comparison Operators
 
 Comparison operators return a `bool` value. All comparison operators share the same precedence level.

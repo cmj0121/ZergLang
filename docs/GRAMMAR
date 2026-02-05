@@ -8,7 +8,7 @@
 # formal way to describe the structure of Zerg programs, and the `PROGRAM` is the
 # starting point for parsing Zerg source code.
 #
-# 52 production rules.
+# 53 production rules.
 
 # ============================================================================
 # Program Structure
@@ -23,6 +23,8 @@ STATEMENT  ::= SIMPLE_STMT | COMPOUND_STMT
 
 SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSION )
                | EXPRESSION "=" EXPRESSION
+               | EXPRESSION ASSIGN_OP EXPRESSION
+               | EXPRESSION ( "++" | "--" )
                | EXPRESSION
                | "return" EXPRESSION? | "break" | "continue"
                | "del" IDENTIFIER | "raise" EXPRESSION?
@@ -77,6 +79,9 @@ TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
              | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( ":" TYPE )?
 TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
 TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
+
+ASSIGN_OP  ::= "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**="
+             | "&=" | "|=" | "^=" | "<<=" | ">>="
 
 # ============================================================================
 # Expressions (from lowest to highest precedence)

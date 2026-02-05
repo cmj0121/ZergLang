@@ -4,6 +4,12 @@ Zerg provides a set of built-in specs (interfaces) that define standard behavior
 are available without importing and form the foundation of Zerg's type system. See
 [CONCEPTS.md](CONCEPTS.md) for how to implement specs using `impl ClassName for SpecName`.
 
+## `Self` Type
+
+Inside a spec definition, `Self` refers to the type that implements the spec. For example, when `Dog`
+implements `Equatable`, `Self` resolves to `Dog`. This allows specs to define methods that accept or return
+the implementing type without knowing it in advance.
+
 ## Stringable
 
 Converts a value to its string representation. All types implement `Stringable` via the `object` root class.
@@ -98,3 +104,19 @@ spec Iterator[T] {
 
 The built-in `iter[T]` type implements both `Iterator` and `Iterable` (returning itself). Coroutines that
 use `yield` return an `iter[T]` that implements this spec.
+
+## Incremental
+
+Supports increment (`++`) and decrement (`--`) operations. The `++` and `--` postfix statements desugar to
+calls to `inc()` and `dec()` respectively.
+
+```txt
+spec Incremental {
+    mut fn inc() : Self
+    mut fn dec() : Self
+}
+```
+
+Both methods mutate `this` in place and return `Self` to allow method chaining. The built-in `int` and `float`
+types implement `Incremental`. `x++` is equivalent to `x.inc()` and `x--` is equivalent to `x.dec()`. Both
+require the variable to be `mut`.
