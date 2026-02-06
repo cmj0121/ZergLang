@@ -161,7 +161,7 @@ IDENTIFIER ::= ( "a"..."z" | "A"..."Z" | "_" ) ( "a"..."z" | "A"..."Z" | DIGIT |
 
 # The following words are reserved and cannot be used as identifiers:
 #   pub mut const static this fn return break continue del raise yield go assert import nop
-#   if else match for in try expect finally with class impl spec enum type
+#   if else match for in try expect finally with as class impl spec enum type
 #   and or xor not is true false nil Ok Err Self
 
 COMMENT    ::= "#" <any char except newline>*
