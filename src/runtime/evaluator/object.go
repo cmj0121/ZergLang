@@ -21,6 +21,7 @@ const (
 	SPEC_OBJ         ObjectType = "SPEC"
 	REFERENCE_OBJ    ObjectType = "REFERENCE"
 	ERROR_OBJ        ObjectType = "ERROR"
+	BUILTIN_OBJ      ObjectType = "BUILTIN"
 )
 
 // Object is the interface for all runtime values.
@@ -248,3 +249,28 @@ type Reference struct {
 
 func (r *Reference) Type() ObjectType { return REFERENCE_OBJ }
 func (r *Reference) Inspect() string  { return fmt.Sprintf("&%s", (*r.Value).Inspect()) }
+
+// BuiltinFn is the signature for builtin functions.
+type BuiltinFn func(args ...Object) Object
+
+// Builtin represents a builtin function.
+type Builtin struct {
+	Name string
+	Fn   BuiltinFn
+}
+
+func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
+func (b *Builtin) Inspect() string  { return fmt.Sprintf("<builtin %s>", b.Name) }
+
+// BoundBuiltinFn is the signature for builtin methods bound to a receiver.
+type BoundBuiltinFn func(receiver Object, args ...Object) Object
+
+// BoundBuiltin represents a builtin method bound to a receiver object.
+type BoundBuiltin struct {
+	Name     string
+	Receiver Object
+	Fn       BoundBuiltinFn
+}
+
+func (bb *BoundBuiltin) Type() ObjectType { return BUILTIN_OBJ }
+func (bb *BoundBuiltin) Inspect() string  { return fmt.Sprintf("<method %s>", bb.Name) }
