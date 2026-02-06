@@ -184,6 +184,8 @@ func applyFunction(fn Object, args []Object) Object {
 		return applyMethod(f, args)
 	case *Builtin:
 		return f.Fn(args...)
+	case *BoundBuiltin:
+		return f.Fn(f.Receiver, args...)
 	default:
 		return newError("not a function: %s", fn.Type())
 	}
@@ -707,6 +709,10 @@ func evalStringIndexExpression(str, index Object) Object {
 func evalMemberExpression(obj Object, member string) Object {
 	switch o := obj.(type) {
 	case *Map:
+		// Check for builtin methods first
+		if methodFn := GetMapMethod(member); methodFn != nil {
+			return &BoundBuiltin{Name: member, Receiver: o, Fn: methodFn}
+		}
 		// Try to access map with string key
 		key := &String{Value: member}
 		pair, ok := o.Pairs[key.HashKey()]
@@ -715,7 +721,11 @@ func evalMemberExpression(obj Object, member string) Object {
 		}
 		return pair.Value
 	case *List:
-		// List built-in methods
+		// Check for builtin methods first
+		if methodFn := GetListMethod(member); methodFn != nil {
+			return &BoundBuiltin{Name: member, Receiver: o, Fn: methodFn}
+		}
+		// List built-in properties
 		switch member {
 		case "length":
 			return &Integer{Value: int64(len(o.Elements))}

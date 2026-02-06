@@ -261,3 +261,16 @@ type Builtin struct {
 
 func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (b *Builtin) Inspect() string  { return fmt.Sprintf("<builtin %s>", b.Name) }
+
+// BoundBuiltinFn is the signature for builtin methods bound to a receiver.
+type BoundBuiltinFn func(receiver Object, args ...Object) Object
+
+// BoundBuiltin represents a builtin method bound to a receiver object.
+type BoundBuiltin struct {
+	Name     string
+	Receiver Object
+	Fn       BoundBuiltinFn
+}
+
+func (bb *BoundBuiltin) Type() ObjectType { return BUILTIN_OBJ }
+func (bb *BoundBuiltin) Inspect() string  { return fmt.Sprintf("<method %s>", bb.Name) }
