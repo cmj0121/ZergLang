@@ -609,6 +609,73 @@ arr[1]`
 	testIntegerObject(t, evaluated, 99)
 }
 
+func TestSpecDeclaration(t *testing.T) {
+	input := `spec Drawable {
+    fn draw()
+    fn area()
+}
+Drawable`
+	evaluated := testEval(input)
+
+	spec, ok := evaluated.(*Spec)
+	if !ok {
+		t.Fatalf("expected Spec, got %T", evaluated)
+	}
+
+	if spec.Name != "Drawable" {
+		t.Fatalf("expected spec name 'Drawable', got %s", spec.Name)
+	}
+
+	if len(spec.Methods) != 2 {
+		t.Fatalf("expected 2 methods, got %d", len(spec.Methods))
+	}
+}
+
+func TestImplForSpec(t *testing.T) {
+	input := `spec Measurable {
+    fn size()
+}
+class Box {
+    pub mut value = 0
+}
+impl Box for Measurable {
+    fn size() {
+        return this.value
+    }
+}
+impl Box {
+    fn init(v) {
+        this.value = v
+    }
+}
+b := Box(42)
+b.size()`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 42)
+}
+
+func TestSpecNotImplementedError(t *testing.T) {
+	input := `spec Required {
+    fn mustHave()
+}
+class Empty {
+    pub mut x = 0
+}
+impl Empty for Required {
+    # Missing mustHave method
+}`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message == "" {
+		t.Fatalf("expected error message")
+	}
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
