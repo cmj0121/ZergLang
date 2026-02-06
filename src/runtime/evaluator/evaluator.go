@@ -182,6 +182,8 @@ func applyFunction(fn Object, args []Object) Object {
 		return instantiateClass(f, args)
 	case *BoundMethod:
 		return applyMethod(f, args)
+	case *Builtin:
+		return f.Fn(args...)
 	default:
 		return newError("not a function: %s", fn.Type())
 	}
