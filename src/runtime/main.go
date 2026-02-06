@@ -7,6 +7,9 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/xrspace/zerglang/runtime/evaluator"
+	"github.com/xrspace/zerglang/runtime/lexer"
+	"github.com/xrspace/zerglang/runtime/parser"
 )
 
 var Version = "0.1.0"
@@ -20,13 +23,13 @@ type CLI struct {
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli,
-		kong.Name("zerg"),
-		kong.Description("Zerg programming language runtime"),
+		kong.Name("zerg-bootstrap"),
+		kong.Description("Zerg bootstrap runtime interpreter"),
 		kong.UsageOnError(),
 	)
 
 	if cli.Version {
-		fmt.Printf("zerg version %s\n", Version)
+		fmt.Printf("zerg-bootstrap version %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -66,8 +69,28 @@ func run(filename string) error {
 
 	log.Debug().Int("bytes", len(source)).Msg("source loaded")
 
-	// TODO: Implement lexer, parser, and evaluator
-	_ = source
+	l := lexer.New(string(source))
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		for _, msg := range p.Errors() {
+			log.Error().Msg(msg)
+		}
+		return fmt.Errorf("parsing failed with %d error(s)", len(p.Errors()))
+	}
+
+	log.Debug().Int("statements", len(program.Statements)).Msg("parsed program")
+
+	env := evaluator.NewEnvironment()
+	result := evaluator.Eval(program, env)
+
+	if result != nil {
+		if evaluator.IsError(result) {
+			return fmt.Errorf("%s", result.Inspect())
+		}
+		log.Debug().Str("result", result.Inspect()).Msg("evaluation complete")
+	}
 
 	return nil
 }
