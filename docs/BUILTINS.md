@@ -169,3 +169,113 @@ for i in 0..=100 {
 ```
 
 Ranges are immutable values. The start must be less than or equal to the end; otherwise the range is empty.
+
+## Built-in Modules
+
+Zerg provides built-in modules that are globally available without import. These modules provide safe, high-level
+APIs for common operations.
+
+### sys Module
+
+The `sys` module provides system-related functions.
+
+| Method           | Signature          | Description                                         |
+| ---------------- | ------------------ | --------------------------------------------------- |
+| `sys.os()`       | `-> string`        | Returns OS name: `"linux"`, `"darwin"`, `"windows"` |
+| `sys.arch()`     | `-> string`        | Returns architecture: `"amd64"`, `"arm64"`, `"386"` |
+| `sys.args()`     | `-> list`          | Returns command-line arguments                      |
+| `sys.exit(code)` | `int -> nil`       | Exits program with given code                       |
+| `sys.env(name)`  | `string -> string` | Returns environment variable value                  |
+
+```zerg
+if sys.os() == "darwin" {
+    print("Running on macOS")
+}
+
+args := sys.args()
+if len(args) < 2 {
+    print("Usage: program <file>")
+    sys.exit(1)
+}
+```
+
+### io Module
+
+The `io` module provides file I/O operations.
+
+| Method                      | Signature                  | Description                                    |
+| --------------------------- | -------------------------- | ---------------------------------------------- |
+| `io.open(path, mode)`       | `string, string -> handle` | Open file (modes: `"r"`, `"w"`, `"a"`, `"rw"`) |
+| `io.read(handle)`           | `handle -> string`         | Read entire file contents                      |
+| `io.read_lines(handle)`     | `handle -> list`           | Read file as list of lines                     |
+| `io.write(handle, data)`    | `handle, string -> int`    | Write string, return bytes written             |
+| `io.close(handle)`          | `handle -> nil`            | Close file handle                              |
+| `io.exists(path)`           | `string -> bool`           | Check if file exists                           |
+| `io.read_file(path)`        | `string -> string`         | Read file contents directly                    |
+| `io.write_file(path, data)` | `string, string -> nil`    | Write file contents directly                   |
+
+```zerg
+# Simple file reading
+content := io.read_file("data.txt")
+lines := str.split(content, "\n")
+
+# Using file handles
+handle := io.open("output.txt", "w")
+io.write(handle, "Hello, World!\n")
+io.close(handle)
+```
+
+### str Module
+
+The `str` module provides string manipulation functions.
+
+| Method                         | Signature                          | Description                            |
+| ------------------------------ | ---------------------------------- | -------------------------------------- |
+| `str.split(s, sep)`            | `string, string -> list`           | Split string by separator              |
+| `str.join(list, sep)`          | `list, string -> string`           | Join list elements with separator      |
+| `str.trim(s)`                  | `string -> string`                 | Remove leading/trailing whitespace     |
+| `str.find(s, sub)`             | `string, string -> int`            | Find substring index (-1 if not found) |
+| `str.replace(s, old, new)`     | `string, string, string -> string` | Replace all occurrences                |
+| `str.substring(s, start, end)` | `string, int, int -> string`       | Extract substring                      |
+| `str.starts_with(s, prefix)`   | `string, string -> bool`           | Check if starts with prefix            |
+| `str.ends_with(s, suffix)`     | `string, string -> bool`           | Check if ends with suffix              |
+| `str.upper(s)`                 | `string -> string`                 | Convert to uppercase                   |
+| `str.lower(s)`                 | `string -> string`                 | Convert to lowercase                   |
+| `str.contains(s, sub)`         | `string, string -> bool`           | Check if contains substring            |
+
+```zerg
+text := "  Hello, World!  "
+trimmed := str.trim(text)           # "Hello, World!"
+upper := str.upper(trimmed)         # "HELLO, WORLD!"
+
+csv := "a,b,c"
+parts := str.split(csv, ",")        # ["a", "b", "c"]
+joined := str.join(parts, " | ")    # "a | b | c"
+```
+
+### char Module
+
+The `char` module provides character-level operations.
+
+| Method             | Signature        | Description                               |
+| ------------------ | ---------------- | ----------------------------------------- |
+| `char.ord(c)`      | `string -> int`  | Get ASCII/Unicode code of first character |
+| `char.chr(code)`   | `int -> string`  | Convert code to character                 |
+| `char.is_digit(c)` | `string -> bool` | Check if character is a digit (0-9)       |
+| `char.is_alpha(c)` | `string -> bool` | Check if character is a letter            |
+| `char.is_space(c)` | `string -> bool` | Check if character is whitespace          |
+| `char.is_alnum(c)` | `string -> bool` | Check if character is alphanumeric        |
+
+```zerg
+# Character checking
+if char.is_digit("5") {
+    print("It's a digit")
+}
+
+# Character conversion
+code := char.ord("A")   # 65
+ch := char.chr(97)      # "a"
+```
+
+These modules are the recommended way to perform system operations. For low-level access, see
+[UNSAFE.md](UNSAFE.md).

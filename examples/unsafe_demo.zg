@@ -1,0 +1,157 @@
+# Unsafe and Asm Demo
+#
+# This file demonstrates the use of `unsafe` blocks and `asm()` expressions
+# for low-level operations. In most cases, prefer the built-in modules
+# (sys, io, str, char) over unsafe code.
+
+print("=== Unsafe Block Demo ===")
+print("")
+
+# ============================================================================
+# Basic unsafe block with asm
+# ============================================================================
+
+print("--- System Information via asm ---")
+
+unsafe {
+    os := asm("sys_os")
+    arch := asm("sys_arch")
+    print("OS: " + os)
+    print("Arch: " + arch)
+}
+
+# ============================================================================
+# Comparison: Modules vs Unsafe
+# ============================================================================
+
+print("")
+print("--- Modules vs Unsafe ---")
+
+# Preferred: Using modules (safe, readable)
+print("Via modules:")
+print("  OS: " + sys.os())
+print("  Arch: " + sys.arch())
+
+# Alternative: Using unsafe (explicit, low-level)
+print("Via unsafe:")
+unsafe {
+    print("  OS: " + asm("sys_os"))
+    print("  Arch: " + asm("sys_arch"))
+}
+
+# ============================================================================
+# String operations via asm
+# ============================================================================
+
+print("")
+print("--- String Operations via asm ---")
+
+unsafe {
+    text := "  Hello, World!  "
+    trimmed := asm("str_trim", text)
+    upper := asm("str_upper", trimmed)
+    lower := asm("str_lower", trimmed)
+
+    print("Original: '" + text + "'")
+    print("Trimmed:  '" + trimmed + "'")
+    print("Upper:    '" + upper + "'")
+    print("Lower:    '" + lower + "'")
+}
+
+# ============================================================================
+# Wrapping unsafe in safe functions
+# ============================================================================
+
+print("")
+print("--- Safe Wrapper Functions ---")
+
+# Best practice: wrap unsafe code in safe functions
+fn get_platform() -> string {
+    unsafe {
+        os := asm("sys_os")
+        arch := asm("sys_arch")
+        return os + "-" + arch
+    }
+}
+
+fn is_macos() -> bool {
+    unsafe {
+        return asm("sys_os") == "darwin"
+    }
+}
+
+print("Platform: " + get_platform())
+print("Is macOS: " + string(is_macos()))
+
+# ============================================================================
+# File operations via asm (compared to io module)
+# ============================================================================
+
+print("")
+print("--- File Operations ---")
+
+# Using module (preferred)
+print("Via io module:")
+if io.exists("examples/unsafe_demo.zg") {
+    print("  File exists: true")
+}
+
+# Using unsafe (for demonstration)
+print("Via unsafe:")
+unsafe {
+    exists := asm("file_exists", "examples/unsafe_demo.zg")
+    print("  File exists: " + string(exists))
+}
+
+# ============================================================================
+# Character operations via asm
+# ============================================================================
+
+print("")
+print("--- Character Operations via asm ---")
+
+unsafe {
+    # Get ASCII code
+    code := asm("char_ord", "A")
+    print("ord('A') = " + string(code))
+
+    # Convert code to character
+    ch := asm("char_chr", 97)
+    print("chr(97) = " + ch)
+
+    # Character type checks
+    print("is_digit('5') = " + string(asm("char_is_digit", "5")))
+    print("is_alpha('x') = " + string(asm("char_is_alpha", "x")))
+    print("is_space(' ') = " + string(asm("char_is_space", " ")))
+}
+
+# ============================================================================
+# Error handling
+# ============================================================================
+
+print("")
+print("--- Error Handling ---")
+
+# Note: Calling asm() outside unsafe block would cause an error
+# asm("sys_os")  # This would fail!
+
+print("asm() can only be called inside unsafe blocks")
+
+# ============================================================================
+# When to use unsafe
+# ============================================================================
+
+print("")
+print("=== Summary ===")
+print("")
+print("Use unsafe + asm when:")
+print("  - Building the compiler itself")
+print("  - Implementing FFI/interop")
+print("  - Performance-critical code (after profiling)")
+print("  - Platform-specific workarounds")
+print("")
+print("Prefer modules for:")
+print("  - File I/O -> io.read_file(), io.write_file()")
+print("  - System info -> sys.os(), sys.arch()")
+print("  - String ops -> str.split(), str.upper()")
+print("  - Char checks -> char.is_digit(), char.ord()")

@@ -88,6 +88,15 @@ The following identifiers are reserved and cannot be used as variable, function,
 | `Self`   | Refers to the implementing type in specs  |
 | `this`   | Refers to the current instance in methods |
 
+### Low-Level
+
+| Keyword  | Description                                  |
+| -------- | -------------------------------------------- |
+| `unsafe` | Marks a block for low-level operations       |
+| `asm`    | Calls a registered runtime function directly |
+
+See [UNSAFE.md](UNSAFE.md) for details on low-level operations.
+
 ### Built-in Result Variants
 
 | Keyword | Description                       |
