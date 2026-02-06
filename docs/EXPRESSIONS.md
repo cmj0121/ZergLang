@@ -251,7 +251,14 @@ numbers.filter(fn(x: int) -> bool { return x > 0 })
 result := fn() -> int { return 42 }()           # immediate invocation
 ```
 
-Anonymous functions can capture variables from the enclosing scope (closures).
+Anonymous functions can capture variables from the enclosing scope (closures). Captured variables are
+copied by value. To modify external state, use reference parameters just like regular functions:
+
+```txt
+fn(mut count: &int) { count = count + 1 }
+```
+
+See [Closures](CONCEPTS.md#closures) for details.
 
 ## Function Calls
 

@@ -9,17 +9,18 @@ The following identifiers are reserved and cannot be used as variable, function,
 
 ### Declarations
 
-| Keyword | Description                                    |
-| ------- | ---------------------------------------------- |
-| `fn`    | Declares a function                            |
-| `class` | Declares a class (data structure)              |
-| `impl`  | Implements methods for a class or spec         |
-| `spec`  | Declares a specification (interface)           |
-| `enum`  | Declares an enumeration (sum type)             |
-| `type`  | Declares a type alias                          |
-| `const` | Declares a compile-time constant               |
-| `pub`   | Makes a declaration visible outside its module |
-| `mut`   | Marks a variable or method as mutable          |
+| Keyword  | Description                                    |
+| -------- | ---------------------------------------------- |
+| `fn`     | Declares a function                            |
+| `class`  | Declares a class (data structure)              |
+| `impl`   | Implements methods for a class or spec         |
+| `spec`   | Declares a specification (interface)           |
+| `enum`   | Declares an enumeration (sum type)             |
+| `type`   | Declares a type alias                          |
+| `const`  | Declares a compile-time constant               |
+| `pub`    | Makes a declaration visible outside its module |
+| `mut`    | Marks a variable or method as mutable          |
+| `static` | Declares a class method (no `this` access)     |
 
 ### Control Flow Keywords
 
@@ -326,8 +327,41 @@ items.filter(fn(x: int) -> bool { return x > 0 })
 go fn() { done <- true }()
 ```
 
-Parameter types must be declared explicitly. Anonymous functions are first-class values and can capture
-variables from the enclosing scope.
+Parameter types must be declared explicitly. Anonymous functions are first-class values.
+
+### Closures
+
+Anonymous functions can capture variables from the enclosing scope. Consistent with Zerg's copy-by-value
+semantics, captured variables are copied at the time the closure is created.
+
+```txt
+# Captured variable is copied
+multiplier := 10
+scale := fn(x: int) -> int {
+    return x * multiplier      # multiplier is copied when closure is created
+}
+print(scale(5))                # 50
+```
+
+To modify external state, pass it as a reference parameter -- just like regular functions:
+
+```txt
+fn makeCounter() -> fn(mut count: &int) -> int {
+    return fn(mut count: &int) -> int {
+        count = count + 1
+        return count
+    }
+}
+
+mut count := 0
+counter := makeCounter()
+print(counter(&count))         # 1
+print(counter(&count))         # 2
+print(counter(&count))         # 3
+```
+
+This keeps closures fully consistent with function semantics: copy-by-value by default, explicit `&` for
+reference passing.
 
 ### Generic Functions
 
@@ -344,12 +378,28 @@ fn first[T](items: list[T]) -> T {
 }
 ```
 
-Type parameters can have constraints by specifying a spec:
+Multiple type parameters are separated by commas:
+
+```txt
+fn pair[T, S](a: T, b: S) -> list[T] {
+    # T and S can be different types
+}
+
+fn zip[T, S](a: list[T], b: list[S]) -> list[list[T]] {
+    # combine two lists
+}
+```
+
+Type parameters can have constraints by specifying a spec. Use `+` to combine multiple constraints:
 
 ```txt
 fn max[T: Comparable[T]](a: T, b: T) -> T {
     if a.compare(b) > 0 { return a }
     return b
+}
+
+fn sortedUnique[T: Comparable[T] + Hashable](items: list[T]) -> list[T] {
+    # T must implement both Comparable and Hashable
 }
 ```
 
@@ -648,6 +698,27 @@ impl Animal {
     }
 }
 ```
+
+### Static Methods
+
+A method declared with `static` belongs to the class itself, not to instances. Static methods cannot access
+`this` and are called on the class name:
+
+```txt
+impl Math {
+    pub static fn max(a: int, b: int) -> int {
+        if a > b { return a }
+        return b
+    }
+}
+
+result := Math.max(10, 20)     # called on class, not instance
+```
+
+Static methods are useful for utility functions, factory methods, or operations that don't require instance
+state.
+
+### Mutability
 
 By default, methods cannot modify the receiver. A method that needs to mutate `this` must be declared with
 `mut fn`. The compiler enforces this -- calling a `mut fn` method on an immutable variable is a compile-time
