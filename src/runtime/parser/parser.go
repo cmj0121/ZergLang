@@ -426,7 +426,8 @@ func (p *Parser) parseFunctionLiteralWithName(fnToken lexer.Token, name *Identif
 	// Skip optional return type annotation: -> type
 	if p.peekToken.Type == lexer.ARROW {
 		p.nextToken() // move to ->
-		p.nextToken() // move to type, skip it
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
 	}
 
 	if p.peekToken.Type != lexer.LBRACE {
@@ -477,7 +478,8 @@ func (p *Parser) parseParameter() *Parameter {
 	// Skip type annotation: name: type
 	if p.peekToken.Type == lexer.COLON {
 		p.nextToken() // move to :
-		p.nextToken() // move to type, skip it
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
 	}
 
 	// Parse default value: name = expr
@@ -488,6 +490,40 @@ func (p *Parser) parseParameter() *Parameter {
 	}
 
 	return param
+}
+
+// skipTypeAnnotation skips a type annotation including generics.
+// Handles: int, list[int], map[string, int], ?int, etc.
+func (p *Parser) skipTypeAnnotation() {
+	// Skip optional ? for nullable types
+	if p.curToken.Literal == "?" {
+		p.nextToken()
+	}
+
+	// Skip the type name (IDENT or SELF)
+	if p.curToken.Type != lexer.IDENT && p.curToken.Type != lexer.SELF {
+		return
+	}
+	// Already on type name, don't advance yet
+
+	// Check for generic parameters: type[T] or type[K, V]
+	if p.peekToken.Type == lexer.LBRACKET {
+		p.nextToken() // move to [
+		p.nextToken() // move past [
+
+		// Skip generic parameters
+		depth := 1
+		for depth > 0 && p.curToken.Type != lexer.EOF {
+			if p.curToken.Type == lexer.LBRACKET {
+				depth++
+			} else if p.curToken.Type == lexer.RBRACKET {
+				depth--
+			}
+			if depth > 0 {
+				p.nextToken()
+			}
+		}
+	}
 }
 
 func (p *Parser) parseBlockStatement() *BlockStatement {
@@ -814,7 +850,8 @@ func (p *Parser) parseFieldDeclaration() *FieldDeclaration {
 	// Skip type annotation if present: name: type
 	if p.peekToken.Type == lexer.COLON {
 		p.nextToken() // move to :
-		p.nextToken() // move to type, skip it
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
 	}
 
 	// Parse default value if present: name = expr
@@ -941,7 +978,8 @@ func (p *Parser) parseMethodDeclaration() *MethodDeclaration {
 	// Skip optional return type annotation: -> type
 	if p.peekToken.Type == lexer.ARROW {
 		p.nextToken() // move to ->
-		p.nextToken() // move to type, skip it
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
 	}
 
 	if p.peekToken.Type != lexer.LBRACE {
@@ -1032,7 +1070,8 @@ func (p *Parser) parseMethodSignature() *MethodSignature {
 	// Skip optional return type annotation: -> type
 	if p.peekToken.Type == lexer.ARROW {
 		p.nextToken() // move to ->
-		p.nextToken() // move to type, skip it
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
 	}
 
 	return method
@@ -1049,10 +1088,24 @@ func (p *Parser) parseSignatureParameters() []*Identifier {
 	p.nextToken()
 	params = append(params, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
 
+	// Skip optional type annotation: : type
+	if p.peekToken.Type == lexer.COLON {
+		p.nextToken() // move to :
+		p.nextToken() // move to type
+		p.skipTypeAnnotation()
+	}
+
 	for p.peekToken.Type == lexer.COMMA {
 		p.nextToken() // move to comma
 		p.nextToken() // move to next param
 		params = append(params, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+
+		// Skip optional type annotation: : type
+		if p.peekToken.Type == lexer.COLON {
+			p.nextToken() // move to :
+			p.nextToken() // move to type
+			p.skipTypeAnnotation()
+		}
 	}
 
 	if p.peekToken.Type != lexer.RPAREN {
