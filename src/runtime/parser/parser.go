@@ -8,20 +8,95 @@ import (
 	"github.com/xrspace/zerglang/runtime/lexer"
 )
 
+// Precedence levels
+const (
+	_ int = iota
+	LOWEST
+	OR_PREC      // or
+	AND_PREC     // and
+	EQUALS       // == !=
+	LESSGREATER  // < > <= >=
+	SUM          // + -
+	PRODUCT      // * / %
+	POWER_PREC   // **
+	PREFIX       // -x, not x
+)
+
+var precedences = map[lexer.TokenType]int{
+	lexer.OR:       OR_PREC,
+	lexer.AND:      AND_PREC,
+	lexer.EQ:       EQUALS,
+	lexer.NOT_EQ:   EQUALS,
+	lexer.LT:       LESSGREATER,
+	lexer.GT:       LESSGREATER,
+	lexer.LT_EQ:    LESSGREATER,
+	lexer.GT_EQ:    LESSGREATER,
+	lexer.PLUS:     SUM,
+	lexer.MINUS:    SUM,
+	lexer.ASTERISK: PRODUCT,
+	lexer.SLASH:    PRODUCT,
+	lexer.PERCENT:  PRODUCT,
+	lexer.POWER:    POWER_PREC,
+}
+
+type (
+	prefixParseFn func() Expression
+	infixParseFn  func(Expression) Expression
+)
+
 // Parser produces an AST from a sequence of tokens.
 type Parser struct {
 	l         *lexer.Lexer
 	curToken  lexer.Token
 	peekToken lexer.Token
 	errors    []string
+
+	prefixParseFns map[lexer.TokenType]prefixParseFn
+	infixParseFns  map[lexer.TokenType]infixParseFn
 }
 
 // New creates a new Parser for the given Lexer.
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
+
+	p.prefixParseFns = make(map[lexer.TokenType]prefixParseFn)
+	p.registerPrefix(lexer.IDENT, p.parseIdentifier)
+	p.registerPrefix(lexer.INT, p.parseIntegerLiteral)
+	p.registerPrefix(lexer.STRING, p.parseStringLiteral)
+	p.registerPrefix(lexer.TRUE, p.parseBoolean)
+	p.registerPrefix(lexer.FALSE, p.parseBoolean)
+	p.registerPrefix(lexer.NIL, p.parseNil)
+	p.registerPrefix(lexer.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(lexer.NOT, p.parsePrefixExpression)
+	p.registerPrefix(lexer.LPAREN, p.parseGroupedExpression)
+
+	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
+	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
+	p.registerInfix(lexer.MINUS, p.parseInfixExpression)
+	p.registerInfix(lexer.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(lexer.SLASH, p.parseInfixExpression)
+	p.registerInfix(lexer.PERCENT, p.parseInfixExpression)
+	p.registerInfix(lexer.POWER, p.parseInfixExpression)
+	p.registerInfix(lexer.EQ, p.parseInfixExpression)
+	p.registerInfix(lexer.NOT_EQ, p.parseInfixExpression)
+	p.registerInfix(lexer.LT, p.parseInfixExpression)
+	p.registerInfix(lexer.GT, p.parseInfixExpression)
+	p.registerInfix(lexer.LT_EQ, p.parseInfixExpression)
+	p.registerInfix(lexer.GT_EQ, p.parseInfixExpression)
+	p.registerInfix(lexer.AND, p.parseInfixExpression)
+	p.registerInfix(lexer.OR, p.parseInfixExpression)
+
 	p.nextToken()
 	p.nextToken()
 	return p
+}
+
+func (p *Parser) registerPrefix(tokenType lexer.TokenType, fn prefixParseFn) {
+	p.prefixParseFns[tokenType] = fn
+}
+
+func (p *Parser) registerInfix(tokenType lexer.TokenType, fn infixParseFn) {
+	p.infixParseFns[tokenType] = fn
 }
 
 // ParseProgram parses the entire program and returns the AST.
@@ -47,6 +122,20 @@ func (p *Parser) Errors() []string {
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
+}
+
+func (p *Parser) curPrecedence() int {
+	if prec, ok := precedences[p.curToken.Type]; ok {
+		return prec
+	}
+	return LOWEST
+}
+
+func (p *Parser) peekPrecedence() int {
+	if prec, ok := precedences[p.peekToken.Type]; ok {
+		return prec
+	}
+	return LOWEST
 }
 
 func (p *Parser) parseStatement() Statement {
@@ -89,7 +178,7 @@ func (p *Parser) parseDeclarationStatement(mutable bool) *DeclarationStatement {
 	stmt.Token = p.curToken
 
 	p.nextToken() // move to expression
-	stmt.Value = p.parseExpression()
+	stmt.Value = p.parseExpression(LOWEST)
 
 	return stmt
 }
@@ -121,7 +210,7 @@ func (p *Parser) parseAssignmentStatement() *AssignmentStatement {
 
 	// Collect right-hand side expressions
 	p.nextToken() // move to first expression
-	expr := p.parseExpression()
+	expr := p.parseExpression(LOWEST)
 	if expr != nil {
 		stmt.Values = append(stmt.Values, expr)
 	}
@@ -130,7 +219,7 @@ func (p *Parser) parseAssignmentStatement() *AssignmentStatement {
 		p.nextToken() // move to comma
 		p.nextToken() // move to next expression
 
-		expr := p.parseExpression()
+		expr := p.parseExpression(LOWEST)
 		if expr != nil {
 			stmt.Values = append(stmt.Values, expr)
 		}
@@ -147,31 +236,36 @@ func (p *Parser) parseAssignmentStatement() *AssignmentStatement {
 
 func (p *Parser) parseExpressionStatement() *ExpressionStatement {
 	stmt := &ExpressionStatement{Token: p.curToken}
-	stmt.Expression = p.parseExpression()
+	stmt.Expression = p.parseExpression(LOWEST)
 	return stmt
 }
 
-func (p *Parser) parseExpression() Expression {
-	switch p.curToken.Type {
-	case lexer.IDENT:
-		return &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	case lexer.INT:
-		return p.parseIntegerLiteral()
-	case lexer.STRING:
-		return &StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
-	case lexer.TRUE:
-		return &BooleanLiteral{Token: p.curToken, Value: true}
-	case lexer.FALSE:
-		return &BooleanLiteral{Token: p.curToken, Value: false}
-	case lexer.NIL:
-		return &NilLiteral{Token: p.curToken}
-	default:
-		p.errors = append(p.errors, fmt.Sprintf("unexpected token: %s", p.curToken.Type))
+func (p *Parser) parseExpression(precedence int) Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
+		p.errors = append(p.errors, fmt.Sprintf("no prefix parse function for %s", p.curToken.Type))
 		return nil
 	}
+	leftExp := prefix()
+
+	for precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+
+		p.nextToken()
+		leftExp = infix(leftExp)
+	}
+
+	return leftExp
 }
 
-func (p *Parser) parseIntegerLiteral() *IntegerLiteral {
+func (p *Parser) parseIdentifier() Expression {
+	return &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseIntegerLiteral() Expression {
 	lit := &IntegerLiteral{Token: p.curToken}
 
 	// Remove underscores from the literal
@@ -185,4 +279,62 @@ func (p *Parser) parseIntegerLiteral() *IntegerLiteral {
 
 	lit.Value = value
 	return lit
+}
+
+func (p *Parser) parseStringLiteral() Expression {
+	return &StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseBoolean() Expression {
+	return &BooleanLiteral{Token: p.curToken, Value: p.curToken.Type == lexer.TRUE}
+}
+
+func (p *Parser) parseNil() Expression {
+	return &NilLiteral{Token: p.curToken}
+}
+
+func (p *Parser) parsePrefixExpression() Expression {
+	expression := &PrefixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+	}
+
+	p.nextToken()
+	expression.Right = p.parseExpression(PREFIX)
+
+	return expression
+}
+
+func (p *Parser) parseInfixExpression(left Expression) Expression {
+	expression := &InfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
+
+	precedence := p.curPrecedence()
+
+	// Right-associative for power operator
+	if p.curToken.Type == lexer.POWER {
+		precedence--
+	}
+
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+
+	return expression
+}
+
+func (p *Parser) parseGroupedExpression() Expression {
+	p.nextToken()
+
+	exp := p.parseExpression(LOWEST)
+
+	if p.peekToken.Type != lexer.RPAREN {
+		p.errors = append(p.errors, "expected )")
+		return nil
+	}
+	p.nextToken()
+
+	return exp
 }

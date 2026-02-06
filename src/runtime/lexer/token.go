@@ -17,6 +17,22 @@ const (
 	ASSIGN  TokenType = "="
 	DECLARE TokenType = ":="
 
+	// Arithmetic operators
+	PLUS     TokenType = "+"
+	MINUS    TokenType = "-"
+	ASTERISK TokenType = "*"
+	SLASH    TokenType = "/"
+	PERCENT  TokenType = "%"
+	POWER    TokenType = "**"
+
+	// Comparison operators
+	EQ     TokenType = "=="
+	NOT_EQ TokenType = "!="
+	LT     TokenType = "<"
+	GT     TokenType = ">"
+	LT_EQ  TokenType = "<="
+	GT_EQ  TokenType = ">="
+
 	// Delimiters
 	COMMA  TokenType = ","
 	LPAREN TokenType = "("
@@ -27,6 +43,9 @@ const (
 	FALSE TokenType = "FALSE"
 	NIL   TokenType = "NIL"
 	MUT   TokenType = "MUT"
+	AND   TokenType = "AND"
+	OR    TokenType = "OR"
+	NOT   TokenType = "NOT"
 )
 
 // Token represents a lexical token.
@@ -42,6 +61,9 @@ var keywords = map[string]TokenType{
 	"false": FALSE,
 	"nil":   NIL,
 	"mut":   MUT,
+	"and":   AND,
+	"or":    OR,
+	"not":   NOT,
 }
 
 // LookupIdent returns the token type for an identifier.
