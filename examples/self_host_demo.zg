@@ -1,0 +1,147 @@
+# Self-hosting demo: Platform detection and file I/O
+
+# Print platform info using modules
+print("=== Platform Info ===")
+print("OS: " + sys.os())
+print("Arch: " + sys.arch())
+
+# String manipulation
+print("")
+print("=== String Module ===")
+text := "  Hello, World!  "
+print("Original: '" + text + "'")
+print("Trimmed: '" + str.trim(text) + "'")
+print("Upper: " + str.upper(str.trim(text)))
+print("Lower: " + str.lower(str.trim(text)))
+
+# Split and join
+csv := "apple,banana,cherry"
+parts := str.split(csv, ",")
+print("")
+print("=== Split/Join ===")
+print("CSV: " + csv)
+print("Parts: " + string(parts))
+print("Joined: " + str.join(parts, " | "))
+
+# Character checking
+print("")
+print("=== Character Module ===")
+print("is_digit('5'): " + string(char.is_digit("5")))
+print("is_alpha('a'): " + string(char.is_alpha("a")))
+print("ord('A'): " + string(char.ord("A")))
+print("chr(65): " + char.chr(65))
+
+# List methods
+print("")
+print("=== List Methods ===")
+nums := [3, 1, 4, 1, 5, 9, 2, 6]
+print("Original: " + string(nums))
+print("Sorted: " + string(nums.sort()))
+print("Reversed: " + string(nums.reverse()))
+print("Slice(2,5): " + string(nums.slice(2, 5)))
+print("Index of 5: " + string(nums.index(5)))
+print("Joined: " + nums.join("-"))
+
+# Using unsafe block with asm (low-level)
+print("")
+print("=== Unsafe Block ===")
+unsafe {
+    os_name := asm("sys_os")
+    arch_name := asm("sys_arch")
+    print("Via asm - OS: " + os_name + ", Arch: " + arch_name)
+}
+
+# Simple tokenizer using char module
+print("")
+print("=== Simple Tokenizer ===")
+
+fn is_identifier_start(c) {
+    return char.is_alpha(c) or c == "_"
+}
+
+fn read_number(source, start, n) {
+    mut i := start
+    for i < n {
+        c := source[i]
+        if not char.is_digit(c) {
+            break
+        }
+        i = i + 1
+    }
+    return i
+}
+
+fn read_identifier(source, start, n) {
+    mut i := start
+    for i < n {
+        c := source[i]
+        if not (char.is_alnum(c) or c == "_") {
+            break
+        }
+        i = i + 1
+    }
+    return i
+}
+
+fn tokenize(source) {
+    mut tokens := []
+    mut i := 0
+    n := len(source)
+
+    for i < n {
+        ch := source[i]
+        mut handled := false
+
+        # Skip whitespace
+        if char.is_space(ch) {
+            i = i + 1
+            handled = true
+        }
+
+        # Number
+        if not handled and char.is_digit(ch) {
+            start := i
+            i = read_number(source, i, n)
+            tokens = tokens.append({"type": "INT", "value": str.substring(source, start, i)})
+            handled = true
+        }
+
+        # Identifier
+        if not handled and is_identifier_start(ch) {
+            start := i
+            i = read_identifier(source, i, n)
+            tokens = tokens.append({"type": "IDENT", "value": str.substring(source, start, i)})
+            handled = true
+        }
+
+        # Single-char operators
+        if not handled {
+            if ch == "+" {
+                tokens = tokens.append({"type": "PLUS", "value": "+"})
+            }
+            if ch == "-" {
+                tokens = tokens.append({"type": "MINUS", "value": "-"})
+            }
+            if ch == "*" {
+                tokens = tokens.append({"type": "STAR", "value": "*"})
+            }
+            if ch == "=" {
+                tokens = tokens.append({"type": "ASSIGN", "value": "="})
+            }
+            i = i + 1
+        }
+    }
+
+    return tokens
+}
+
+code := "x = 42 + y"
+tokens := tokenize(code)
+print("Code: " + code)
+print("Tokens:")
+for tok in tokens {
+    print("  " + tok["type"] + ": " + tok["value"])
+}
+
+print("")
+print("=== Done ===")

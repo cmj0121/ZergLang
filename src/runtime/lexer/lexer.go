@@ -197,17 +197,35 @@ func (l *Lexer) readNumber() string {
 }
 
 func (l *Lexer) readString() string {
-	position := l.position + 1
+	var result []byte
+	l.readChar() // skip opening quote
 	for {
-		l.readChar()
 		if l.ch == '"' || l.ch == 0 {
 			break
 		}
 		if l.ch == '\\' {
-			l.readChar() // skip escaped character
+			l.readChar() // read the escaped character
+			switch l.ch {
+			case 'n':
+				result = append(result, '\n')
+			case 't':
+				result = append(result, '\t')
+			case 'r':
+				result = append(result, '\r')
+			case '\\':
+				result = append(result, '\\')
+			case '"':
+				result = append(result, '"')
+			default:
+				// Unknown escape, keep as-is
+				result = append(result, '\\', l.ch)
+			}
+		} else {
+			result = append(result, l.ch)
 		}
+		l.readChar()
 	}
-	return l.input[position:l.position]
+	return string(result)
 }
 
 func isLetter(ch byte) bool {

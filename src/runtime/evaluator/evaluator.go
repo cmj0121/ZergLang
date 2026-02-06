@@ -119,6 +119,10 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalReferenceExpression(node, env)
 	case *parser.AssertStatement:
 		return evalAssertStatement(node, env)
+	case *parser.UnsafeBlock:
+		return evalUnsafeBlock(node, env)
+	case *parser.AsmExpression:
+		return evalAsmExpression(node, env)
 	}
 
 	return nil
@@ -446,8 +450,13 @@ func NewEnvironment() *Environment {
 // NewEnvironmentWithBuiltins creates a new Environment with all builtins pre-declared.
 func NewEnvironmentWithBuiltins() *Environment {
 	env := NewEnvironment()
+	// Register builtin functions
 	for name, builtin := range Builtins {
 		env.Declare(name, builtin, false)
+	}
+	// Register builtin modules
+	for name, module := range BuiltinModules {
+		env.Declare(name, module, false)
 	}
 	return env
 }
@@ -708,6 +717,11 @@ func evalStringIndexExpression(str, index Object) Object {
 
 func evalMemberExpression(obj Object, member string) Object {
 	switch o := obj.(type) {
+	case *Module:
+		if method, ok := o.Methods[member]; ok {
+			return method
+		}
+		return newError("module '%s' has no method '%s'", o.Name, member)
 	case *Map:
 		// Check for builtin methods first
 		if methodFn := GetMapMethod(member); methodFn != nil {
@@ -1098,4 +1112,80 @@ func isError(obj Object) bool {
 		return obj.Type() == ERROR_OBJ
 	}
 	return false
+}
+
+// evalUnsafeBlock evaluates an unsafe block.
+// Currently, this just evaluates the body - in a future compiler,
+// this would enable access to low-level operations.
+func evalUnsafeBlock(ub *parser.UnsafeBlock, env *Environment) Object {
+	// Create a new environment to mark that we're in an unsafe context
+	unsafeEnv := NewEnclosedEnvironment(env)
+	unsafeEnv.Declare("__unsafe__", TRUE, false)
+
+	return Eval(ub.Body, unsafeEnv)
+}
+
+// AsmFunction is the signature for asm-callable functions.
+type AsmFunction func(args ...Object) Object
+
+// AsmRegistry maps function names to their Go implementations.
+var AsmRegistry = map[string]AsmFunction{
+	// sys functions
+	"sys_os":   func(args ...Object) Object { return sysOs(args...) },
+	"sys_arch": func(args ...Object) Object { return sysArch(args...) },
+	"sys_args": func(args ...Object) Object { return sysArgs(args...) },
+	"sys_exit": func(args ...Object) Object { return sysExit(args...) },
+	"sys_env":  func(args ...Object) Object { return sysEnv(args...) },
+
+	// io functions
+	"file_open":   func(args ...Object) Object { return ioOpen(args...) },
+	"file_read":   func(args ...Object) Object { return ioRead(args...) },
+	"file_write":  func(args ...Object) Object { return ioWrite(args...) },
+	"file_close":  func(args ...Object) Object { return ioClose(args...) },
+	"file_exists": func(args ...Object) Object { return ioExists(args...) },
+	"read_file":   func(args ...Object) Object { return ioReadFile(args...) },
+	"write_file":  func(args ...Object) Object { return ioWriteFile(args...) },
+
+	// str functions
+	"str_split":       func(args ...Object) Object { return strSplit(args...) },
+	"str_join":        func(args ...Object) Object { return strJoin(args...) },
+	"str_trim":        func(args ...Object) Object { return strTrim(args...) },
+	"str_find":        func(args ...Object) Object { return strFind(args...) },
+	"str_replace":     func(args ...Object) Object { return strReplace(args...) },
+	"str_substring":   func(args ...Object) Object { return strSubstring(args...) },
+	"str_starts_with": func(args ...Object) Object { return strStartsWith(args...) },
+	"str_ends_with":   func(args ...Object) Object { return strEndsWith(args...) },
+	"str_upper":       func(args ...Object) Object { return strUpper(args...) },
+	"str_lower":       func(args ...Object) Object { return strLower(args...) },
+	"str_contains":    func(args ...Object) Object { return strContains(args...) },
+
+	// char functions
+	"char_ord":      func(args ...Object) Object { return charOrd(args...) },
+	"char_chr":      func(args ...Object) Object { return charChr(args...) },
+	"char_is_digit": func(args ...Object) Object { return charIsDigit(args...) },
+	"char_is_alpha": func(args ...Object) Object { return charIsAlpha(args...) },
+	"char_is_space": func(args ...Object) Object { return charIsSpace(args...) },
+	"char_is_alnum": func(args ...Object) Object { return charIsAlnum(args...) },
+}
+
+// evalAsmExpression evaluates an asm expression.
+func evalAsmExpression(ae *parser.AsmExpression, env *Environment) Object {
+	// Check if we're in an unsafe context
+	if _, ok := env.Get("__unsafe__"); !ok {
+		return newError("asm() can only be used inside an unsafe block")
+	}
+
+	// Look up the function in the registry
+	fn, ok := AsmRegistry[ae.Function]
+	if !ok {
+		return newError("unknown asm function: %s", ae.Function)
+	}
+
+	// Evaluate arguments
+	args := evalExpressions(ae.Args, env)
+	if len(args) == 1 && IsError(args[0]) {
+		return args[0]
+	}
+
+	return fn(args...)
 }

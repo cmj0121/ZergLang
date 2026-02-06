@@ -841,17 +841,17 @@ func TestBuiltinLen(t *testing.T) {
 	}
 }
 
-func TestBuiltinStr(t *testing.T) {
+func TestBuiltinString(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
 	}{
-		{`str(42)`, "42"},
-		{`str(true)`, "true"},
-		{`str(false)`, "false"},
-		{`str(nil)`, "nil"},
-		{`str("hello")`, "hello"},
-		{`str([1, 2, 3])`, "[1, 2, 3]"},
+		{`string(42)`, "42"},
+		{`string(true)`, "true"},
+		{`string(false)`, "false"},
+		{`string(nil)`, "nil"},
+		{`string("hello")`, "hello"},
+		{`string([1, 2, 3])`, "[1, 2, 3]"},
 	}
 
 	for _, tt := range tests {
@@ -1036,5 +1036,412 @@ func TestMapContains(t *testing.T) {
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
 		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+// ============================================================================
+// Module tests
+// ============================================================================
+
+func TestSysModule(t *testing.T) {
+	// Test sys.os()
+	osResult := testEval(`sys.os()`)
+	osStr, ok := osResult.(*String)
+	if !ok {
+		t.Fatalf("expected String for sys.os(), got %T", osResult)
+	}
+	if osStr.Value != "darwin" && osStr.Value != "linux" && osStr.Value != "windows" {
+		t.Fatalf("unexpected os: %s", osStr.Value)
+	}
+
+	// Test sys.arch()
+	archResult := testEval(`sys.arch()`)
+	archStr, ok := archResult.(*String)
+	if !ok {
+		t.Fatalf("expected String for sys.arch(), got %T", archResult)
+	}
+	if archStr.Value != "amd64" && archStr.Value != "arm64" && archStr.Value != "386" {
+		t.Fatalf("unexpected arch: %s", archStr.Value)
+	}
+
+	// Test sys.args()
+	argsResult := testEval(`sys.args()`)
+	_, ok = argsResult.(*List)
+	if !ok {
+		t.Fatalf("expected List for sys.args(), got %T", argsResult)
+	}
+
+	// Test sys.env()
+	envResult := testEval(`sys.env("PATH")`)
+	_, ok = envResult.(*String)
+	if !ok {
+		t.Fatalf("expected String for sys.env(), got %T", envResult)
+	}
+}
+
+func TestStrModule(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`str.split("a,b,c", ",")`, []string{"a", "b", "c"}},
+		{`str.join(["a", "b", "c"], ",")`, "a,b,c"},
+		{`str.trim("  hello  ")`, "hello"},
+		{`str.find("hello", "l")`, int64(2)},
+		{`str.find("hello", "x")`, int64(-1)},
+		{`str.replace("hello", "l", "L")`, "heLLo"},
+		{`str.substring("hello", 1, 4)`, "ell"},
+		{`str.starts_with("hello", "he")`, true},
+		{`str.starts_with("hello", "lo")`, false},
+		{`str.ends_with("hello", "lo")`, true},
+		{`str.ends_with("hello", "he")`, false},
+		{`str.upper("hello")`, "HELLO"},
+		{`str.lower("HELLO")`, "hello"},
+		{`str.contains("hello", "ell")`, true},
+		{`str.contains("hello", "xyz")`, false},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("for %s: expected String, got %T (%+v)", tt.input, evaluated, evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("for %s: expected %q, got %q", tt.input, expected, str.Value)
+			}
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case bool:
+			testBooleanObject(t, evaluated, expected)
+		case []string:
+			list, ok := evaluated.(*List)
+			if !ok {
+				t.Errorf("for %s: expected List, got %T", tt.input, evaluated)
+				continue
+			}
+			if len(list.Elements) != len(expected) {
+				t.Errorf("for %s: expected %d elements, got %d", tt.input, len(expected), len(list.Elements))
+				continue
+			}
+			for i, exp := range expected {
+				str, ok := list.Elements[i].(*String)
+				if !ok || str.Value != exp {
+					t.Errorf("for %s: element %d expected %q, got %v", tt.input, i, exp, list.Elements[i])
+				}
+			}
+		}
+	}
+}
+
+func TestCharModule(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`char.ord("A")`, int64(65)},
+		{`char.ord("a")`, int64(97)},
+		{`char.chr(65)`, "A"},
+		{`char.chr(97)`, "a"},
+		{`char.is_digit("5")`, true},
+		{`char.is_digit("a")`, false},
+		{`char.is_alpha("a")`, true},
+		{`char.is_alpha("5")`, false},
+		{`char.is_space(" ")`, true},
+		{`char.is_space("a")`, false},
+		{`char.is_alnum("a")`, true},
+		{`char.is_alnum("5")`, true},
+		{`char.is_alnum("!")`, false},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("for %s: expected String, got %T", tt.input, evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("for %s: expected %q, got %q", tt.input, expected, str.Value)
+			}
+		case bool:
+			testBooleanObject(t, evaluated, expected)
+		}
+	}
+}
+
+// ============================================================================
+// Unsafe/asm tests
+// ============================================================================
+
+func TestUnsafeBlock(t *testing.T) {
+	input := `unsafe {
+		x := 42
+		x
+	}`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 42)
+}
+
+func TestAsmOutsideUnsafeError(t *testing.T) {
+	input := `asm("sys_os")`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message != "asm() can only be used inside an unsafe block" {
+		t.Fatalf("unexpected error: %s", err.Message)
+	}
+}
+
+func TestAsmSysOs(t *testing.T) {
+	input := `unsafe {
+		asm("sys_os")
+	}`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "darwin" && str.Value != "linux" && str.Value != "windows" {
+		t.Fatalf("unexpected os: %s", str.Value)
+	}
+}
+
+func TestAsmSysArch(t *testing.T) {
+	input := `unsafe {
+		asm("sys_arch")
+	}`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "amd64" && str.Value != "arm64" && str.Value != "386" {
+		t.Fatalf("unexpected arch: %s", str.Value)
+	}
+}
+
+func TestAsmStrFunctions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`unsafe { asm("str_upper", "hello") }`, "HELLO"},
+		{`unsafe { asm("str_lower", "HELLO") }`, "hello"},
+		{`unsafe { asm("str_trim", "  hello  ") }`, "hello"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("for %s: expected String, got %T", tt.input, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("for %s: expected %q, got %q", tt.input, tt.expected, str.Value)
+		}
+	}
+}
+
+func TestAsmUnknownFunction(t *testing.T) {
+	input := `unsafe {
+		asm("unknown_func")
+	}`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message != "unknown asm function: unknown_func" {
+		t.Fatalf("unexpected error: %s", err.Message)
+	}
+}
+
+// ============================================================================
+// Additional list method tests
+// ============================================================================
+
+func TestListJoin(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`["a", "b", "c"].join(",")`, "a,b,c"},
+		{`["hello", "world"].join(" ")`, "hello world"},
+		{`[1, 2, 3].join("-")`, "1-2-3"},
+		{`[].join(",")`, ""},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("for %s: expected String, got %T (%+v)", tt.input, evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("for %s: expected %q, got %q", tt.input, tt.expected, str.Value)
+		}
+	}
+}
+
+func TestListSlice(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []int64
+	}{
+		{`[1, 2, 3, 4, 5].slice(1, 4)`, []int64{2, 3, 4}},
+		{`[1, 2, 3].slice(0, 2)`, []int64{1, 2}},
+		{`[1, 2, 3].slice(0, 0)`, []int64{}},
+		{`[1, 2, 3].slice(5, 10)`, []int64{}},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		list, ok := evaluated.(*List)
+		if !ok {
+			t.Errorf("for %s: expected List, got %T", tt.input, evaluated)
+			continue
+		}
+		if len(list.Elements) != len(tt.expected) {
+			t.Errorf("for %s: expected %d elements, got %d", tt.input, len(tt.expected), len(list.Elements))
+			continue
+		}
+		for i, exp := range tt.expected {
+			testIntegerObject(t, list.Elements[i], exp)
+		}
+	}
+}
+
+func TestListIndexMethod(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{`[1, 2, 3].index(2)`, 1},
+		{`[1, 2, 3].index(1)`, 0},
+		{`[1, 2, 3].index(3)`, 2},
+		{`[1, 2, 3].index(5)`, -1},
+		{`["a", "b", "c"].index("b")`, 1},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestListReverse(t *testing.T) {
+	input := `[1, 2, 3].reverse()`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[0], 3)
+	testIntegerObject(t, list.Elements[1], 2)
+	testIntegerObject(t, list.Elements[2], 1)
+}
+
+func TestListSort(t *testing.T) {
+	input := `[3, 1, 2].sort()`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[0], 1)
+	testIntegerObject(t, list.Elements[1], 2)
+	testIntegerObject(t, list.Elements[2], 3)
+}
+
+func TestListSortStrings(t *testing.T) {
+	input := `["c", "a", "b"].sort()`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	expected := []string{"a", "b", "c"}
+	for i, exp := range expected {
+		str, ok := list.Elements[i].(*String)
+		if !ok || str.Value != exp {
+			t.Errorf("element %d: expected %q, got %v", i, exp, list.Elements[i])
+		}
+	}
+}
+
+// ============================================================================
+// Integration tests
+// ============================================================================
+
+func TestPlatformDetection(t *testing.T) {
+	input := `os := sys.os()
+if os == "darwin" {
+	result := "macOS"
+} else {
+	result := "other"
+}
+os`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	// Just verify it returned a valid OS string
+	if str.Value != "darwin" && str.Value != "linux" && str.Value != "windows" {
+		t.Fatalf("unexpected os: %s", str.Value)
+	}
+}
+
+func TestModuleMethodChaining(t *testing.T) {
+	input := `str.upper(str.trim("  hello  "))`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "HELLO" {
+		t.Fatalf("expected HELLO, got %s", str.Value)
 	}
 }

@@ -400,3 +400,22 @@ type AssertStatement struct {
 
 func (as *AssertStatement) statementNode()       {}
 func (as *AssertStatement) TokenLiteral() string { return as.Token.Literal }
+
+// UnsafeBlock represents: unsafe { ... }
+type UnsafeBlock struct {
+	Token lexer.Token // the 'unsafe' token
+	Body  *BlockStatement
+}
+
+func (ub *UnsafeBlock) statementNode()       {}
+func (ub *UnsafeBlock) TokenLiteral() string { return ub.Token.Literal }
+
+// AsmExpression represents: asm("go_function", args...)
+type AsmExpression struct {
+	Token    lexer.Token  // the 'asm' token
+	Function string       // Go function name
+	Args     []Expression // arguments
+}
+
+func (ae *AsmExpression) expressionNode()      {}
+func (ae *AsmExpression) TokenLiteral() string { return ae.Token.Literal }

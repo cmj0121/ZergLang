@@ -82,6 +82,9 @@ func run(filename string) error {
 
 	log.Debug().Int("statements", len(program.Statements)).Msg("parsed program")
 
+	// Set program args for sys.args()
+	evaluator.SetProgramArgs(os.Args)
+
 	env := evaluator.NewEnvironmentWithBuiltins()
 	result := evaluator.Eval(program, env)
 

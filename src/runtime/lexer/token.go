@@ -81,6 +81,10 @@ const (
 
 	// Builtins
 	ASSERT TokenType = "ASSERT"
+
+	// Low-level
+	UNSAFE TokenType = "UNSAFE"
+	ASM    TokenType = "ASM"
 )
 
 // Token represents a lexical token.
@@ -117,6 +121,8 @@ var keywords = map[string]TokenType{
 	"spec":     SPEC,
 	"Self":     SELF,
 	"assert":   ASSERT,
+	"unsafe":   UNSAFE,
+	"asm":      ASM,
 }
 
 // LookupIdent returns the token type for an identifier.

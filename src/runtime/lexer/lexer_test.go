@@ -89,8 +89,37 @@ func TestStringEscapes(t *testing.T) {
 		t.Fatalf("expected STRING, got %s", tok.Type)
 	}
 
-	if tok.Literal != `hello\nworld` {
-		t.Fatalf("expected hello\\nworld, got %s", tok.Literal)
+	// Escape sequences are now converted to actual characters
+	expected := "hello\nworld"
+	if tok.Literal != expected {
+		t.Fatalf("expected %q, got %q", expected, tok.Literal)
+	}
+}
+
+func TestStringEscapesAll(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`"hello\nworld"`, "hello\nworld"},
+		{`"hello\tworld"`, "hello\tworld"},
+		{`"hello\\world"`, "hello\\world"},
+		{`"hello\"world"`, "hello\"world"},
+		{`"hello\rworld"`, "hello\rworld"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+
+		if tok.Type != STRING {
+			t.Errorf("for %s: expected STRING, got %s", tt.input, tok.Type)
+			continue
+		}
+
+		if tok.Literal != tt.expected {
+			t.Errorf("for %s: expected %q, got %q", tt.input, tt.expected, tok.Literal)
+		}
 	}
 }
 

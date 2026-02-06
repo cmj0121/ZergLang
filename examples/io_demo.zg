@@ -1,0 +1,42 @@
+# File I/O demo
+
+# Test file exists
+test_file := "examples/self_host_demo.zg"
+print("Testing io module with: " + test_file)
+print("File exists: " + string(io.exists(test_file)))
+
+# Read file using convenience function
+print("")
+print("=== Reading file ===")
+content := io.read_file(test_file)
+lines := str.split(content, "\n")
+print("Total lines: " + string(len(lines)))
+print("First 3 lines:")
+print("  1: " + lines[0])
+print("  2: " + lines[1])
+print("  3: " + lines[2])
+
+# Test with file handles
+print("")
+print("=== Using file handles ===")
+handle := io.open(test_file, "r")
+print("Opened file handle: " + string(handle))
+file_content := io.read(handle)
+io.close(handle)
+print("Read " + string(len(file_content)) + " bytes")
+
+# Write to temp file
+print("")
+print("=== Write test ===")
+temp_file := "/tmp/zerg_test_output.txt"
+test_content := "Hello from Zerg!\nLine 2\nLine 3"
+io.write_file(temp_file, test_content)
+print("Wrote to: " + temp_file)
+
+# Read back
+read_back := io.read_file(temp_file)
+print("Read back: " + read_back)
+print("Match: " + string(read_back == test_content))
+
+print("")
+print("=== Done ===")

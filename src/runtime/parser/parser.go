@@ -80,6 +80,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.THIS, p.parseThis)
 	p.registerPrefix(lexer.SELF, p.parseSelf)
 	p.registerPrefix(lexer.AMPERSAND, p.parseReferenceExpression)
+	p.registerPrefix(lexer.ASM, p.parseAsmExpression)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -174,6 +175,8 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseImplDeclaration()
 	case lexer.ASSERT:
 		return p.parseAssertStatement()
+	case lexer.UNSAFE:
+		return p.parseUnsafeBlock()
 	case lexer.FN:
 		if p.peekToken.Type == lexer.IDENT {
 			return p.parseFunctionDeclaration()
@@ -1145,4 +1148,53 @@ func (p *Parser) parseAssertStatement() *AssertStatement {
 	}
 
 	return stmt
+}
+
+func (p *Parser) parseUnsafeBlock() *UnsafeBlock {
+	stmt := &UnsafeBlock{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after unsafe")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Body = p.parseBlockStatement()
+
+	return stmt
+}
+
+func (p *Parser) parseAsmExpression() Expression {
+	expr := &AsmExpression{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.LPAREN {
+		p.errors = append(p.errors, "expected ( after asm")
+		return nil
+	}
+	p.nextToken() // move to (
+
+	if p.peekToken.Type != lexer.STRING {
+		p.errors = append(p.errors, "expected function name string after asm(")
+		return nil
+	}
+	p.nextToken() // move to function name
+	expr.Function = p.curToken.Literal
+
+	// Parse optional arguments
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to argument
+		arg := p.parseExpression(LOWEST)
+		if arg != nil {
+			expr.Args = append(expr.Args, arg)
+		}
+	}
+
+	if p.peekToken.Type != lexer.RPAREN {
+		p.errors = append(p.errors, "expected ) after asm arguments")
+		return nil
+	}
+	p.nextToken() // move to )
+
+	return expr
 }

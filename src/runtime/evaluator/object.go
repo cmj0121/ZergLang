@@ -22,6 +22,8 @@ const (
 	REFERENCE_OBJ    ObjectType = "REFERENCE"
 	ERROR_OBJ        ObjectType = "ERROR"
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
+	MODULE_OBJ       ObjectType = "MODULE"
+	FILE_HANDLE_OBJ  ObjectType = "FILE_HANDLE"
 )
 
 // Object is the interface for all runtime values.
@@ -274,3 +276,22 @@ type BoundBuiltin struct {
 
 func (bb *BoundBuiltin) Type() ObjectType { return BUILTIN_OBJ }
 func (bb *BoundBuiltin) Inspect() string  { return fmt.Sprintf("<method %s>", bb.Name) }
+
+// Module represents a built-in module with methods.
+type Module struct {
+	Name    string
+	Methods map[string]*Builtin
+}
+
+func (m *Module) Type() ObjectType { return MODULE_OBJ }
+func (m *Module) Inspect() string  { return fmt.Sprintf("<module %s>", m.Name) }
+
+// FileHandle represents an open file handle.
+type FileHandle struct {
+	Path   string
+	Mode   string
+	Handle interface{} // *os.File
+}
+
+func (fh *FileHandle) Type() ObjectType { return FILE_HANDLE_OBJ }
+func (fh *FileHandle) Inspect() string  { return fmt.Sprintf("<file %s>", fh.Path) }
