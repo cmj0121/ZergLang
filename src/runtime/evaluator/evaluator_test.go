@@ -89,6 +89,48 @@ func TestIdentifierError(t *testing.T) {
 	}
 }
 
+func TestMutableDeclaration(t *testing.T) {
+	input := `mut x := 10
+x = 20
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 20)
+}
+
+func TestImmutableAssignmentError(t *testing.T) {
+	input := `x := 10
+x = 20`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	expected := "cannot assign to immutable variable: x"
+	if err.Message != expected {
+		t.Fatalf("wrong error message: got %q, want %q", err.Message, expected)
+	}
+}
+
+func TestMultiValueAssignment(t *testing.T) {
+	input := `mut a := 10
+mut b := 20
+a, b = b, a
+a`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 20)
+}
+
+func TestMultiValueAssignmentSwap(t *testing.T) {
+	input := `mut a := 10
+mut b := 20
+a, b = b, a
+b`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)

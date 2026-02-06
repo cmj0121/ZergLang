@@ -31,15 +31,26 @@ func (p *Program) TokenLiteral() string {
 	return ""
 }
 
-// DeclarationStatement represents a variable declaration: x := expr
+// DeclarationStatement represents a variable declaration: x := expr or mut x := expr
 type DeclarationStatement struct {
-	Token lexer.Token // the := token
-	Name  *Identifier
-	Value Expression
+	Token   lexer.Token // the := token
+	Name    *Identifier
+	Value   Expression
+	Mutable bool
 }
 
 func (ds *DeclarationStatement) statementNode()       {}
 func (ds *DeclarationStatement) TokenLiteral() string { return ds.Token.Literal }
+
+// AssignmentStatement represents variable reassignment: x = expr or x, y = a, b
+type AssignmentStatement struct {
+	Token  lexer.Token  // the = token
+	Names  []*Identifier
+	Values []Expression
+}
+
+func (as *AssignmentStatement) statementNode()       {}
+func (as *AssignmentStatement) TokenLiteral() string { return as.Token.Literal }
 
 // ExpressionStatement represents a bare expression used as a statement.
 type ExpressionStatement struct {

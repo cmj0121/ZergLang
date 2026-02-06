@@ -132,6 +132,88 @@ func TestIdentifier(t *testing.T) {
 	}
 }
 
+func TestMutableDeclaration(t *testing.T) {
+	input := `mut x := 42`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*DeclarationStatement)
+	if !ok {
+		t.Fatalf("expected DeclarationStatement, got %T", program.Statements[0])
+	}
+
+	if !stmt.Mutable {
+		t.Fatal("expected mutable declaration")
+	}
+
+	if stmt.Name.Value != "x" {
+		t.Fatalf("expected x, got %s", stmt.Name.Value)
+	}
+}
+
+func TestAssignmentStatement(t *testing.T) {
+	input := `x = 42`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*AssignmentStatement)
+	if !ok {
+		t.Fatalf("expected AssignmentStatement, got %T", program.Statements[0])
+	}
+
+	if len(stmt.Names) != 1 {
+		t.Fatalf("expected 1 name, got %d", len(stmt.Names))
+	}
+
+	if stmt.Names[0].Value != "x" {
+		t.Fatalf("expected x, got %s", stmt.Names[0].Value)
+	}
+}
+
+func TestMultiValueAssignment(t *testing.T) {
+	input := `a, b = 1, 2`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*AssignmentStatement)
+	if !ok {
+		t.Fatalf("expected AssignmentStatement, got %T", program.Statements[0])
+	}
+
+	if len(stmt.Names) != 2 {
+		t.Fatalf("expected 2 names, got %d", len(stmt.Names))
+	}
+
+	if len(stmt.Values) != 2 {
+		t.Fatalf("expected 2 values, got %d", len(stmt.Values))
+	}
+
+	if stmt.Names[0].Value != "a" || stmt.Names[1].Value != "b" {
+		t.Fatalf("expected a, b got %s, %s", stmt.Names[0].Value, stmt.Names[1].Value)
+	}
+}
+
 func checkParserErrors(t *testing.T, p *Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {

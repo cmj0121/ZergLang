@@ -93,3 +93,46 @@ func TestStringEscapes(t *testing.T) {
 		t.Fatalf("expected hello\\nworld, got %s", tok.Literal)
 	}
 }
+
+func TestAssignmentTokens(t *testing.T) {
+	input := `mut x := 10
+x = 20
+a, b = b, a`
+
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{MUT, "mut"},
+		{IDENT, "x"},
+		{DECLARE, ":="},
+		{INT, "10"},
+		{IDENT, "x"},
+		{ASSIGN, "="},
+		{INT, "20"},
+		{IDENT, "a"},
+		{COMMA, ","},
+		{IDENT, "b"},
+		{ASSIGN, "="},
+		{IDENT, "b"},
+		{COMMA, ","},
+		{IDENT, "a"},
+		{EOF, ""},
+	}
+
+	l := New(input)
+
+	for i, tt := range tests {
+		tok := l.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

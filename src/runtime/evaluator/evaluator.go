@@ -13,6 +13,8 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalProgram(node, env)
 	case *parser.DeclarationStatement:
 		return evalDeclarationStatement(node, env)
+	case *parser.AssignmentStatement:
+		return evalAssignmentStatement(node, env)
 	case *parser.ExpressionStatement:
 		return Eval(node.Expression, env)
 	case *parser.Identifier:
@@ -45,8 +47,32 @@ func evalDeclarationStatement(ds *parser.DeclarationStatement, env *Environment)
 	if val == nil {
 		return nil
 	}
-	env.Set(ds.Name.Value, val)
+	env.Declare(ds.Name.Value, val, ds.Mutable)
 	return val
+}
+
+func evalAssignmentStatement(as *parser.AssignmentStatement, env *Environment) Object {
+	// Evaluate all values first (for swap: a, b = b, a)
+	values := make([]Object, len(as.Values))
+	for i, expr := range as.Values {
+		val := Eval(expr, env)
+		if IsError(val) {
+			return val
+		}
+		values[i] = val
+	}
+
+	// Assign all values
+	for i, name := range as.Names {
+		if err := env.Assign(name.Value, values[i]); err != nil {
+			return newError("%s", err.Error())
+		}
+	}
+
+	if len(values) == 1 {
+		return values[0]
+	}
+	return values[len(values)-1]
 }
 
 func evalIdentifier(node *parser.Identifier, env *Environment) Object {
@@ -77,24 +103,51 @@ func IsError(obj Object) bool {
 	return false
 }
 
+// binding represents a variable binding with its value and mutability.
+type binding struct {
+	value   Object
+	mutable bool
+}
+
 // Environment stores variable bindings.
 type Environment struct {
-	store map[string]Object
+	store map[string]*binding
 }
 
 // NewEnvironment creates a new Environment.
 func NewEnvironment() *Environment {
-	return &Environment{store: make(map[string]Object)}
+	return &Environment{store: make(map[string]*binding)}
 }
 
 // Get retrieves a variable from the environment.
 func (e *Environment) Get(name string) (Object, bool) {
-	obj, ok := e.store[name]
-	return obj, ok
+	b, ok := e.store[name]
+	if !ok {
+		return nil, false
+	}
+	return b.value, true
 }
 
-// Set stores a variable in the environment.
-func (e *Environment) Set(name string, val Object) Object {
-	e.store[name] = val
+// Declare creates a new variable in the environment.
+func (e *Environment) Declare(name string, val Object, mutable bool) Object {
+	e.store[name] = &binding{value: val, mutable: mutable}
 	return val
+}
+
+// Assign updates a mutable variable in the environment.
+func (e *Environment) Assign(name string, val Object) error {
+	b, ok := e.store[name]
+	if !ok {
+		return fmt.Errorf("identifier not found: %s", name)
+	}
+	if !b.mutable {
+		return fmt.Errorf("cannot assign to immutable variable: %s", name)
+	}
+	b.value = val
+	return nil
+}
+
+// Set stores a variable in the environment (for backward compatibility).
+func (e *Environment) Set(name string, val Object) Object {
+	return e.Declare(name, val, false)
 }

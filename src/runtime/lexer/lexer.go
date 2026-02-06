@@ -29,6 +29,10 @@ func (l *Lexer) NextToken() Token {
 	tok.Column = l.column
 
 	switch l.ch {
+	case '=':
+		tok = l.newToken(ASSIGN, l.ch)
+	case ',':
+		tok = l.newToken(COMMA, l.ch)
 	case '(':
 		tok = l.newToken(LPAREN, l.ch)
 	case ')':
