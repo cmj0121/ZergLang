@@ -20,6 +20,7 @@ const (
 	PRODUCT      // * / %
 	POWER_PREC   // **
 	PREFIX       // -x, not x
+	CALL         // fn()
 )
 
 var precedences = map[lexer.TokenType]int{
@@ -37,6 +38,7 @@ var precedences = map[lexer.TokenType]int{
 	lexer.SLASH:    PRODUCT,
 	lexer.PERCENT:  PRODUCT,
 	lexer.POWER:    POWER_PREC,
+	lexer.LPAREN:   CALL,
 }
 
 type (
@@ -69,6 +71,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.MINUS, p.parsePrefixExpression)
 	p.registerPrefix(lexer.NOT, p.parsePrefixExpression)
 	p.registerPrefix(lexer.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(lexer.FN, p.parseFunctionLiteral)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -85,6 +88,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(lexer.GT_EQ, p.parseInfixExpression)
 	p.registerInfix(lexer.AND, p.parseInfixExpression)
 	p.registerInfix(lexer.OR, p.parseInfixExpression)
+	p.registerInfix(lexer.LPAREN, p.parseCallExpression)
 
 	p.nextToken()
 	p.nextToken()
@@ -139,6 +143,16 @@ func (p *Parser) peekPrecedence() int {
 }
 
 func (p *Parser) parseStatement() Statement {
+	// return expr
+	if p.curToken.Type == lexer.RETURN {
+		return p.parseReturnStatement()
+	}
+
+	// fn name(...) { ... } - named function declaration
+	if p.curToken.Type == lexer.FN && p.peekToken.Type == lexer.IDENT {
+		return p.parseFunctionDeclaration()
+	}
+
 	// mut x := expr
 	if p.curToken.Type == lexer.MUT {
 		return p.parseMutableDeclaration()
@@ -337,4 +351,163 @@ func (p *Parser) parseGroupedExpression() Expression {
 	p.nextToken()
 
 	return exp
+}
+
+func (p *Parser) parseReturnStatement() *ReturnStatement {
+	stmt := &ReturnStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	if p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		stmt.ReturnValue = p.parseExpression(LOWEST)
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseFunctionDeclaration() *DeclarationStatement {
+	fnToken := p.curToken
+	p.nextToken() // move to function name
+
+	name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	fn := p.parseFunctionLiteralWithName(fnToken, name)
+
+	return &DeclarationStatement{
+		Token:   fnToken,
+		Name:    name,
+		Value:   fn,
+		Mutable: false,
+	}
+}
+
+func (p *Parser) parseFunctionLiteral() Expression {
+	return p.parseFunctionLiteralWithName(p.curToken, nil)
+}
+
+func (p *Parser) parseFunctionLiteralWithName(fnToken lexer.Token, name *Identifier) *FunctionLiteral {
+	lit := &FunctionLiteral{Token: fnToken, Name: name}
+
+	if p.peekToken.Type != lexer.LPAREN {
+		p.errors = append(p.errors, "expected ( after fn")
+		return nil
+	}
+	p.nextToken()
+
+	lit.Parameters = p.parseFunctionParameters()
+
+	// Skip optional return type annotation: -> type
+	if p.peekToken.Type == lexer.ARROW {
+		p.nextToken() // move to ->
+		p.nextToken() // move to type, skip it
+	}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { for function body")
+		return nil
+	}
+	p.nextToken()
+
+	lit.Body = p.parseBlockStatement()
+
+	return lit
+}
+
+func (p *Parser) parseFunctionParameters() []*Parameter {
+	params := []*Parameter{}
+
+	if p.peekToken.Type == lexer.RPAREN {
+		p.nextToken()
+		return params
+	}
+
+	p.nextToken()
+
+	param := p.parseParameter()
+	params = append(params, param)
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to next param
+		param := p.parseParameter()
+		params = append(params, param)
+	}
+
+	if p.peekToken.Type != lexer.RPAREN {
+		p.errors = append(p.errors, "expected ) after parameters")
+		return nil
+	}
+	p.nextToken()
+
+	return params
+}
+
+func (p *Parser) parseParameter() *Parameter {
+	param := &Parameter{
+		Name: &Identifier{Token: p.curToken, Value: p.curToken.Literal},
+	}
+
+	// Skip type annotation: name: type
+	if p.peekToken.Type == lexer.COLON {
+		p.nextToken() // move to :
+		p.nextToken() // move to type, skip it
+	}
+
+	// Parse default value: name = expr
+	if p.peekToken.Type == lexer.ASSIGN {
+		p.nextToken() // move to =
+		p.nextToken() // move to default value
+		param.Default = p.parseExpression(LOWEST)
+	}
+
+	return param
+}
+
+func (p *Parser) parseBlockStatement() *BlockStatement {
+	block := &BlockStatement{Token: p.curToken}
+	block.Statements = []Statement{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+		p.nextToken()
+	}
+
+	return block
+}
+
+func (p *Parser) parseCallExpression(function Expression) Expression {
+	exp := &CallExpression{Token: p.curToken, Function: function}
+	exp.Arguments = p.parseCallArguments()
+	return exp
+}
+
+func (p *Parser) parseCallArguments() []Expression {
+	args := []Expression{}
+
+	if p.peekToken.Type == lexer.RPAREN {
+		p.nextToken()
+		return args
+	}
+
+	p.nextToken()
+	args = append(args, p.parseExpression(LOWEST))
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken()
+		p.nextToken()
+		args = append(args, p.parseExpression(LOWEST))
+	}
+
+	if p.peekToken.Type != lexer.RPAREN {
+		p.errors = append(p.errors, "expected ) after arguments")
+		return nil
+	}
+	p.nextToken()
+
+	return args
 }

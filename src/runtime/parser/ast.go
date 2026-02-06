@@ -125,3 +125,48 @@ type InfixExpression struct {
 
 func (ie *InfixExpression) expressionNode()      {}
 func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
+
+// BlockStatement represents a block of statements: { ... }
+type BlockStatement struct {
+	Token      lexer.Token // the { token
+	Statements []Statement
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+
+// Parameter represents a function parameter.
+type Parameter struct {
+	Name    *Identifier
+	Default Expression // optional default value
+}
+
+// FunctionLiteral represents a function: fn name(params) -> type { body }
+type FunctionLiteral struct {
+	Token      lexer.Token // the 'fn' token
+	Name       *Identifier // nil for anonymous functions
+	Parameters []*Parameter
+	Body       *BlockStatement
+}
+
+func (fl *FunctionLiteral) expressionNode()      {}
+func (fl *FunctionLiteral) TokenLiteral() string { return fl.Token.Literal }
+
+// CallExpression represents a function call: fn(args)
+type CallExpression struct {
+	Token     lexer.Token // the '(' token
+	Function  Expression  // Identifier or FunctionLiteral
+	Arguments []Expression
+}
+
+func (ce *CallExpression) expressionNode()      {}
+func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
+
+// ReturnStatement represents a return statement.
+type ReturnStatement struct {
+	Token       lexer.Token // the 'return' token
+	ReturnValue Expression
+}
+
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
