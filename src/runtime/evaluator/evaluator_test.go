@@ -366,6 +366,164 @@ x`
 	testIntegerObject(t, evaluated, 5)
 }
 
+func TestListLiteral(t *testing.T) {
+	input := `[1, 2, 3]`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[0], 1)
+	testIntegerObject(t, list.Elements[1], 2)
+	testIntegerObject(t, list.Elements[2], 3)
+}
+
+func TestListIndex(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"[1, 2, 3][0]", int64(1)},
+		{"[1, 2, 3][1]", int64(2)},
+		{"[1, 2, 3][2]", int64(3)},
+		{"[1, 2, 3][3]", nil},
+		{"[1, 2, 3][-1]", nil},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case nil:
+			if evaluated != NULL {
+				t.Errorf("expected NULL, got %T", evaluated)
+			}
+		}
+	}
+}
+
+func TestMapLiteral(t *testing.T) {
+	input := `{"one": 1, "two": 2}`
+	evaluated := testEval(input)
+
+	m, ok := evaluated.(*Map)
+	if !ok {
+		t.Fatalf("expected Map, got %T", evaluated)
+	}
+
+	if len(m.Pairs) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(m.Pairs))
+	}
+}
+
+func TestMapIndex(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`{"foo": 5}["foo"]`, int64(5)},
+		{`{"foo": 5}["bar"]`, nil},
+		{`{1: "one"}[1]`, "one"},
+		{`{true: "yes"}[true]`, "yes"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("expected String, got %T", evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("expected %s, got %s", expected, str.Value)
+			}
+		case nil:
+			if evaluated != NULL {
+				t.Errorf("expected NULL, got %T", evaluated)
+			}
+		}
+	}
+}
+
+func TestMemberAccess(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`{"name": "Alice"}.name`, "Alice"},
+		{`[1, 2, 3].length`, int64(3)},
+		{`"hello".length`, int64(5)},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("expected String, got %T", evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("expected %s, got %s", expected, str.Value)
+			}
+		}
+	}
+}
+
+func TestStringIndex(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`"hello"[0]`, "h"},
+		{`"hello"[4]`, "o"},
+		{`"hello"[5]`, nil},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("expected String, got %T", evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("expected %s, got %s", expected, str.Value)
+			}
+		case nil:
+			if evaluated != NULL {
+				t.Errorf("expected NULL, got %T", evaluated)
+			}
+		}
+	}
+}
+
+func TestForInList(t *testing.T) {
+	input := `mut sum := 0
+for n in [1, 2, 3, 4] {
+    sum = sum + n
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
