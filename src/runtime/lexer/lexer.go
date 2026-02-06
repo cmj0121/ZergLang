@@ -30,7 +30,53 @@ func (l *Lexer) NextToken() Token {
 
 	switch l.ch {
 	case '=':
-		tok = l.newToken(ASSIGN, l.ch)
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: EQ, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(ASSIGN, l.ch)
+		}
+	case '!':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: NOT_EQ, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(ILLEGAL, l.ch)
+		}
+	case '<':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: LT_EQ, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(LT, l.ch)
+		}
+	case '>':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: GT_EQ, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(GT, l.ch)
+		}
+	case '+':
+		tok = l.newToken(PLUS, l.ch)
+	case '-':
+		tok = l.newToken(MINUS, l.ch)
+	case '*':
+		if l.peekChar() == '*' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: POWER, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(ASTERISK, l.ch)
+		}
+	case '/':
+		tok = l.newToken(SLASH, l.ch)
+	case '%':
+		tok = l.newToken(PERCENT, l.ch)
 	case ',':
 		tok = l.newToken(COMMA, l.ch)
 	case '(':

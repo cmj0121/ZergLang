@@ -27,6 +27,22 @@ func Eval(node parser.Node, env *Environment) Object {
 		return nativeBoolToBooleanObject(node.Value)
 	case *parser.NilLiteral:
 		return NULL
+	case *parser.PrefixExpression:
+		right := Eval(node.Right, env)
+		if IsError(right) {
+			return right
+		}
+		return evalPrefixExpression(node.Operator, right)
+	case *parser.InfixExpression:
+		left := Eval(node.Left, env)
+		if IsError(left) {
+			return left
+		}
+		right := Eval(node.Right, env)
+		if IsError(right) {
+			return right
+		}
+		return evalInfixExpression(node.Operator, left, right)
 	}
 
 	return nil
@@ -81,6 +97,157 @@ func evalIdentifier(node *parser.Identifier, env *Environment) Object {
 		return newError("identifier not found: %s", node.Value)
 	}
 	return val
+}
+
+func evalPrefixExpression(operator string, right Object) Object {
+	switch operator {
+	case "-":
+		return evalMinusPrefixOperatorExpression(right)
+	case "not":
+		return evalNotOperatorExpression(right)
+	default:
+		return newError("unknown operator: %s%s", operator, right.Type())
+	}
+}
+
+func evalMinusPrefixOperatorExpression(right Object) Object {
+	if right.Type() != INTEGER_OBJ {
+		return newError("unknown operator: -%s", right.Type())
+	}
+	value := right.(*Integer).Value
+	return &Integer{Value: -value}
+}
+
+func evalNotOperatorExpression(right Object) Object {
+	switch right {
+	case TRUE:
+		return FALSE
+	case FALSE:
+		return TRUE
+	case NULL:
+		return TRUE
+	default:
+		return FALSE
+	}
+}
+
+func evalInfixExpression(operator string, left, right Object) Object {
+	switch {
+	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
+		return evalIntegerInfixExpression(operator, left, right)
+	case left.Type() == STRING_OBJ && right.Type() == STRING_OBJ:
+		return evalStringInfixExpression(operator, left, right)
+	case operator == "==":
+		return nativeBoolToBooleanObject(left == right)
+	case operator == "!=":
+		return nativeBoolToBooleanObject(left != right)
+	case operator == "and":
+		return evalAndExpression(left, right)
+	case operator == "or":
+		return evalOrExpression(left, right)
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalIntegerInfixExpression(operator string, left, right Object) Object {
+	leftVal := left.(*Integer).Value
+	rightVal := right.(*Integer).Value
+
+	switch operator {
+	case "+":
+		return &Integer{Value: leftVal + rightVal}
+	case "-":
+		return &Integer{Value: leftVal - rightVal}
+	case "*":
+		return &Integer{Value: leftVal * rightVal}
+	case "/":
+		if rightVal == 0 {
+			return newError("division by zero")
+		}
+		return &Integer{Value: leftVal / rightVal}
+	case "%":
+		if rightVal == 0 {
+			return newError("division by zero")
+		}
+		return &Integer{Value: leftVal % rightVal}
+	case "**":
+		return &Integer{Value: intPow(leftVal, rightVal)}
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case "<=":
+		return nativeBoolToBooleanObject(leftVal <= rightVal)
+	case ">=":
+		return nativeBoolToBooleanObject(leftVal >= rightVal)
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalStringInfixExpression(operator string, left, right Object) Object {
+	leftVal := left.(*String).Value
+	rightVal := right.(*String).Value
+
+	switch operator {
+	case "+":
+		return &String{Value: leftVal + rightVal}
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalAndExpression(left, right Object) Object {
+	if isTruthy(left) {
+		return right
+	}
+	return left
+}
+
+func evalOrExpression(left, right Object) Object {
+	if isTruthy(left) {
+		return left
+	}
+	return right
+}
+
+func isTruthy(obj Object) bool {
+	switch obj {
+	case NULL:
+		return false
+	case TRUE:
+		return true
+	case FALSE:
+		return false
+	default:
+		return true
+	}
+}
+
+func intPow(base, exp int64) int64 {
+	if exp < 0 {
+		return 0
+	}
+	result := int64(1)
+	for exp > 0 {
+		if exp%2 == 1 {
+			result *= base
+		}
+		base *= base
+		exp /= 2
+	}
+	return result
 }
 
 // Error represents a runtime error.

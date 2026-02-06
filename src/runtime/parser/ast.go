@@ -104,3 +104,24 @@ type NilLiteral struct {
 
 func (nl *NilLiteral) expressionNode()      {}
 func (nl *NilLiteral) TokenLiteral() string { return nl.Token.Literal }
+
+// PrefixExpression represents a prefix operator: -x, not x
+type PrefixExpression struct {
+	Token    lexer.Token // the prefix token, e.g. - or not
+	Operator string
+	Right    Expression
+}
+
+func (pe *PrefixExpression) expressionNode()      {}
+func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
+
+// InfixExpression represents an infix operator: x + y, x and y
+type InfixExpression struct {
+	Token    lexer.Token // the operator token, e.g. +
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (ie *InfixExpression) expressionNode()      {}
+func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
