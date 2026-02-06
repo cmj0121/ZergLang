@@ -275,6 +275,97 @@ greet()`
 	}
 }
 
+func TestIfStatement(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"if true { 10 }", int64(10)},
+		{"if false { 10 }", nil},
+		{"if 1 < 2 { 10 }", int64(10)},
+		{"if 1 > 2 { 10 }", nil},
+		{"if 1 > 2 { 10 } else { 20 }", int64(20)},
+		{"if 1 < 2 { 10 } else { 20 }", int64(10)},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case nil:
+			if evaluated != NULL {
+				t.Errorf("expected NULL, got %T", evaluated)
+			}
+		}
+	}
+}
+
+func TestForConditionLoop(t *testing.T) {
+	input := `mut count := 0
+for count < 5 {
+    count = count + 1
+}
+count`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
+func TestForInLoop(t *testing.T) {
+	input := `mut result := ""
+for ch in "abc" {
+    result = result + ch
+}
+result`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+	if str.Value != "abc" {
+		t.Fatalf("expected 'abc', got %s", str.Value)
+	}
+}
+
+func TestBreakStatement(t *testing.T) {
+	input := `mut sum := 0
+mut i := 0
+for i < 10 {
+    if i == 5 {
+        break
+    }
+    sum = sum + i
+    i = i + 1
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10) // 0+1+2+3+4 = 10
+}
+
+func TestContinueStatement(t *testing.T) {
+	input := `mut sum := 0
+mut i := 0
+for i < 5 {
+    i = i + 1
+    if i == 3 {
+        continue
+    }
+    sum = sum + i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 12) // 1+2+4+5 = 12
+}
+
+func TestNopStatement(t *testing.T) {
+	input := `x := 5
+nop
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
