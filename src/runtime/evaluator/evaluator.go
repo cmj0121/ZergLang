@@ -43,6 +43,26 @@ func Eval(node parser.Node, env *Environment) Object {
 			return right
 		}
 		return evalInfixExpression(node.Operator, left, right)
+	case *parser.BlockStatement:
+		return evalBlockStatement(node, env)
+	case *parser.ReturnStatement:
+		val := Eval(node.ReturnValue, env)
+		if IsError(val) {
+			return val
+		}
+		return &ReturnValue{Value: val}
+	case *parser.FunctionLiteral:
+		return &Function{Parameters: node.Parameters, Body: node.Body, Env: env}
+	case *parser.CallExpression:
+		function := Eval(node.Function, env)
+		if IsError(function) {
+			return function
+		}
+		args := evalExpressions(node.Arguments, env)
+		if len(args) == 1 && IsError(args[0]) {
+			return args[0]
+		}
+		return applyFunction(function, args)
 	}
 
 	return nil
@@ -53,9 +73,81 @@ func evalProgram(program *parser.Program, env *Environment) Object {
 
 	for _, stmt := range program.Statements {
 		result = Eval(stmt, env)
+
+		if returnValue, ok := result.(*ReturnValue); ok {
+			return returnValue.Value
+		}
+		if IsError(result) {
+			return result
+		}
 	}
 
 	return result
+}
+
+func evalBlockStatement(block *parser.BlockStatement, env *Environment) Object {
+	var result Object
+
+	for _, stmt := range block.Statements {
+		result = Eval(stmt, env)
+
+		if result != nil {
+			rt := result.Type()
+			if rt == RETURN_VALUE_OBJ || rt == "ERROR" {
+				return result
+			}
+		}
+	}
+
+	return result
+}
+
+func evalExpressions(exps []parser.Expression, env *Environment) []Object {
+	var result []Object
+
+	for _, e := range exps {
+		evaluated := Eval(e, env)
+		if IsError(evaluated) {
+			return []Object{evaluated}
+		}
+		result = append(result, evaluated)
+	}
+
+	return result
+}
+
+func applyFunction(fn Object, args []Object) Object {
+	function, ok := fn.(*Function)
+	if !ok {
+		return newError("not a function: %s", fn.Type())
+	}
+
+	extendedEnv := extendFunctionEnv(function, args)
+	evaluated := Eval(function.Body, extendedEnv)
+	return unwrapReturnValue(evaluated)
+}
+
+func extendFunctionEnv(fn *Function, args []Object) *Environment {
+	env := NewEnclosedEnvironment(fn.Env)
+
+	for i, param := range fn.Parameters {
+		if i < len(args) {
+			env.Declare(param.Name.Value, args[i], false)
+		} else if param.Default != nil {
+			// Evaluate default value in function's closure environment
+			defaultVal := Eval(param.Default, fn.Env)
+			env.Declare(param.Name.Value, defaultVal, false)
+		}
+	}
+
+	return env
+}
+
+func unwrapReturnValue(obj Object) Object {
+	if returnValue, ok := obj.(*ReturnValue); ok {
+		return returnValue.Value
+	}
+	return obj
 }
 
 func evalDeclarationStatement(ds *parser.DeclarationStatement, env *Environment) Object {
@@ -279,21 +371,42 @@ type binding struct {
 // Environment stores variable bindings.
 type Environment struct {
 	store map[string]*binding
+	outer *Environment
 }
 
 // NewEnvironment creates a new Environment.
 func NewEnvironment() *Environment {
-	return &Environment{store: make(map[string]*binding)}
+	return &Environment{store: make(map[string]*binding), outer: nil}
+}
+
+// NewEnclosedEnvironment creates a new Environment with an outer scope.
+func NewEnclosedEnvironment(outer *Environment) *Environment {
+	env := NewEnvironment()
+	env.outer = outer
+	return env
 }
 
 // Get retrieves a variable from the environment.
 func (e *Environment) Get(name string) (Object, bool) {
 	b, ok := e.store[name]
+	if !ok && e.outer != nil {
+		return e.outer.Get(name)
+	}
 	if !ok {
 		return nil, false
 	}
 	return b.value, true
 }
+
+// Function represents a function value with closure.
+type Function struct {
+	Parameters []*parser.Parameter
+	Body       *parser.BlockStatement
+	Env        *Environment
+}
+
+func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
+func (f *Function) Inspect() string  { return "fn(...) {...}" }
 
 // Declare creates a new variable in the environment.
 func (e *Environment) Declare(name string, val Object, mutable bool) Object {

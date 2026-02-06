@@ -6,10 +6,12 @@ import "fmt"
 type ObjectType string
 
 const (
-	INTEGER_OBJ ObjectType = "INTEGER"
-	STRING_OBJ  ObjectType = "STRING"
-	BOOLEAN_OBJ ObjectType = "BOOLEAN"
-	NULL_OBJ    ObjectType = "NULL"
+	INTEGER_OBJ      ObjectType = "INTEGER"
+	STRING_OBJ       ObjectType = "STRING"
+	BOOLEAN_OBJ      ObjectType = "BOOLEAN"
+	NULL_OBJ         ObjectType = "NULL"
+	FUNCTION_OBJ     ObjectType = "FUNCTION"
+	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
 )
 
 // Object is the interface for all runtime values.
@@ -61,3 +63,11 @@ func nativeBoolToBooleanObject(input bool) *Boolean {
 	}
 	return FALSE
 }
+
+// ReturnValue wraps a return value to propagate it up the call stack.
+type ReturnValue struct {
+	Value Object
+}
+
+func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
+func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }

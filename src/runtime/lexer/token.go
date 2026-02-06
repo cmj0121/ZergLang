@@ -34,18 +34,24 @@ const (
 	GT_EQ  TokenType = ">="
 
 	// Delimiters
-	COMMA  TokenType = ","
-	LPAREN TokenType = "("
-	RPAREN TokenType = ")"
+	COMMA    TokenType = ","
+	COLON    TokenType = ":"
+	LPAREN   TokenType = "("
+	RPAREN   TokenType = ")"
+	LBRACE   TokenType = "{"
+	RBRACE   TokenType = "}"
+	ARROW    TokenType = "->"
 
 	// Keywords
-	TRUE  TokenType = "TRUE"
-	FALSE TokenType = "FALSE"
-	NIL   TokenType = "NIL"
-	MUT   TokenType = "MUT"
-	AND   TokenType = "AND"
-	OR    TokenType = "OR"
-	NOT   TokenType = "NOT"
+	TRUE   TokenType = "TRUE"
+	FALSE  TokenType = "FALSE"
+	NIL    TokenType = "NIL"
+	MUT    TokenType = "MUT"
+	AND    TokenType = "AND"
+	OR     TokenType = "OR"
+	NOT    TokenType = "NOT"
+	FN     TokenType = "FN"
+	RETURN TokenType = "RETURN"
 )
 
 // Token represents a lexical token.
@@ -57,13 +63,15 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"true":  TRUE,
-	"false": FALSE,
-	"nil":   NIL,
-	"mut":   MUT,
-	"and":   AND,
-	"or":    OR,
-	"not":   NOT,
+	"true":   TRUE,
+	"false":  FALSE,
+	"nil":    NIL,
+	"mut":    MUT,
+	"and":    AND,
+	"or":     OR,
+	"not":    NOT,
+	"fn":     FN,
+	"return": RETURN,
 }
 
 // LookupIdent returns the token type for an identifier.
