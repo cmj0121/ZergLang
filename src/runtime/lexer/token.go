@@ -34,16 +34,17 @@ const (
 	GT_EQ  TokenType = ">="
 
 	// Delimiters
-	COMMA    TokenType = ","
-	COLON    TokenType = ":"
-	LPAREN   TokenType = "("
-	RPAREN   TokenType = ")"
-	LBRACE   TokenType = "{"
-	RBRACE   TokenType = "}"
-	LBRACKET TokenType = "["
-	RBRACKET TokenType = "]"
-	DOT      TokenType = "."
-	ARROW    TokenType = "->"
+	COMMA     TokenType = ","
+	COLON     TokenType = ":"
+	LPAREN    TokenType = "("
+	RPAREN    TokenType = ")"
+	LBRACE    TokenType = "{"
+	RBRACE    TokenType = "}"
+	LBRACKET  TokenType = "["
+	RBRACKET  TokenType = "]"
+	DOT       TokenType = "."
+	ARROW     TokenType = "->"
+	AMPERSAND TokenType = "&"
 
 	// Keywords
 	TRUE     TokenType = "TRUE"
@@ -77,6 +78,9 @@ const (
 	// Spec-related keywords
 	SPEC TokenType = "SPEC"
 	SELF TokenType = "SELF"
+
+	// Builtins
+	ASSERT TokenType = "ASSERT"
 )
 
 // Token represents a lexical token.
@@ -112,6 +116,7 @@ var keywords = map[string]TokenType{
 	"static":   STATIC,
 	"spec":     SPEC,
 	"Self":     SELF,
+	"assert":   ASSERT,
 }
 
 // LookupIdent returns the token type for an identifier.

@@ -381,3 +381,22 @@ type SelfExpression struct {
 
 func (se *SelfExpression) expressionNode()      {}
 func (se *SelfExpression) TokenLiteral() string { return se.Token.Literal }
+
+// ReferenceExpression represents a reference (&expr).
+type ReferenceExpression struct {
+	Token lexer.Token // The '&' token
+	Value Expression
+}
+
+func (re *ReferenceExpression) expressionNode()      {}
+func (re *ReferenceExpression) TokenLiteral() string { return re.Token.Literal }
+
+// AssertStatement represents an assert statement.
+type AssertStatement struct {
+	Token     lexer.Token
+	Condition Expression
+	Message   Expression // optional message
+}
+
+func (as *AssertStatement) statementNode()       {}
+func (as *AssertStatement) TokenLiteral() string { return as.Token.Literal }

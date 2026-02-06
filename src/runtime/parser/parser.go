@@ -79,6 +79,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.LBRACE, p.parseMapLiteral)
 	p.registerPrefix(lexer.THIS, p.parseThis)
 	p.registerPrefix(lexer.SELF, p.parseSelf)
+	p.registerPrefix(lexer.AMPERSAND, p.parseReferenceExpression)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -171,6 +172,8 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseSpecDeclaration()
 	case lexer.IMPL:
 		return p.parseImplDeclaration()
+	case lexer.ASSERT:
+		return p.parseAssertStatement()
 	case lexer.FN:
 		if p.peekToken.Type == lexer.IDENT {
 			return p.parseFunctionDeclaration()
@@ -1119,4 +1122,27 @@ func (p *Parser) parseSignatureParameters() []*Identifier {
 
 func (p *Parser) parseSelf() Expression {
 	return &SelfExpression{Token: p.curToken}
+}
+
+func (p *Parser) parseReferenceExpression() Expression {
+	expr := &ReferenceExpression{Token: p.curToken}
+	p.nextToken()
+	expr.Value = p.parseExpression(PREFIX)
+	return expr
+}
+
+func (p *Parser) parseAssertStatement() *AssertStatement {
+	stmt := &AssertStatement{Token: p.curToken}
+	p.nextToken()
+
+	stmt.Condition = p.parseExpression(LOWEST)
+
+	// Optional message after comma
+	if p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to message
+		stmt.Message = p.parseExpression(LOWEST)
+	}
+
+	return stmt
 }

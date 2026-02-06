@@ -19,6 +19,8 @@ const (
 	CLASS_OBJ        ObjectType = "CLASS"
 	INSTANCE_OBJ     ObjectType = "INSTANCE"
 	SPEC_OBJ         ObjectType = "SPEC"
+	REFERENCE_OBJ    ObjectType = "REFERENCE"
+	ERROR_OBJ        ObjectType = "ERROR"
 )
 
 // Object is the interface for all runtime values.
@@ -238,3 +240,11 @@ type Spec struct {
 
 func (s *Spec) Type() ObjectType { return SPEC_OBJ }
 func (s *Spec) Inspect() string  { return fmt.Sprintf("<spec %s>", s.Name) }
+
+// Reference represents a reference to an object.
+type Reference struct {
+	Value *Object
+}
+
+func (r *Reference) Type() ObjectType { return REFERENCE_OBJ }
+func (r *Reference) Inspect() string  { return fmt.Sprintf("&%s", (*r.Value).Inspect()) }
