@@ -777,7 +777,7 @@ func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
-	env := NewEnvironment()
+	env := NewEnvironmentWithBuiltins()
 	return Eval(program, env)
 }
 
@@ -805,4 +805,236 @@ func testBooleanObject(t *testing.T, obj Object, expected bool) bool {
 		return false
 	}
 	return true
+}
+
+// Stdlib tests
+
+func TestBuiltinLen(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`len("hello")`, int64(5)},
+		{`len("")`, int64(0)},
+		{`len([1, 2, 3])`, int64(3)},
+		{`len([])`, int64(0)},
+		{`len({"a": 1, "b": 2})`, int64(2)},
+		{`len({})`, int64(0)},
+		{`len(1)`, "len() argument must be string, list, or map, not INTEGER"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			err, ok := evaluated.(*Error)
+			if !ok {
+				t.Errorf("expected Error, got %T (%+v)", evaluated, evaluated)
+				continue
+			}
+			if err.Message != expected {
+				t.Errorf("expected error %q, got %q", expected, err.Message)
+			}
+		}
+	}
+}
+
+func TestBuiltinStr(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`str(42)`, "42"},
+		{`str(true)`, "true"},
+		{`str(false)`, "false"},
+		{`str(nil)`, "nil"},
+		{`str("hello")`, "hello"},
+		{`str([1, 2, 3])`, "[1, 2, 3]"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("expected String, got %T (%+v)", evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, str.Value)
+		}
+	}
+}
+
+func TestBuiltinInt(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`int("123")`, int64(123)},
+		{`int("-456")`, int64(-456)},
+		{`int(42)`, int64(42)},
+		{`int(true)`, int64(1)},
+		{`int(false)`, int64(0)},
+		{`int("abc")`, "int() argument is not a valid integer: abc"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			err, ok := evaluated.(*Error)
+			if !ok {
+				t.Errorf("expected Error, got %T (%+v)", evaluated, evaluated)
+				continue
+			}
+			if err.Message != expected {
+				t.Errorf("expected error %q, got %q", expected, err.Message)
+			}
+		}
+	}
+}
+
+func TestListAppend(t *testing.T) {
+	input := `nums := [1, 2, 3]
+nums.append(4)`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 4 {
+		t.Fatalf("expected 4 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[3], 4)
+}
+
+func TestListAppendImmutable(t *testing.T) {
+	// Verify append returns new list without modifying original
+	input := `nums := [1, 2]
+new_nums := nums.append(3)
+nums.length`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 2)
+}
+
+func TestListPop(t *testing.T) {
+	input := `[1, 2, 3].pop()`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 3)
+}
+
+func TestListPopEmpty(t *testing.T) {
+	input := `[].pop()`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message != "pop() from empty list" {
+		t.Fatalf("expected 'pop() from empty list', got %s", err.Message)
+	}
+}
+
+func TestListFilter(t *testing.T) {
+	input := `[1, 2, 3, 4, 5].filter(fn(x) { return x > 2 })`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[0], 3)
+	testIntegerObject(t, list.Elements[1], 4)
+	testIntegerObject(t, list.Elements[2], 5)
+}
+
+func TestListMap(t *testing.T) {
+	input := `[1, 2, 3].map(fn(x) { return x * 2 })`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(list.Elements))
+	}
+
+	testIntegerObject(t, list.Elements[0], 2)
+	testIntegerObject(t, list.Elements[1], 4)
+	testIntegerObject(t, list.Elements[2], 6)
+}
+
+func TestMapKeys(t *testing.T) {
+	input := `{"a": 1, "b": 2}.keys()`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(list.Elements))
+	}
+
+	// Keys are sorted alphabetically
+	str1, ok := list.Elements[0].(*String)
+	if !ok || str1.Value != "a" {
+		t.Errorf("expected first key 'a', got %v", list.Elements[0])
+	}
+	str2, ok := list.Elements[1].(*String)
+	if !ok || str2.Value != "b" {
+		t.Errorf("expected second key 'b', got %v", list.Elements[1])
+	}
+}
+
+func TestMapValues(t *testing.T) {
+	input := `{"a": 1, "b": 2}.values()`
+	evaluated := testEval(input)
+
+	list, ok := evaluated.(*List)
+	if !ok {
+		t.Fatalf("expected List, got %T", evaluated)
+	}
+
+	if len(list.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(list.Elements))
+	}
+
+	// Values are in key-sorted order (a=1, b=2)
+	testIntegerObject(t, list.Elements[0], 1)
+	testIntegerObject(t, list.Elements[1], 2)
+}
+
+func TestMapContains(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`{"a": 1, "b": 2}.contains("a")`, true},
+		{`{"a": 1, "b": 2}.contains("c")`, false},
+		{`{1: "one", 2: "two"}.contains(1)`, true},
+		{`{1: "one", 2: "two"}.contains(3)`, false},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
 }
