@@ -1,4 +1,4 @@
-SUBDIR :=
+SUBDIR := src/runtime
 VIM_PREFIX := $(HOME)/.vim
 
 .PHONY: all clean test run build upgrade help install-vim uninstall-vim $(SUBDIR)
@@ -14,7 +14,7 @@ test:				# run test
 
 run:				# run in the local environment
 
-build:				# build the binary/library
+build: $(SUBDIR)		# build the binary/library
 
 install-vim:		# install vim syntax files
 	@mkdir -p $(VIM_PREFIX)/syntax $(VIM_PREFIX)/ftdetect
