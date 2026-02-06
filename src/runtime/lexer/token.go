@@ -73,6 +73,10 @@ const (
 	THIS   TokenType = "THIS"
 	PUB    TokenType = "PUB"
 	STATIC TokenType = "STATIC"
+
+	// Spec-related keywords
+	SPEC TokenType = "SPEC"
+	SELF TokenType = "SELF"
 )
 
 // Token represents a lexical token.
@@ -106,6 +110,8 @@ var keywords = map[string]TokenType{
 	"this":     THIS,
 	"pub":      PUB,
 	"static":   STATIC,
+	"spec":     SPEC,
+	"Self":     SELF,
 }
 
 // LookupIdent returns the token type for an identifier.

@@ -109,6 +109,12 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalMemberAssignment(node, env)
 	case *parser.IndexAssignmentStatement:
 		return evalIndexAssignment(node, env)
+	case *parser.SpecDeclaration:
+		return evalSpecDeclaration(node, env)
+	case *parser.ImplForDeclaration:
+		return evalImplForDeclaration(node, env)
+	case *parser.SelfExpression:
+		return evalSelf(env)
 	}
 
 	return nil
@@ -731,6 +737,7 @@ func evalClassDeclaration(cd *parser.ClassDeclaration, env *Environment) Object 
 		Fields:        make(map[string]*ClassField),
 		Methods:       make(map[string]*ClassMethod),
 		StaticMethods: make(map[string]*ClassMethod),
+		Implements:    make(map[string]*Spec),
 	}
 
 	for _, field := range cd.Fields {
@@ -932,4 +939,101 @@ func evalIndexAssignment(ias *parser.IndexAssignmentStatement, env *Environment)
 	default:
 		return newError("cannot assign index on type %s", left.Type())
 	}
+}
+
+func evalSpecDeclaration(sd *parser.SpecDeclaration, env *Environment) Object {
+	spec := &Spec{
+		Name:    sd.Name.Value,
+		Methods: make(map[string]*SpecMethod),
+	}
+
+	for _, method := range sd.Methods {
+		params := []string{}
+		for _, param := range method.Parameters {
+			params = append(params, param.Value)
+		}
+
+		spec.Methods[method.Name.Value] = &SpecMethod{
+			Name:       method.Name.Value,
+			Parameters: params,
+			Public:     method.Public,
+			Mutable:    method.Mutable,
+		}
+	}
+
+	env.Declare(sd.Name.Value, spec, false)
+	return spec
+}
+
+func evalImplForDeclaration(ifd *parser.ImplForDeclaration, env *Environment) Object {
+	// Get the class
+	classObj, ok := env.Get(ifd.Class.Value)
+	if !ok {
+		return newError("class not found: %s", ifd.Class.Value)
+	}
+
+	class, ok := classObj.(*Class)
+	if !ok {
+		return newError("%s is not a class", ifd.Class.Value)
+	}
+
+	// Get the spec
+	specObj, ok := env.Get(ifd.Spec.Value)
+	if !ok {
+		return newError("spec not found: %s", ifd.Spec.Value)
+	}
+
+	spec, ok := specObj.(*Spec)
+	if !ok {
+		return newError("%s is not a spec", ifd.Spec.Value)
+	}
+
+	// Add methods to the class
+	for _, method := range ifd.Methods {
+		cm := &ClassMethod{
+			Name:       method.Name.Value,
+			Parameters: []string{},
+			Body:       method.Body,
+			Public:     method.Public,
+			Static:     method.Static,
+			Mutable:    method.Mutable,
+			Env:        env,
+		}
+
+		for _, param := range method.Parameters {
+			cm.Parameters = append(cm.Parameters, param.Name.Value)
+		}
+
+		if method.Static {
+			class.StaticMethods[method.Name.Value] = cm
+		} else {
+			class.Methods[method.Name.Value] = cm
+		}
+	}
+
+	// Verify all spec methods are implemented
+	for name, specMethod := range spec.Methods {
+		classMethod, ok := class.Methods[name]
+		if !ok {
+			return newError("class %s does not implement method '%s' from spec %s",
+				class.Name, name, spec.Name)
+		}
+
+		// Check parameter count matches
+		if len(classMethod.Parameters) != len(specMethod.Parameters) {
+			return newError("method '%s' has %d parameters, spec requires %d",
+				name, len(classMethod.Parameters), len(specMethod.Parameters))
+		}
+	}
+
+	// Record that class implements this spec
+	class.Implements[spec.Name] = spec
+
+	return NULL
+}
+
+func evalSelf(env *Environment) Object {
+	// Self is used in spec contexts to refer to the implementing type
+	// In this bootstrap, we just return a placeholder
+	return &String{Value: "Self"}
 }

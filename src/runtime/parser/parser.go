@@ -78,6 +78,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.LBRACKET, p.parseListLiteral)
 	p.registerPrefix(lexer.LBRACE, p.parseMapLiteral)
 	p.registerPrefix(lexer.THIS, p.parseThis)
+	p.registerPrefix(lexer.SELF, p.parseSelf)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -166,6 +167,8 @@ func (p *Parser) parseStatement() Statement {
 		return &NopStatement{Token: p.curToken}
 	case lexer.CLASS:
 		return p.parseClassDeclaration()
+	case lexer.SPEC:
+		return p.parseSpecDeclaration()
 	case lexer.IMPL:
 		return p.parseImplDeclaration()
 	case lexer.FN:
@@ -824,25 +827,57 @@ func (p *Parser) parseFieldDeclaration() *FieldDeclaration {
 	return field
 }
 
-func (p *Parser) parseImplDeclaration() *ImplDeclaration {
-	stmt := &ImplDeclaration{Token: p.curToken}
+func (p *Parser) parseImplDeclaration() Statement {
+	implToken := p.curToken
 
 	if p.peekToken.Type != lexer.IDENT {
 		p.errors = append(p.errors, "expected class name after impl")
 		return nil
 	}
 	p.nextToken()
-	stmt.Class = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	className := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
+	// Check for "impl Class for Spec" syntax
+	if p.peekToken.Type == lexer.FOR {
+		p.nextToken() // move to 'for'
+
+		if p.peekToken.Type != lexer.IDENT {
+			p.errors = append(p.errors, "expected spec name after 'for'")
+			return nil
+		}
+		p.nextToken()
+		specName := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		if p.peekToken.Type != lexer.LBRACE {
+			p.errors = append(p.errors, "expected { after spec name")
+			return nil
+		}
+		p.nextToken()
+
+		methods := p.parseMethodDeclarations()
+
+		return &ImplForDeclaration{
+			Token:   implToken,
+			Class:   className,
+			Spec:    specName,
+			Methods: methods,
+		}
+	}
+
+	// Regular "impl Class" syntax
 	if p.peekToken.Type != lexer.LBRACE {
 		p.errors = append(p.errors, "expected { after class name")
 		return nil
 	}
 	p.nextToken()
 
-	stmt.Methods = p.parseMethodDeclarations()
+	methods := p.parseMethodDeclarations()
 
-	return stmt
+	return &ImplDeclaration{
+		Token:   implToken,
+		Class:   className,
+		Methods: methods,
+	}
 }
 
 func (p *Parser) parseMethodDeclarations() []*MethodDeclaration {
@@ -918,4 +953,117 @@ func (p *Parser) parseMethodDeclaration() *MethodDeclaration {
 	method.Body = p.parseBlockStatement()
 
 	return method
+}
+
+func (p *Parser) parseSpecDeclaration() *SpecDeclaration {
+	stmt := &SpecDeclaration{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected spec name")
+		return nil
+	}
+	p.nextToken()
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after spec name")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Methods = p.parseMethodSignatures()
+
+	return stmt
+}
+
+func (p *Parser) parseMethodSignatures() []*MethodSignature {
+	methods := []*MethodSignature{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		method := p.parseMethodSignature()
+		if method != nil {
+			methods = append(methods, method)
+		}
+		p.nextToken()
+	}
+
+	return methods
+}
+
+func (p *Parser) parseMethodSignature() *MethodSignature {
+	method := &MethodSignature{}
+
+	// Check for pub modifier
+	if p.curToken.Type == lexer.PUB {
+		method.Public = true
+		p.nextToken()
+	}
+
+	// Check for mut modifier (mutable receiver)
+	if p.curToken.Type == lexer.MUT {
+		method.Mutable = true
+		p.nextToken()
+	}
+
+	if p.curToken.Type != lexer.FN {
+		p.errors = append(p.errors, "expected fn keyword in method signature")
+		return nil
+	}
+	method.Token = p.curToken
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected method name")
+		return nil
+	}
+	p.nextToken()
+	method.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LPAREN {
+		p.errors = append(p.errors, "expected ( after method name")
+		return nil
+	}
+	p.nextToken()
+
+	// Parse parameter names only (no types in bootstrap)
+	method.Parameters = p.parseSignatureParameters()
+
+	// Skip optional return type annotation: -> type
+	if p.peekToken.Type == lexer.ARROW {
+		p.nextToken() // move to ->
+		p.nextToken() // move to type, skip it
+	}
+
+	return method
+}
+
+func (p *Parser) parseSignatureParameters() []*Identifier {
+	params := []*Identifier{}
+
+	if p.peekToken.Type == lexer.RPAREN {
+		p.nextToken()
+		return params
+	}
+
+	p.nextToken()
+	params = append(params, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to next param
+		params = append(params, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+	}
+
+	if p.peekToken.Type != lexer.RPAREN {
+		p.errors = append(p.errors, "expected ) after parameters")
+		return nil
+	}
+	p.nextToken()
+
+	return params
+}
+
+func (p *Parser) parseSelf() Expression {
+	return &SelfExpression{Token: p.curToken}
 }
