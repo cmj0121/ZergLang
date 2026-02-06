@@ -43,6 +43,68 @@ The following types are supported in the bootstrap runtime:
 The bootstrap runtime supports a minimal subset of Zerg grammar. The detailed support list will be updated as features
 are implemented.
 
+## Standard Library
+
+The bootstrap runtime includes a minimal standard library with builtin functions and collection methods.
+
+### Builtin Functions
+
+| Function | Signature          | Description                             |
+| -------- | ------------------ | --------------------------------------- |
+| `print`  | `print(v...)`      | Output arguments to stdout with newline |
+| `len`    | `len(c) -> int`    | Return length of string, list, or map   |
+| `str`    | `str(v) -> string` | Convert any value to string             |
+| `int`    | `int(v) -> int`    | Convert string or bool to integer       |
+
+**Examples:**
+
+```zerg
+print("hello", "world")  # Output: hello world
+print(len([1, 2, 3]))    # Output: 3
+print(str(42))           # Output: 42
+print(int("123"))        # Output: 123
+print(int(true))         # Output: 1
+```
+
+### List Methods
+
+| Method   | Signature                   | Description                                           |
+| -------- | --------------------------- | ----------------------------------------------------- |
+| `append` | `list.append(item) -> list` | Return new list with item added                       |
+| `pop`    | `list.pop() -> item`        | Return last element                                   |
+| `filter` | `list.filter(fn) -> list`   | Return new list with elements passing predicate       |
+| `map`    | `list.map(fn) -> list`      | Return new list with function applied to each element |
+
+**Examples:**
+
+```zerg
+nums := [1, 2, 3]
+print(nums.append(4))                      # Output: [1, 2, 3, 4]
+print(nums.pop())                          # Output: 3
+print(nums.filter(fn(x) { return x > 1 })) # Output: [2, 3]
+print(nums.map(fn(x) { return x * 2 }))    # Output: [2, 4, 6]
+```
+
+Note: `append`, `filter`, and `map` return new lists without modifying the original.
+
+### Map Methods
+
+| Method     | Signature                   | Description                              |
+| ---------- | --------------------------- | ---------------------------------------- |
+| `keys`     | `map.keys() -> list`        | Return list of all keys (sorted)         |
+| `values`   | `map.values() -> list`      | Return list of all values (in key order) |
+| `contains` | `map.contains(key) -> bool` | Check if key exists in map               |
+
+**Examples:**
+
+```zerg
+m := {"a": 1, "b": 2}
+print(m.keys())        # Output: [a, b]
+print(m.values())      # Output: [1, 2]
+print(m.contains("a")) # Output: true
+print(m.contains("c")) # Output: false
+```
+
 ## Project Structure
 
 ```txt
@@ -58,5 +120,5 @@ src/runtime/
 └── evaluator/
     ├── object.go     # Runtime value representations
     ├── evaluator.go  # Tree-walking interpreter (AST → result)
-    └── builtins.go   # Built-in statement (assert)
+    └── builtins.go   # Built-in functions and collection methods
 ```
