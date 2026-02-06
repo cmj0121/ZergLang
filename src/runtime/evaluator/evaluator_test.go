@@ -131,6 +131,108 @@ b`
 	testIntegerObject(t, evaluated, 10)
 }
 
+func TestArithmeticOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"5 + 5", 10},
+		{"5 - 5", 0},
+		{"5 * 5", 25},
+		{"10 / 2", 5},
+		{"10 % 3", 1},
+		{"2 ** 3", 8},
+		{"10 + 5 * 2", 20},
+		{"(10 + 5) * 2", 30},
+		{"-5", -5},
+		{"-10 + 20", 10},
+		{"2 ** 3 ** 2", 512},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestComparisonOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"5 < 10", true},
+		{"5 > 10", false},
+		{"5 <= 5", true},
+		{"5 >= 5", true},
+		{"5 == 5", true},
+		{"5 != 5", false},
+		{"5 == 10", false},
+		{"5 != 10", true},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestLogicalOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"true and true", true},
+		{"true and false", false},
+		{"false or true", true},
+		{"false or false", false},
+		{"not true", false},
+		{"not false", true},
+		{"10 > 5 and 3 < 7", true},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestStringConcatenation(t *testing.T) {
+	input := `"hello" + " " + "world"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "hello world" {
+		t.Fatalf("expected 'hello world', got %s", str.Value)
+	}
+}
+
+func TestPrefixExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"-5", int64(-5)},
+		{"-10", int64(-10)},
+		{"not true", false},
+		{"not false", true},
+		{"not nil", true},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case bool:
+			testBooleanObject(t, evaluated, expected)
+		}
+	}
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
