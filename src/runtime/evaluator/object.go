@@ -18,6 +18,7 @@ const (
 	MAP_OBJ          ObjectType = "MAP"
 	CLASS_OBJ        ObjectType = "CLASS"
 	INSTANCE_OBJ     ObjectType = "INSTANCE"
+	SPEC_OBJ         ObjectType = "SPEC"
 )
 
 // Object is the interface for all runtime values.
@@ -197,6 +198,7 @@ type Class struct {
 	Fields        map[string]*ClassField
 	Methods       map[string]*ClassMethod
 	StaticMethods map[string]*ClassMethod
+	Implements    map[string]*Spec // specs this class implements
 }
 
 func (c *Class) Type() ObjectType { return CLASS_OBJ }
@@ -219,3 +221,20 @@ type BoundMethod struct {
 
 func (bm *BoundMethod) Type() ObjectType { return FUNCTION_OBJ }
 func (bm *BoundMethod) Inspect() string  { return fmt.Sprintf("<method %s>", bm.Method.Name) }
+
+// SpecMethod represents a method signature in a spec.
+type SpecMethod struct {
+	Name       string
+	Parameters []string
+	Public     bool
+	Mutable    bool
+}
+
+// Spec represents a spec (interface) definition.
+type Spec struct {
+	Name    string
+	Methods map[string]*SpecMethod
+}
+
+func (s *Spec) Type() ObjectType { return SPEC_OBJ }
+func (s *Spec) Inspect() string  { return fmt.Sprintf("<spec %s>", s.Name) }

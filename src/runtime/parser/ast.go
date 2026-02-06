@@ -340,3 +340,44 @@ type IndexAssignmentStatement struct {
 
 func (ias *IndexAssignmentStatement) statementNode()       {}
 func (ias *IndexAssignmentStatement) TokenLiteral() string { return ias.Token.Literal }
+
+// SpecDeclaration represents a spec (interface) definition: spec Name { methods }
+type SpecDeclaration struct {
+	Token   lexer.Token // the 'spec' token
+	Name    *Identifier
+	Methods []*MethodSignature
+}
+
+func (sd *SpecDeclaration) statementNode()       {}
+func (sd *SpecDeclaration) TokenLiteral() string { return sd.Token.Literal }
+
+// MethodSignature represents a method signature in a spec: fn name(params) -> type
+type MethodSignature struct {
+	Token      lexer.Token // the 'fn' token
+	Name       *Identifier
+	Parameters []*Identifier // just names for signatures
+	Public     bool
+	Mutable    bool // mut receiver
+}
+
+func (ms *MethodSignature) statementNode()       {}
+func (ms *MethodSignature) TokenLiteral() string { return ms.Token.Literal }
+
+// ImplForDeclaration represents impl Class for Spec { methods }
+type ImplForDeclaration struct {
+	Token   lexer.Token // the 'impl' token
+	Class   *Identifier
+	Spec    *Identifier
+	Methods []*MethodDeclaration
+}
+
+func (ifd *ImplForDeclaration) statementNode()       {}
+func (ifd *ImplForDeclaration) TokenLiteral() string { return ifd.Token.Literal }
+
+// SelfExpression represents 'Self' type reference.
+type SelfExpression struct {
+	Token lexer.Token
+}
+
+func (se *SelfExpression) expressionNode()      {}
+func (se *SelfExpression) TokenLiteral() string { return se.Token.Literal }
