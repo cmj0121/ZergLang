@@ -75,6 +75,30 @@ func Eval(node parser.Node, env *Environment) Object {
 		return CONTINUE
 	case *parser.NopStatement:
 		return NULL
+	case *parser.ListLiteral:
+		elements := evalExpressions(node.Elements, env)
+		if len(elements) == 1 && IsError(elements[0]) {
+			return elements[0]
+		}
+		return &List{Elements: elements}
+	case *parser.MapLiteral:
+		return evalMapLiteral(node, env)
+	case *parser.IndexExpression:
+		left := Eval(node.Left, env)
+		if IsError(left) {
+			return left
+		}
+		index := Eval(node.Index, env)
+		if IsError(index) {
+			return index
+		}
+		return evalIndexExpression(left, index)
+	case *parser.MemberExpression:
+		obj := Eval(node.Object, env)
+		if IsError(obj) {
+			return obj
+		}
+		return evalMemberExpression(obj, node.Member.Value)
 	}
 
 	return nil
@@ -470,11 +494,11 @@ func evalForInStatement(fis *parser.ForInStatement, env *Environment) Object {
 		return iterable
 	}
 
-	// For now, we only support iterating over strings (character by character)
-	// Future: support lists, maps, ranges
 	switch obj := iterable.(type) {
 	case *String:
 		return evalForInString(fis, obj.Value, env)
+	case *List:
+		return evalForInList(fis, obj, env)
 	default:
 		return newError("cannot iterate over %s", iterable.Type())
 	}
@@ -539,4 +563,134 @@ func evalForConditionStatement(fcs *parser.ForConditionStatement, env *Environme
 	}
 
 	return result
+}
+
+func evalForInList(fis *parser.ForInStatement, list *List, env *Environment) Object {
+	var result Object = NULL
+
+	loopEnv := NewEnclosedEnvironment(env)
+
+	for _, el := range list.Elements {
+		loopEnv.Declare(fis.Variable.Value, el, false)
+
+		result = Eval(fis.Body, loopEnv)
+
+		if result != nil {
+			switch result.Type() {
+			case BREAK_OBJ:
+				return NULL
+			case CONTINUE_OBJ:
+				continue
+			case RETURN_VALUE_OBJ, "ERROR":
+				return result
+			}
+		}
+	}
+
+	return result
+}
+
+func evalMapLiteral(node *parser.MapLiteral, env *Environment) Object {
+	pairs := make(map[HashKey]MapPair)
+
+	for keyNode, valueNode := range node.Pairs {
+		key := Eval(keyNode, env)
+		if IsError(key) {
+			return key
+		}
+
+		hashKey, ok := key.(Hashable)
+		if !ok {
+			return newError("unusable as hash key: %s", key.Type())
+		}
+
+		value := Eval(valueNode, env)
+		if IsError(value) {
+			return value
+		}
+
+		hashed := hashKey.HashKey()
+		pairs[hashed] = MapPair{Key: key, Value: value}
+	}
+
+	return &Map{Pairs: pairs}
+}
+
+func evalIndexExpression(left, index Object) Object {
+	switch {
+	case left.Type() == LIST_OBJ && index.Type() == INTEGER_OBJ:
+		return evalListIndexExpression(left, index)
+	case left.Type() == MAP_OBJ:
+		return evalMapIndexExpression(left, index)
+	case left.Type() == STRING_OBJ && index.Type() == INTEGER_OBJ:
+		return evalStringIndexExpression(left, index)
+	default:
+		return newError("index operator not supported: %s", left.Type())
+	}
+}
+
+func evalListIndexExpression(list, index Object) Object {
+	listObj := list.(*List)
+	idx := index.(*Integer).Value
+	max := int64(len(listObj.Elements) - 1)
+
+	if idx < 0 || idx > max {
+		return NULL
+	}
+
+	return listObj.Elements[idx]
+}
+
+func evalMapIndexExpression(m, index Object) Object {
+	mapObj := m.(*Map)
+
+	key, ok := index.(Hashable)
+	if !ok {
+		return newError("unusable as hash key: %s", index.Type())
+	}
+
+	pair, ok := mapObj.Pairs[key.HashKey()]
+	if !ok {
+		return NULL
+	}
+
+	return pair.Value
+}
+
+func evalStringIndexExpression(str, index Object) Object {
+	strObj := str.(*String)
+	idx := index.(*Integer).Value
+	max := int64(len(strObj.Value) - 1)
+
+	if idx < 0 || idx > max {
+		return NULL
+	}
+
+	return &String{Value: string(strObj.Value[idx])}
+}
+
+func evalMemberExpression(obj Object, member string) Object {
+	switch o := obj.(type) {
+	case *Map:
+		// Try to access map with string key
+		key := &String{Value: member}
+		pair, ok := o.Pairs[key.HashKey()]
+		if !ok {
+			return NULL
+		}
+		return pair.Value
+	case *List:
+		// List built-in methods
+		switch member {
+		case "length":
+			return &Integer{Value: int64(len(o.Elements))}
+		}
+	case *String:
+		// String built-in methods
+		switch member {
+		case "length":
+			return &Integer{Value: int64(len(o.Value))}
+		}
+	}
+	return newError("no member '%s' on type %s", member, obj.Type())
 }

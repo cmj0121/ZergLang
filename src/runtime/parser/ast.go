@@ -226,3 +226,41 @@ type NopStatement struct {
 
 func (ns *NopStatement) statementNode()       {}
 func (ns *NopStatement) TokenLiteral() string { return ns.Token.Literal }
+
+// ListLiteral represents a list: [1, 2, 3]
+type ListLiteral struct {
+	Token    lexer.Token // the '[' token
+	Elements []Expression
+}
+
+func (ll *ListLiteral) expressionNode()      {}
+func (ll *ListLiteral) TokenLiteral() string { return ll.Token.Literal }
+
+// MapLiteral represents a map: {key: value, ...}
+type MapLiteral struct {
+	Token lexer.Token // the '{' token
+	Pairs map[Expression]Expression
+}
+
+func (ml *MapLiteral) expressionNode()      {}
+func (ml *MapLiteral) TokenLiteral() string { return ml.Token.Literal }
+
+// IndexExpression represents index access: arr[0], map["key"]
+type IndexExpression struct {
+	Token lexer.Token // the '[' token
+	Left  Expression
+	Index Expression
+}
+
+func (ie *IndexExpression) expressionNode()      {}
+func (ie *IndexExpression) TokenLiteral() string { return ie.Token.Literal }
+
+// MemberExpression represents member access: obj.field
+type MemberExpression struct {
+	Token  lexer.Token // the '.' token
+	Object Expression
+	Member *Identifier
+}
+
+func (me *MemberExpression) expressionNode()      {}
+func (me *MemberExpression) TokenLiteral() string { return me.Token.Literal }

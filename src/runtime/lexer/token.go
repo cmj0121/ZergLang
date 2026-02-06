@@ -40,6 +40,9 @@ const (
 	RPAREN   TokenType = ")"
 	LBRACE   TokenType = "{"
 	RBRACE   TokenType = "}"
+	LBRACKET TokenType = "["
+	RBRACKET TokenType = "]"
+	DOT      TokenType = "."
 	ARROW    TokenType = "->"
 
 	// Keywords
