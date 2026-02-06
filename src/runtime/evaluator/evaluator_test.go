@@ -714,6 +714,65 @@ impl Empty for Required {
 	}
 }
 
+func TestReferenceExpression(t *testing.T) {
+	input := `x := 42
+ref := &x
+ref`
+	evaluated := testEval(input)
+
+	ref, ok := evaluated.(*Reference)
+	if !ok {
+		t.Fatalf("expected Reference, got %T", evaluated)
+	}
+
+	intVal, ok := (*ref.Value).(*Integer)
+	if !ok {
+		t.Fatalf("expected referenced Integer, got %T", *ref.Value)
+	}
+
+	if intVal.Value != 42 {
+		t.Fatalf("expected referenced value 42, got %d", intVal.Value)
+	}
+}
+
+func TestAssertSuccess(t *testing.T) {
+	input := `x := 10
+assert x > 5
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}
+
+func TestAssertFailure(t *testing.T) {
+	input := `x := 3
+assert x > 5`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message != "assertion failed" {
+		t.Fatalf("expected 'assertion failed', got %s", err.Message)
+	}
+}
+
+func TestAssertWithMessage(t *testing.T) {
+	input := `x := 3
+assert x > 5, "x must be greater than 5"`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message != "x must be greater than 5" {
+		t.Fatalf("expected custom message, got %s", err.Message)
+	}
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)

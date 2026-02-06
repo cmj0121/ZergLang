@@ -115,6 +115,10 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalImplForDeclaration(node, env)
 	case *parser.SelfExpression:
 		return evalSelf(env)
+	case *parser.ReferenceExpression:
+		return evalReferenceExpression(node, env)
+	case *parser.AssertStatement:
+		return evalAssertStatement(node, env)
 	}
 
 	return nil
@@ -1036,4 +1040,41 @@ func evalSelf(env *Environment) Object {
 	// Self is used in spec contexts to refer to the implementing type
 	// In this bootstrap, we just return a placeholder
 	return &String{Value: "Self"}
+}
+
+func evalReferenceExpression(node *parser.ReferenceExpression, env *Environment) Object {
+	val := Eval(node.Value, env)
+	if isError(val) {
+		return val
+	}
+	return &Reference{Value: &val}
+}
+
+func evalAssertStatement(node *parser.AssertStatement, env *Environment) Object {
+	condition := Eval(node.Condition, env)
+	if isError(condition) {
+		return condition
+	}
+
+	if !isTruthy(condition) {
+		msg := "assertion failed"
+		if node.Message != nil {
+			msgObj := Eval(node.Message, env)
+			if str, ok := msgObj.(*String); ok {
+				msg = str.Value
+			} else {
+				msg = msgObj.Inspect()
+			}
+		}
+		return &Error{Message: msg}
+	}
+
+	return NULL
+}
+
+func isError(obj Object) bool {
+	if obj != nil {
+		return obj.Type() == ERROR_OBJ
+	}
+	return false
 }
