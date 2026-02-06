@@ -631,6 +631,44 @@ Drawable`
 	}
 }
 
+func TestSpecWithTypedParameters(t *testing.T) {
+	input := `spec Container {
+    fn get(index: int) -> int
+    fn set(index: int, value: int)
+}
+Container`
+	evaluated := testEval(input)
+
+	spec, ok := evaluated.(*Spec)
+	if !ok {
+		t.Fatalf("expected Spec, got %T", evaluated)
+	}
+
+	if spec.Name != "Container" {
+		t.Fatalf("expected spec name 'Container', got %s", spec.Name)
+	}
+
+	if len(spec.Methods) != 2 {
+		t.Fatalf("expected 2 methods, got %d", len(spec.Methods))
+	}
+
+	getMethod := spec.Methods["get"]
+	if getMethod == nil {
+		t.Fatalf("expected 'get' method")
+	}
+	if len(getMethod.Parameters) != 1 {
+		t.Fatalf("expected 1 parameter for get, got %d", len(getMethod.Parameters))
+	}
+
+	setMethod := spec.Methods["set"]
+	if setMethod == nil {
+		t.Fatalf("expected 'set' method")
+	}
+	if len(setMethod.Parameters) != 2 {
+		t.Fatalf("expected 2 parameters for set, got %d", len(setMethod.Parameters))
+	}
+}
+
 func TestImplForSpec(t *testing.T) {
 	input := `spec Measurable {
     fn size()
