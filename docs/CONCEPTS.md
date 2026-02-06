@@ -3,6 +3,97 @@
 The following are the core concepts of the Zerg programming language, how to use it, and why it is designed
 this way.
 
+## Reserved Keywords
+
+The following identifiers are reserved and cannot be used as variable, function, or type names.
+
+### Declarations
+
+| Keyword | Description                                    |
+| ------- | ---------------------------------------------- |
+| `fn`    | Declares a function                            |
+| `class` | Declares a class (data structure)              |
+| `impl`  | Implements methods for a class or spec         |
+| `spec`  | Declares a specification (interface)           |
+| `enum`  | Declares an enumeration (sum type)             |
+| `type`  | Declares a type alias                          |
+| `const` | Declares a compile-time constant               |
+| `pub`   | Makes a declaration visible outside its module |
+| `mut`   | Marks a variable or method as mutable          |
+
+### Control Flow Keywords
+
+| Keyword    | Description                                     |
+| ---------- | ----------------------------------------------- |
+| `if`       | Conditional branch                              |
+| `else`     | Alternative branch for `if`                     |
+| `for`      | Loop construct (iteration, condition, infinite) |
+| `match`    | Pattern matching statement                      |
+| `return`   | Returns a value from a function                 |
+| `break`    | Exits the innermost loop                        |
+| `continue` | Skips to the next loop iteration                |
+
+### Concurrency Keywords
+
+| Keyword | Description                               |
+| ------- | ----------------------------------------- |
+| `go`    | Spawns a concurrent task                  |
+| `yield` | Suspends a coroutine and produces a value |
+
+### Error Handling Keywords
+
+| Keyword   | Description                                   |
+| --------- | --------------------------------------------- |
+| `try`     | Begins an exception-handling block            |
+| `expect`  | Catches exceptions by type                    |
+| `finally` | Runs cleanup code regardless of exceptions    |
+| `raise`   | Raises an exception                           |
+| `assert`  | Raises `AssertionError` if condition is false |
+
+### Resource Management Keywords
+
+| Keyword | Description                             |
+| ------- | --------------------------------------- |
+| `with`  | Manages scoped resources (`Disposable`) |
+| `del`   | Deletes a variable binding              |
+
+### Operators
+
+| Keyword | Description                                    |
+| ------- | ---------------------------------------------- |
+| `and`   | Logical AND (short-circuit)                    |
+| `or`    | Logical OR (short-circuit)                     |
+| `xor`   | Logical XOR                                    |
+| `not`   | Logical NOT                                    |
+| `is`    | Type or spec check                             |
+| `in`    | Membership test or `for` loop iterator         |
+| `as`    | Binds exception to variable in `expect` clause |
+| `&`     | Reference (prefix) or bitwise AND (infix)      |
+
+### Literals and Values
+
+| Keyword | Description                            |
+| ------- | -------------------------------------- |
+| `true`  | Boolean true value                     |
+| `false` | Boolean false value                    |
+| `nil`   | Absence of value (nullable types only) |
+| `nop`   | No-operation statement                 |
+
+### Special
+
+| Keyword  | Description                               |
+| -------- | ----------------------------------------- |
+| `import` | Imports a module or package               |
+| `Self`   | Refers to the implementing type in specs  |
+| `this`   | Refers to the current instance in methods |
+
+### Built-in Result Variants
+
+| Keyword | Description                       |
+| ------- | --------------------------------- |
+| `Ok`    | Success variant of `Result[T, E]` |
+| `Err`   | Error variant of `Result[T, E]`   |
+
 ## Variables
 
 The variable in Zerg is immutable by default, which means once a variable is assigned, its value cannot be
@@ -36,6 +127,16 @@ a, b = b, a
 ```
 
 Multi-value declaration is not supported -- declare each variable on its own line.
+
+Zerg has no tuple type. For functions that need to return multiple values, return a `list` and unpack it:
+
+```txt
+fn divmod(a: int, b: int) -> list[int] {
+    return [a // b, a % b]
+}
+
+q, r := divmod(17, 5)    # unpack: q = 3, r = 2
+```
 
 ### Mutable
 
@@ -124,6 +225,23 @@ There are no block comments. Use multiple `#` lines for longer explanations.
 Strings in Zerg are UTF-8 encoded and delimited by double quotes. They support escape sequences and string
 interpolation.
 
+### Escape Sequences
+
+The following escape sequences are recognized inside regular strings:
+
+| Escape     | Description            |
+| ---------- | ---------------------- |
+| `\\`       | Backslash              |
+| `\"`       | Double quote           |
+| `\n`       | Newline                |
+| `\r`       | Carriage return        |
+| `\t`       | Tab                    |
+| `\0`       | Null character         |
+| `\{`       | Literal `{`            |
+| `\}`       | Literal `}`            |
+| `\xHH`     | Hex byte (e.g. `\x41`) |
+| `\u{XXXX}` | Unicode codepoint      |
+
 ### String Interpolation
 
 Any expression enclosed in `{}` inside a string is evaluated and its string representation is inserted
@@ -196,19 +314,44 @@ on every code path. A function with no return type annotation returns nothing --
 (e.g., `x := foo()`) is a compile-time error. A bare `return` (with no expression) is valid inside a
 void-returning function.
 
-### Lambda Expressions
+### Anonymous Functions
 
-For short, single-expression functions, Zerg provides lambda syntax using `|params| => expression`. Lambdas
-are anonymous and can only contain one expression (or `nop` for a no-op). Parameter types are inferred from
-context when possible. For multi-statement logic, use a full `fn` declaration instead.
+Anonymous functions are function literals without a name. They use the same `fn` syntax as named functions
+but omit the function name. Anonymous functions can be assigned to variables, passed as arguments, or
+invoked immediately.
 
 ```txt
-square := |x: int| => x ** 2
-add := |a, b| => a + b
-items.filter(|x| => x > 0)
+square := fn(x: int) -> int { return x ** 2 }
+items.filter(fn(x: int) -> bool { return x > 0 })
+go fn() { done <- true }()
 ```
 
-See [EXPRESSIONS.md](EXPRESSIONS.md#lambda-expressions) for full details.
+Parameter types must be declared explicitly. Anonymous functions are first-class values and can capture
+variables from the enclosing scope.
+
+### Generic Functions
+
+Functions can have type parameters using `[T]` syntax after the function name. This enables writing reusable
+functions that work with multiple types while preserving type safety.
+
+```txt
+fn identity[T](x: T) -> T {
+    return x
+}
+
+fn first[T](items: list[T]) -> T {
+    return items[0]
+}
+```
+
+Type parameters can have constraints by specifying a spec:
+
+```txt
+fn max[T: Comparable[T]](a: T, b: T) -> T {
+    if a.compare(b) > 0 { return a }
+    return b
+}
+```
 
 ### Function Types
 
@@ -219,6 +362,60 @@ directly.
 As a convenience, a standalone function implicitly satisfies any single-method `spec` if its signature
 matches -- no explicit `implement` declaration is needed. This allows functions to be used interchangeably
 with single-method interfaces.
+
+## Control Flow
+
+Zerg provides minimal control flow constructs that favor explicitness over convenience.
+
+### If Statement
+
+The `if` statement executes a block when a condition is true. It is a **statement**, not an expression --
+it cannot produce a value. Zerg does not support `else if` or `elif`; use `match` for multi-branch logic.
+
+```txt
+if condition {
+    # executed when condition is true
+}
+
+if condition {
+    # true branch
+} else {
+    # false branch
+}
+```
+
+For more than two branches, use `match`:
+
+```txt
+match value {
+    1 => { print("one") }
+    2 => { print("two") }
+    _ => { print("other") }
+}
+```
+
+### Break and Continue
+
+The `break` statement exits the innermost loop immediately. The `continue` statement skips the rest of the
+current iteration and proceeds to the next one.
+
+```txt
+for i in 0..10 {
+    if i == 5 { break }       # exit loop when i is 5
+    if i % 2 == 0 { continue } # skip even numbers
+    print(i)                   # prints 1, 3
+}
+```
+
+### Nop
+
+The `nop` statement is a no-operation placeholder that does nothing. Use it where a statement is required
+but no action is needed.
+
+```txt
+if debug { nop }                              # placeholder for future code
+callbacks.each(fn(_: int) { nop })            # ignore each element
+```
 
 ## Typing System
 
@@ -255,13 +452,33 @@ Zerg supports `enum` as an algebraic data type (sum type). An enum defines a typ
 several distinct variants, where each variant can optionally carry associated data. This enables type-safe
 modeling of values that have multiple possible forms.
 
-Enum variants are handled using the `match` statement, which requires all variants to be covered
-exhaustively. The compiler rejects any `match` that does not handle every variant, ensuring no case is
-silently ignored. Each branch can destructure the variant's associated data and bind it to local variables.
+```txt
+enum Status {
+    Pending
+    Active(since: int)
+    Completed(result: string, code: int)
+}
+```
 
-A match branch can include a **guard** (`if` condition) to further constrain when the branch matches. The
-guard can reference variables bound by the pattern. The branch matches only if the pattern matches AND the
-guard is true.
+Variants without associated data are written as plain identifiers. Variants with data list their fields in
+parentheses, similar to function parameters. Enums can also have type parameters:
+
+```txt
+enum Option[T] {
+    Some(value: T)
+    None
+}
+```
+
+The `enum` keyword is syntax sugar -- the underlying data representation is an implementation detail managed
+by the compiler. User code should treat enums as opaque and access variants only through pattern matching.
+
+The `match` statement handles values by pattern matching. It is a **statement**, not an expression -- it
+cannot be assigned to a variable. Internally, `match` is syntax sugar for `if-elif-else` chains.
+
+When matching enum variants, the compiler requires all variants to be covered exhaustively. The compiler
+rejects any `match` that does not handle every variant, ensuring no case is silently ignored. Each branch
+can destructure the variant's associated data and bind it to local variables.
 
 ```txt
 match result {
@@ -270,6 +487,22 @@ match result {
     Err(e) => { print(e.message) }
 }
 ```
+
+A match branch can include a **guard** (`if` condition) to further constrain when the branch matches. The
+guard can reference variables bound by the pattern. The branch matches only if the pattern matches AND the
+guard is true.
+
+The `match` statement also works with non-enum types. Use `_` as the wildcard pattern to match any value:
+
+```txt
+match code {
+    200 => { print("ok") }
+    404 => { print("not found") }
+    _ => { print("other: {code}") }
+}
+```
+
+For non-enum matches, the wildcard `_` is required to ensure exhaustiveness.
 
 The built-in `Result[T, E]` enum has two variants: `Ok(value: T)` representing success, and `Err(error: E)`
 representing failure. `Ok` and `Err` are built-in keywords -- they do not need to be imported or defined.
@@ -328,6 +561,18 @@ spec, which defines how the resource is acquired (`open()`) and released (`close
 calls `open()` when entering the scope and `close()` when exiting. This is useful for managing non-memory
 resources such as file handles, network connections, etc. The `with` statement transfers ownership of the
 resource into the scope -- the resource cannot be used after the scope exits.
+
+```txt
+# With assignment -- bind the resource to a variable
+with file := open("data.txt") {
+    content := file.read()
+}
+
+# With expression -- resource is managed but not bound to a name
+with open("log.txt") {
+    # useful when the resource is used implicitly
+}
+```
 
 ## Visibility
 
@@ -390,20 +635,52 @@ Methods are defined inside `impl` blocks and have implicit access to the current
 keyword. Inside a method, `this` refers to the receiver object and can be used to access its properties and
 call its other methods.
 
+Methods are private by default -- they can only be called from within the instance. Use `pub` to make a
+method accessible from outside:
+
+```txt
+impl Animal {
+    fn internal_helper() {         # private -- only callable within Animal methods
+        # ...
+    }
+    pub fn greet() -> string {     # public -- callable from anywhere
+        return "Hi, I am {this.name}"
+    }
+}
+```
+
 By default, methods cannot modify the receiver. A method that needs to mutate `this` must be declared with
 `mut fn`. The compiler enforces this -- calling a `mut fn` method on an immutable variable is a compile-time
 error.
 
-Parameters can also be declared mutable using `fn foo(x: mut int)`, allowing the function body to reassign
-the parameter. This only affects the local copy -- it does not modify the caller's value (consistent with
-Zerg's value semantics).
+Parameters can also be declared mutable using `mut` before the parameter name:
+
+```txt
+fn process(mut x: int) {
+    x = x + 1              # OK -- x is mutable inside the function
+}                          # caller's value is unchanged (copy semantics)
+```
+
+To modify the caller's value, use a reference parameter with `&`:
+
+```txt
+fn increment(mut x: &int) {
+    x = x + 1              # modifies the caller's value
+}
+
+mut n := 10
+increment(&n)              # pass reference with &
+print(n)                   # 11
+```
+
+The caller must explicitly pass `&x` to allow modification, making mutation visible at the call site.
 
 ```txt
 impl Animal {
-    fn greet() -> string {
+    pub fn greet() -> string {
         return "Hi, I am {this.name}"
     }
-    mut fn birthday() {
+    pub mut fn birthday() {
         this.age = this.age + 1
     }
 }
@@ -603,6 +880,14 @@ The following built-in types implement `Iterable` and can be used directly with 
 | `range`     | value      | index, value        |
 | `chan[T]`   | value      | _(compile error)_   |
 | `iter[T]`   | value      | _(depends on iter)_ |
+
+Zerg has no `while` loop. For conditional looping, use `for` with a condition, and for infinite loops use
+`for` with an empty clause:
+
+```txt
+for condition {}           # loop while condition is true
+for {}                     # infinite loop (use break to exit)
+```
 
 Because coroutines return `iter[T]`, a coroutine acts as a generator -- the `for` loop drives the coroutine,
 resuming it to produce the next value on each iteration. Similarly, a `for` loop over a `chan` receives

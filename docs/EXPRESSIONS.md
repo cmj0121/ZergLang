@@ -8,23 +8,23 @@ time. This document describes the available operators, their behavior, and their
 Operators are listed from **lowest** to **highest** precedence. Operators at the same precedence level are
 evaluated **left to right** (left-associative), except for unary operators which are right-associative.
 
-| Precedence   | Operator                         | Description            | Associativity |
-| ------------ | -------------------------------- | ---------------------- | ------------- |
-| 1 (lowest)   | `??`                             | Nil coalescing         | Left          |
-| 2            | `or`                             | Logical OR             | Left          |
-| 3            | `xor`                            | Logical XOR            | Left          |
-| 4            | `and`                            | Logical AND            | Left          |
-| 5            | `==` `!=` `<` `>` `<=` `>=` `is` | Comparison (chainable) | Left          |
-| 6            | `\|`                             | Bitwise OR             | Left          |
-| 7            | `^`                              | Bitwise XOR            | Left          |
-| 8            | `&`                              | Bitwise AND            | Left          |
-| 9            | `<<` `>>`                        | Bit shift              | Left          |
-| 10           | `..` `..=`                       | Range                  | None          |
-| 11           | `+` `-`                          | Addition, Subtraction  | Left          |
-| 12           | `*` `/` `//` `%`                 | Multiply, Divide, Mod  | Left          |
-| 13           | `-` `not` `~` `<-`               | Negation, NOT, Receive | Right         |
-| 14           | `**`                             | Power                  | Right         |
-| 15 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member    | Left          |
+| Precedence   | Operator                         | Description                 | Associativity |
+| ------------ | -------------------------------- | --------------------------- | ------------- |
+| 1 (lowest)   | `??`                             | Nil coalescing              | Left          |
+| 2            | `or`                             | Logical OR                  | Left          |
+| 3            | `xor`                            | Logical XOR                 | Left          |
+| 4            | `and`                            | Logical AND                 | Left          |
+| 5            | `==` `!=` `<` `>` `<=` `>=` `is` | Comparison (chainable)      | Left          |
+| 6            | `\|`                             | Bitwise OR                  | Left          |
+| 7            | `^`                              | Bitwise XOR                 | Left          |
+| 8            | `&`                              | Bitwise AND                 | Left          |
+| 9            | `<<` `>>`                        | Bit shift                   | Left          |
+| 10           | `..` `..=`                       | Range                       | None          |
+| 11           | `+` `-`                          | Addition, Subtraction       | Left          |
+| 12           | `*` `/` `//` `%`                 | Multiply, Divide, Mod       | Left          |
+| 13           | `-` `not` `~` `<-` `&`           | Negation, NOT, Receive, Ref | Right         |
+| 14           | `**`                             | Power                       | Right         |
+| 15 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member         | Left          |
 
 Parentheses `( )` can be used to override the default precedence.
 
@@ -181,6 +181,9 @@ Bitwise operators work on `int` values and perform bit-level manipulation.
 All bitwise operators require `int` operands and produce an `int` result. They are not defined for `float`,
 `bool`, or any other type.
 
+Note: `&` has two meanings depending on context. As a binary operator (`a & b`), it performs bitwise AND.
+As a unary prefix operator (`&x`), it creates a reference. See [Reference Operator](#reference-operator).
+
 The shift amount must be a non-negative `int`. Shifting by a negative amount or by more than 63 bits raises
 an exception.
 
@@ -205,39 +208,50 @@ See [BUILTINS.md](BUILTINS.md#range) for details on the `range` type.
 | `not`    | Logical negation | `bool`       | `bool`      |
 | `~`      | Bitwise NOT      | `int`        | `int`       |
 | `<-`     | Channel receive  | `chan[T]`    | `T`         |
+| `&`      | Reference        | `T`          | `&T`        |
 
-## Lambda Expressions
+## Reference Operator
 
-A lambda is a lightweight anonymous function that evaluates a single expression. The syntax uses `|` to
-delimit parameters and `=>` to introduce the body:
-
-```txt
-|x| => x ** 2
-|a, b| => a + b
-|| => 42
-```
-
-Parameter types can be omitted when the compiler can infer them from context:
+The `&` operator creates a reference to a variable. References are used exclusively in function parameters
+to allow a function to modify the caller's value.
 
 ```txt
-numbers.map(|x| => x ** 2)              # type of x inferred from list element
-numbers.filter(|x| => x > 0)
+mut x := 10
+increment(&x)              # pass a reference to x
 ```
 
-Explicit type annotations are also allowed:
+The reference type `&T` can only appear in function parameter declarations with `mut`:
 
 ```txt
-|x: int, y: int| => x + y
+fn increment(mut n: &int) {
+    n = n + 1              # modifies the caller's value
+}
 ```
 
-The body must be a single expression or `nop` (a no-operation that returns nothing):
+References cannot be stored in variables or returned from functions -- they exist only for the duration of
+the function call. This ensures that references are always valid and prevents dangling references.
+
+## Anonymous Functions
+
+An anonymous function is a function literal without a name. It uses the same syntax as a named function
+declaration but omits the function name:
 
 ```txt
-callbacks.each(|_| => nop)
+fn(x: int) -> int { return x ** 2 }
+fn(a: int, b: int) -> int { return a + b }
+fn() -> int { return 42 }
 ```
 
-Lambdas are expressions and can be assigned to variables, passed as arguments, or returned from functions.
-For multi-statement bodies, use `fn` instead.
+Parameter types must be declared explicitly -- they cannot be inferred. Anonymous functions are expressions
+and can be assigned to variables, passed as arguments, or invoked immediately:
+
+```txt
+square := fn(x: int) -> int { return x ** 2 }
+numbers.filter(fn(x: int) -> bool { return x > 0 })
+result := fn() -> int { return 42 }()           # immediate invocation
+```
+
+Anonymous functions can capture variables from the enclosing scope (closures).
 
 ## Function Calls
 

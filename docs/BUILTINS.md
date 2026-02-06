@@ -7,36 +7,33 @@ Zerg runtime and cannot be shadowed or redefined.
 
 | Built-in         | Kind      | Description                               |
 | ---------------- | --------- | ----------------------------------------- |
-| `print(args...)` | function  | Write to stdout                           |
+| `print(v)`       | function  | Write to stdout                           |
 | `len(c)`         | function  | Length of string/list/map/set             |
 | `int(v)`         | function  | Convert to int                            |
 | `float(v)`       | function  | Convert to float                          |
 | `str(v)`         | function  | Convert to string (calls `string()`)      |
 | `input(prompt?)` | function  | Read line from stdin                      |
-| `typeof(v)`      | function  | Return the type of v                      |
 | `assert`         | statement | Raise `AssertionError` if condition false |
 | `range`          | type      | Built-in iterable range type              |
 
 ## print
 
 ```txt
-print(args...)
+print(v)
 ```
 
-Writes its arguments to standard output followed by a newline. Multiple arguments are separated by a single
-space. Each argument is converted to its string representation by calling its `string()` method (from the
-`Stringable` spec).
+Writes a value to standard output followed by a newline. The value is converted to its string representation
+by calling its `string()` method (from the `Stringable` spec). Use string interpolation for multiple values.
 
 ```txt
 print("hello")                  # hello
-print("x =", 42)               # x = 42
-print(1, 2, 3)                  # 1 2 3
-print(true, nil)                # true nil
+print(42)                       # 42
+print("x = {x}, y = {y}")      # x = 1, y = 2
 ```
 
-**Signature**: `fn print(args...: any)`
+**Signature**: `fn print(v: Stringable)`
 
-- **Parameters**: zero or more values of any type
+- **Parameters**: a value that implements `Stringable` (all types do)
 - **Returns**: nothing
 
 ## len
@@ -55,9 +52,7 @@ len("hello")               # 5
 len("")                    # 0
 ```
 
-**Signature**: `fn len(c: any) ->int`
-
-- **Parameters**: a `string`, `list`, `map`, or `set`
+- **Parameters**: a `string`, `list[T]`, `map[K, V]`, or `set[T]`
 - **Returns**: `int` -- the number of elements (or bytes for strings)
 - **Raises**: `TypeError` if the argument does not support `len`
 
@@ -76,8 +71,8 @@ int("42")      # 42
 int(true)      # 1
 ```
 
-**Signature**: `fn int(v: any) ->int`
-
+- **Parameters**: `float`, `string`, or `bool`
+- **Returns**: `int`
 - **Raises**: `ValueError` if the value cannot be converted
 
 ## float
@@ -94,8 +89,8 @@ float(42)       # 42.0
 float("3.14")   # 3.14
 ```
 
-**Signature**: `fn float(v: any) ->float`
-
+- **Parameters**: `int`, `string`, or `bool`
+- **Returns**: `float`
 - **Raises**: `ValueError` if the value cannot be converted
 
 ## str
@@ -114,7 +109,7 @@ str(true)       # "true"
 str(nil)        # "nil"
 ```
 
-**Signature**: `fn str(v: any) ->string`
+**Signature**: `fn str(v: Stringable) -> string`
 
 ## input
 
@@ -134,21 +129,6 @@ line := input()
 
 - **Parameters**: optional prompt string
 - **Returns**: `string` -- the line read (without trailing newline)
-
-## typeof
-
-```txt
-typeof(v)
-```
-
-Returns the runtime type of a value. The returned value can be compared using `==` or used with `is`.
-
-```txt
-typeof(42) == int            # true
-typeof("hello") == string    # true
-```
-
-**Signature**: `fn typeof(v: any) ->type`
 
 ## assert
 

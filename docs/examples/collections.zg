@@ -1,6 +1,6 @@
 #! /usr/bin/env zerg
 #
-# Collections -- demonstrates list, map, set, nullable collections, and lambdas.
+# Collections -- demonstrates list, map, set, nullable collections, and anonymous functions.
 
 fn main() {
     numbers := [1, 2, 3, 4, 5]                      # List
@@ -17,12 +17,12 @@ fn main() {
         print("  {name}: {scores[name]}")
     }
 
-    # Lambda with collections
-    high_scores := scores.filter(|k, v| => v >= 90)
-    print("High scores:", high_scores)
+    # Anonymous function with collections
+    high_scores := scores.filter(fn(k: string, v: int) -> bool { return v >= 90 })
+    print("High scores: {high_scores}")
 
-    labels := tags.map(|t| => "lang:{t}")
-    print("Labels:", labels)
+    labels := tags.map(fn(t: string) -> string { return "lang:{t}" })
+    print("Labels: {labels}")
 
     # Empty collections
     empty_list: list[int] = []
@@ -31,9 +31,9 @@ fn main() {
 
     # Nullable collections
     data: list[string?] = ["hello", nil, "world"]
-    clean := data.filter(|x| => x != nil)
-    print("Clean:", clean)
+    clean := data.filter(fn(x: string?) -> bool { return x != nil })
+    print("Clean: {clean}")
 
     maybe_list: list[int]? = nil
-    print("Fallback:", maybe_list ?? [])
+    print("Fallback: {maybe_list ?? []}")
 }

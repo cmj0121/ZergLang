@@ -12,12 +12,13 @@ syn keyword zergKeyword       pub mut const this
 syn keyword zergKeyword       impl nextgroup=zergClassName skipwhite
 syn keyword zergFnDecl        fn nextgroup=zergFnName skipwhite
 syn keyword zergConditional   if else match
-syn keyword zergRepeat        for while in
+syn keyword zergRepeat        for in
 syn keyword zergStatement     return break continue del raise yield go import assert nop
 syn keyword zergException     try expect finally with as
 syn keyword zergStructure     class nextgroup=zergClassName skipwhite
 syn keyword zergStructure     spec nextgroup=zergSpecName skipwhite
 syn keyword zergStructure     enum nextgroup=zergEnumName skipwhite
+syn keyword zergStructure     type
 syn keyword zergOperator      and or xor not is
 
 " --- Constants ---
@@ -29,7 +30,7 @@ syn keyword zergNil           nil
 syn keyword zergType          int float bool string list map set chan object iter range Self
 
 " --- Built-in functions ---
-syn keyword zergBuiltin       print len input str typeof
+syn keyword zergBuiltin       print len input str int float
 
 " --- Wildcard pattern ---
 syn match   zergWildcard      /\<_\>/
@@ -75,6 +76,7 @@ syn match   zergOperatorSym   /\/\//
 syn match   zergOperatorSym   /\.\.=/
 syn match   zergOperatorSym   /\.\./
 syn match   zergChanOp        /<-/
+syn match   zergRefOp         /&\ze\w/
 syn match   zergOperatorSym   /+=/
 syn match   zergOperatorSym   /-=/
 syn match   zergOperatorSym   /\*=/
@@ -95,13 +97,6 @@ syn match   zergFnName        /\w\+/ contained
 syn match   zergClassName     /\w\+/ contained
 syn match   zergSpecName      /\w\+/ contained
 syn match   zergEnumName      /\w\+/ contained
-
-" --- Lambda |params| => expr ---
-syn match   zergLambdaPipe    /|/ contained
-syn match   zergLambdaArrow   /=>/ contained
-syn region  zergLambdaParams  start=/|/ end=/|/ contains=zergLambdaPipe,zergType,zergOperatorSym
-                              \ nextgroup=zergLambdaArrow skipwhite
-                              \ oneline
 
 " --- Highlight links ---
 hi def link zergKeyword       Keyword
@@ -130,9 +125,7 @@ hi def link zergClassName     Function
 hi def link zergSpecName      Function
 hi def link zergEnumName      Function
 hi def link zergChanOp        Special
-hi def link zergLambdaPipe    Delimiter
-hi def link zergLambdaArrow   Operator
-hi def link zergLambdaParams  Normal
+hi def link zergRefOp         Special
 hi def link zergBuiltin       Function
 
 let b:current_syntax = "zerg"
