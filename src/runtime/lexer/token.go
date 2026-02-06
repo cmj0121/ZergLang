@@ -43,15 +43,26 @@ const (
 	ARROW    TokenType = "->"
 
 	// Keywords
-	TRUE   TokenType = "TRUE"
-	FALSE  TokenType = "FALSE"
-	NIL    TokenType = "NIL"
-	MUT    TokenType = "MUT"
-	AND    TokenType = "AND"
-	OR     TokenType = "OR"
-	NOT    TokenType = "NOT"
-	FN     TokenType = "FN"
-	RETURN TokenType = "RETURN"
+	TRUE     TokenType = "TRUE"
+	FALSE    TokenType = "FALSE"
+	NIL      TokenType = "NIL"
+	MUT      TokenType = "MUT"
+	AND      TokenType = "AND"
+	OR       TokenType = "OR"
+	NOT      TokenType = "NOT"
+	FN       TokenType = "FN"
+	RETURN   TokenType = "RETURN"
+	IF       TokenType = "IF"
+	ELSE     TokenType = "ELSE"
+	FOR      TokenType = "FOR"
+	IN       TokenType = "IN"
+	BREAK    TokenType = "BREAK"
+	CONTINUE TokenType = "CONTINUE"
+	NOP      TokenType = "NOP"
+
+	// Match (for future)
+	MATCH    TokenType = "MATCH"
+	FAT_ARROW TokenType = "=>"
 )
 
 // Token represents a lexical token.
@@ -63,15 +74,23 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"true":   TRUE,
-	"false":  FALSE,
-	"nil":    NIL,
-	"mut":    MUT,
-	"and":    AND,
-	"or":     OR,
-	"not":    NOT,
-	"fn":     FN,
-	"return": RETURN,
+	"true":     TRUE,
+	"false":    FALSE,
+	"nil":      NIL,
+	"mut":      MUT,
+	"and":      AND,
+	"or":       OR,
+	"not":      NOT,
+	"fn":       FN,
+	"return":   RETURN,
+	"if":       IF,
+	"else":     ELSE,
+	"for":      FOR,
+	"in":       IN,
+	"break":    BREAK,
+	"continue": CONTINUE,
+	"nop":      NOP,
+	"match":    MATCH,
 }
 
 // LookupIdent returns the token type for an identifier.

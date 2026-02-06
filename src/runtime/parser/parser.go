@@ -143,29 +143,32 @@ func (p *Parser) peekPrecedence() int {
 }
 
 func (p *Parser) parseStatement() Statement {
-	// return expr
-	if p.curToken.Type == lexer.RETURN {
+	switch p.curToken.Type {
+	case lexer.RETURN:
 		return p.parseReturnStatement()
-	}
-
-	// fn name(...) { ... } - named function declaration
-	if p.curToken.Type == lexer.FN && p.peekToken.Type == lexer.IDENT {
-		return p.parseFunctionDeclaration()
-	}
-
-	// mut x := expr
-	if p.curToken.Type == lexer.MUT {
+	case lexer.IF:
+		return p.parseIfStatement()
+	case lexer.FOR:
+		return p.parseForStatement()
+	case lexer.BREAK:
+		return &BreakStatement{Token: p.curToken}
+	case lexer.CONTINUE:
+		return &ContinueStatement{Token: p.curToken}
+	case lexer.NOP:
+		return &NopStatement{Token: p.curToken}
+	case lexer.FN:
+		if p.peekToken.Type == lexer.IDENT {
+			return p.parseFunctionDeclaration()
+		}
+	case lexer.MUT:
 		return p.parseMutableDeclaration()
-	}
-
-	// x := expr
-	if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.DECLARE {
-		return p.parseDeclarationStatement(false)
-	}
-
-	// x = expr or x, y = a, b
-	if p.curToken.Type == lexer.IDENT && (p.peekToken.Type == lexer.ASSIGN || p.peekToken.Type == lexer.COMMA) {
-		return p.parseAssignmentStatement()
+	case lexer.IDENT:
+		if p.peekToken.Type == lexer.DECLARE {
+			return p.parseDeclarationStatement(false)
+		}
+		if p.peekToken.Type == lexer.ASSIGN || p.peekToken.Type == lexer.COMMA {
+			return p.parseAssignmentStatement()
+		}
 	}
 
 	return p.parseExpressionStatement()
@@ -510,4 +513,74 @@ func (p *Parser) parseCallArguments() []Expression {
 	p.nextToken()
 
 	return args
+}
+
+func (p *Parser) parseIfStatement() *IfStatement {
+	stmt := &IfStatement{Token: p.curToken}
+
+	p.nextToken()
+	stmt.Condition = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after if condition")
+		return nil
+	}
+	p.nextToken()
+	stmt.Consequence = p.parseBlockStatement()
+
+	if p.peekToken.Type == lexer.ELSE {
+		p.nextToken()
+
+		if p.peekToken.Type != lexer.LBRACE {
+			p.errors = append(p.errors, "expected { after else")
+			return nil
+		}
+		p.nextToken()
+		stmt.Alternative = p.parseBlockStatement()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseForStatement() Statement {
+	token := p.curToken
+
+	// for { } - infinite loop
+	if p.peekToken.Type == lexer.LBRACE {
+		p.nextToken()
+		body := p.parseBlockStatement()
+		return &ForConditionStatement{Token: token, Condition: nil, Body: body}
+	}
+
+	p.nextToken()
+
+	// Check if it's a for-in loop: for item in collection { }
+	if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.IN {
+		variable := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		p.nextToken() // move to 'in'
+		p.nextToken() // move to iterable
+
+		iterable := p.parseExpression(LOWEST)
+
+		if p.peekToken.Type != lexer.LBRACE {
+			p.errors = append(p.errors, "expected { after for-in")
+			return nil
+		}
+		p.nextToken()
+		body := p.parseBlockStatement()
+
+		return &ForInStatement{Token: token, Variable: variable, Iterable: iterable, Body: body}
+	}
+
+	// for condition { } - conditional loop
+	condition := p.parseExpression(LOWEST)
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after for condition")
+		return nil
+	}
+	p.nextToken()
+	body := p.parseBlockStatement()
+
+	return &ForConditionStatement{Token: token, Condition: condition, Body: body}
 }

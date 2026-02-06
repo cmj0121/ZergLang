@@ -63,6 +63,18 @@ func Eval(node parser.Node, env *Environment) Object {
 			return args[0]
 		}
 		return applyFunction(function, args)
+	case *parser.IfStatement:
+		return evalIfStatement(node, env)
+	case *parser.ForInStatement:
+		return evalForInStatement(node, env)
+	case *parser.ForConditionStatement:
+		return evalForConditionStatement(node, env)
+	case *parser.BreakStatement:
+		return BREAK
+	case *parser.ContinueStatement:
+		return CONTINUE
+	case *parser.NopStatement:
+		return NULL
 	}
 
 	return nil
@@ -93,7 +105,7 @@ func evalBlockStatement(block *parser.BlockStatement, env *Environment) Object {
 
 		if result != nil {
 			rt := result.Type()
-			if rt == RETURN_VALUE_OBJ || rt == "ERROR" {
+			if rt == RETURN_VALUE_OBJ || rt == "ERROR" || rt == BREAK_OBJ || rt == CONTINUE_OBJ {
 				return result
 			}
 		}
@@ -417,17 +429,114 @@ func (e *Environment) Declare(name string, val Object, mutable bool) Object {
 // Assign updates a mutable variable in the environment.
 func (e *Environment) Assign(name string, val Object) error {
 	b, ok := e.store[name]
-	if !ok {
-		return fmt.Errorf("identifier not found: %s", name)
+	if ok {
+		if !b.mutable {
+			return fmt.Errorf("cannot assign to immutable variable: %s", name)
+		}
+		b.value = val
+		return nil
 	}
-	if !b.mutable {
-		return fmt.Errorf("cannot assign to immutable variable: %s", name)
+	// Search in outer environments
+	if e.outer != nil {
+		return e.outer.Assign(name, val)
 	}
-	b.value = val
-	return nil
+	return fmt.Errorf("identifier not found: %s", name)
 }
 
 // Set stores a variable in the environment (for backward compatibility).
 func (e *Environment) Set(name string, val Object) Object {
 	return e.Declare(name, val, false)
+}
+
+// evalIfStatement evaluates an if statement.
+func evalIfStatement(is *parser.IfStatement, env *Environment) Object {
+	condition := Eval(is.Condition, env)
+	if IsError(condition) {
+		return condition
+	}
+
+	if isTruthy(condition) {
+		return Eval(is.Consequence, env)
+	} else if is.Alternative != nil {
+		return Eval(is.Alternative, env)
+	}
+	return NULL
+}
+
+// evalForInStatement evaluates a for-in loop.
+func evalForInStatement(fis *parser.ForInStatement, env *Environment) Object {
+	iterable := Eval(fis.Iterable, env)
+	if IsError(iterable) {
+		return iterable
+	}
+
+	// For now, we only support iterating over strings (character by character)
+	// Future: support lists, maps, ranges
+	switch obj := iterable.(type) {
+	case *String:
+		return evalForInString(fis, obj.Value, env)
+	default:
+		return newError("cannot iterate over %s", iterable.Type())
+	}
+}
+
+func evalForInString(fis *parser.ForInStatement, str string, env *Environment) Object {
+	var result Object = NULL
+
+	loopEnv := NewEnclosedEnvironment(env)
+
+	for _, ch := range str {
+		loopEnv.Declare(fis.Variable.Value, &String{Value: string(ch)}, false)
+
+		result = Eval(fis.Body, loopEnv)
+
+		if result != nil {
+			switch result.Type() {
+			case BREAK_OBJ:
+				return NULL
+			case CONTINUE_OBJ:
+				continue
+			case RETURN_VALUE_OBJ, "ERROR":
+				return result
+			}
+		}
+	}
+
+	return result
+}
+
+// evalForConditionStatement evaluates a for loop with condition.
+func evalForConditionStatement(fcs *parser.ForConditionStatement, env *Environment) Object {
+	var result Object = NULL
+
+	for {
+		// Check condition if present (nil means infinite loop)
+		// Condition is evaluated in the outer environment
+		if fcs.Condition != nil {
+			condition := Eval(fcs.Condition, env)
+			if IsError(condition) {
+				return condition
+			}
+			if !isTruthy(condition) {
+				break
+			}
+		}
+
+		// Body gets its own scope for each iteration
+		loopEnv := NewEnclosedEnvironment(env)
+		result = Eval(fcs.Body, loopEnv)
+
+		if result != nil {
+			switch result.Type() {
+			case BREAK_OBJ:
+				return NULL
+			case CONTINUE_OBJ:
+				continue
+			case RETURN_VALUE_OBJ, "ERROR":
+				return result
+			}
+		}
+	}
+
+	return result
 }

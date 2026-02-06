@@ -12,6 +12,8 @@ const (
 	NULL_OBJ         ObjectType = "NULL"
 	FUNCTION_OBJ     ObjectType = "FUNCTION"
 	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
+	BREAK_OBJ        ObjectType = "BREAK"
+	CONTINUE_OBJ     ObjectType = "CONTINUE"
 )
 
 // Object is the interface for all runtime values.
@@ -71,3 +73,21 @@ type ReturnValue struct {
 
 func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
 func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
+
+// BreakSignal signals a break statement in a loop.
+type BreakSignal struct{}
+
+func (bs *BreakSignal) Type() ObjectType { return BREAK_OBJ }
+func (bs *BreakSignal) Inspect() string  { return "break" }
+
+// ContinueSignal signals a continue statement in a loop.
+type ContinueSignal struct{}
+
+func (cs *ContinueSignal) Type() ObjectType { return CONTINUE_OBJ }
+func (cs *ContinueSignal) Inspect() string  { return "continue" }
+
+// Singleton break and continue signals.
+var (
+	BREAK    = &BreakSignal{}
+	CONTINUE = &ContinueSignal{}
+)

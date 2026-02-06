@@ -34,6 +34,10 @@ func (l *Lexer) NextToken() Token {
 			ch := l.ch
 			l.readChar()
 			tok = Token{Type: EQ, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: FAT_ARROW, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
 		} else {
 			tok = l.newToken(ASSIGN, l.ch)
 		}
