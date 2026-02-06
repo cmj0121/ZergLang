@@ -21,9 +21,7 @@ func New(input string) *Lexer {
 func (l *Lexer) NextToken() Token {
 	var tok Token
 
-	l.skipWhitespace()
-	l.skipComment()
-	l.skipWhitespace()
+	l.skipWhitespaceAndComments()
 
 	tok.Line = l.line
 	tok.Column = l.column
@@ -165,16 +163,19 @@ func (l *Lexer) peekChar() byte {
 	return l.input[l.readPosition]
 }
 
-func (l *Lexer) skipWhitespace() {
-	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
-		l.readChar()
-	}
-}
-
-func (l *Lexer) skipComment() {
-	if l.ch == '#' {
-		for l.ch != '\n' && l.ch != 0 {
+func (l *Lexer) skipWhitespaceAndComments() {
+	for {
+		// Skip whitespace
+		for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 			l.readChar()
+		}
+		// Skip comment if present
+		if l.ch == '#' {
+			for l.ch != '\n' && l.ch != 0 {
+				l.readChar()
+			}
+		} else {
+			break
 		}
 	}
 }
