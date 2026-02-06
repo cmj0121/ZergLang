@@ -77,6 +77,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.FN, p.parseFunctionLiteral)
 	p.registerPrefix(lexer.LBRACKET, p.parseListLiteral)
 	p.registerPrefix(lexer.LBRACE, p.parseMapLiteral)
+	p.registerPrefix(lexer.THIS, p.parseThis)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -163,6 +164,10 @@ func (p *Parser) parseStatement() Statement {
 		return &ContinueStatement{Token: p.curToken}
 	case lexer.NOP:
 		return &NopStatement{Token: p.curToken}
+	case lexer.CLASS:
+		return p.parseClassDeclaration()
+	case lexer.IMPL:
+		return p.parseImplDeclaration()
 	case lexer.FN:
 		if p.peekToken.Type == lexer.IDENT {
 			return p.parseFunctionDeclaration()
@@ -175,6 +180,15 @@ func (p *Parser) parseStatement() Statement {
 		}
 		if p.peekToken.Type == lexer.ASSIGN || p.peekToken.Type == lexer.COMMA {
 			return p.parseAssignmentStatement()
+		}
+		// Check for member/index assignment: ident.field = value or ident[idx] = value
+		if p.peekToken.Type == lexer.DOT || p.peekToken.Type == lexer.LBRACKET {
+			return p.tryParseMemberAssignment()
+		}
+	case lexer.THIS:
+		// Check for member assignment: this.field = value
+		if p.peekToken.Type == lexer.DOT {
+			return p.tryParseMemberAssignment()
 		}
 	}
 
@@ -688,4 +702,220 @@ func (p *Parser) parseMemberExpression(left Expression) Expression {
 
 	exp.Member = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	return exp
+}
+
+func (p *Parser) parseThis() Expression {
+	return &ThisExpression{Token: p.curToken}
+}
+
+func (p *Parser) tryParseMemberAssignment() Statement {
+	// Parse the left-hand side expression first
+	expr := p.parseExpression(LOWEST)
+
+	// Check if followed by = for assignment
+	if p.peekToken.Type != lexer.ASSIGN {
+		// Not an assignment, return as expression statement
+		return &ExpressionStatement{Token: p.curToken, Expression: expr}
+	}
+
+	// It's a member/index assignment
+	switch left := expr.(type) {
+	case *MemberExpression:
+		p.nextToken() // move to =
+		assignToken := p.curToken
+		p.nextToken() // move to value
+		value := p.parseExpression(LOWEST)
+		return &MemberAssignmentStatement{
+			Token:  assignToken,
+			Object: left.Object,
+			Member: left.Member,
+			Value:  value,
+		}
+	case *IndexExpression:
+		p.nextToken() // move to =
+		assignToken := p.curToken
+		p.nextToken() // move to value
+		value := p.parseExpression(LOWEST)
+		return &IndexAssignmentStatement{
+			Token: assignToken,
+			Left:  left.Left,
+			Index: left.Index,
+			Value: value,
+		}
+	default:
+		// Return as expression statement
+		return &ExpressionStatement{Token: p.curToken, Expression: expr}
+	}
+}
+
+func (p *Parser) parseClassDeclaration() *ClassDeclaration {
+	stmt := &ClassDeclaration{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected class name")
+		return nil
+	}
+	p.nextToken()
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after class name")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Fields = p.parseClassFields()
+
+	return stmt
+}
+
+func (p *Parser) parseClassFields() []*FieldDeclaration {
+	fields := []*FieldDeclaration{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		field := p.parseFieldDeclaration()
+		if field != nil {
+			fields = append(fields, field)
+		}
+		p.nextToken()
+	}
+
+	return fields
+}
+
+func (p *Parser) parseFieldDeclaration() *FieldDeclaration {
+	field := &FieldDeclaration{}
+
+	// Check for pub modifier
+	if p.curToken.Type == lexer.PUB {
+		field.Public = true
+		p.nextToken()
+	}
+
+	// Check for mut modifier
+	if p.curToken.Type == lexer.MUT {
+		field.Mutable = true
+		p.nextToken()
+	}
+
+	if p.curToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected field name")
+		return nil
+	}
+
+	field.Token = p.curToken
+	field.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	// Skip type annotation if present: name: type
+	if p.peekToken.Type == lexer.COLON {
+		p.nextToken() // move to :
+		p.nextToken() // move to type, skip it
+	}
+
+	// Parse default value if present: name = expr
+	if p.peekToken.Type == lexer.ASSIGN {
+		p.nextToken() // move to =
+		p.nextToken() // move to default value
+		field.Default = p.parseExpression(LOWEST)
+	}
+
+	return field
+}
+
+func (p *Parser) parseImplDeclaration() *ImplDeclaration {
+	stmt := &ImplDeclaration{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected class name after impl")
+		return nil
+	}
+	p.nextToken()
+	stmt.Class = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after class name")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Methods = p.parseMethodDeclarations()
+
+	return stmt
+}
+
+func (p *Parser) parseMethodDeclarations() []*MethodDeclaration {
+	methods := []*MethodDeclaration{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		method := p.parseMethodDeclaration()
+		if method != nil {
+			methods = append(methods, method)
+		}
+		p.nextToken()
+	}
+
+	return methods
+}
+
+func (p *Parser) parseMethodDeclaration() *MethodDeclaration {
+	method := &MethodDeclaration{}
+
+	// Check for pub modifier
+	if p.curToken.Type == lexer.PUB {
+		method.Public = true
+		p.nextToken()
+	}
+
+	// Check for static modifier
+	if p.curToken.Type == lexer.STATIC {
+		method.Static = true
+		p.nextToken()
+	}
+
+	// Check for mut modifier (mutable receiver)
+	if p.curToken.Type == lexer.MUT {
+		method.Mutable = true
+		p.nextToken()
+	}
+
+	if p.curToken.Type != lexer.FN {
+		p.errors = append(p.errors, "expected fn keyword in method")
+		return nil
+	}
+	method.Token = p.curToken
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected method name")
+		return nil
+	}
+	p.nextToken()
+	method.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LPAREN {
+		p.errors = append(p.errors, "expected ( after method name")
+		return nil
+	}
+	p.nextToken()
+
+	method.Parameters = p.parseFunctionParameters()
+
+	// Skip optional return type annotation: -> type
+	if p.peekToken.Type == lexer.ARROW {
+		p.nextToken() // move to ->
+		p.nextToken() // move to type, skip it
+	}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { for method body")
+		return nil
+	}
+	p.nextToken()
+
+	method.Body = p.parseBlockStatement()
+
+	return method
 }

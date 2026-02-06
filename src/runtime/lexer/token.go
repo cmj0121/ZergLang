@@ -64,8 +64,15 @@ const (
 	NOP      TokenType = "NOP"
 
 	// Match (for future)
-	MATCH    TokenType = "MATCH"
+	MATCH     TokenType = "MATCH"
 	FAT_ARROW TokenType = "=>"
+
+	// Class-related keywords
+	CLASS  TokenType = "CLASS"
+	IMPL   TokenType = "IMPL"
+	THIS   TokenType = "THIS"
+	PUB    TokenType = "PUB"
+	STATIC TokenType = "STATIC"
 )
 
 // Token represents a lexical token.
@@ -94,6 +101,11 @@ var keywords = map[string]TokenType{
 	"continue": CONTINUE,
 	"nop":      NOP,
 	"match":    MATCH,
+	"class":    CLASS,
+	"impl":     IMPL,
+	"this":     THIS,
+	"pub":      PUB,
+	"static":   STATIC,
 }
 
 // LookupIdent returns the token type for an identifier.

@@ -16,6 +16,8 @@ const (
 	CONTINUE_OBJ     ObjectType = "CONTINUE"
 	LIST_OBJ         ObjectType = "LIST"
 	MAP_OBJ          ObjectType = "MAP"
+	CLASS_OBJ        ObjectType = "CLASS"
+	INSTANCE_OBJ     ObjectType = "INSTANCE"
 )
 
 // Object is the interface for all runtime values.
@@ -169,3 +171,51 @@ func (m *Map) Inspect() string {
 	out += "}"
 	return out
 }
+
+// ClassField represents a field definition in a class.
+type ClassField struct {
+	Name    string
+	Default Object
+	Public  bool
+	Mutable bool
+}
+
+// ClassMethod represents a method definition in a class.
+type ClassMethod struct {
+	Name       string
+	Parameters []string
+	Body       interface{} // *parser.BlockStatement
+	Public     bool
+	Static     bool
+	Mutable    bool // mutable receiver
+	Env        *Environment
+}
+
+// Class represents a class definition.
+type Class struct {
+	Name          string
+	Fields        map[string]*ClassField
+	Methods       map[string]*ClassMethod
+	StaticMethods map[string]*ClassMethod
+}
+
+func (c *Class) Type() ObjectType { return CLASS_OBJ }
+func (c *Class) Inspect() string  { return fmt.Sprintf("<class %s>", c.Name) }
+
+// Instance represents an instance of a class.
+type Instance struct {
+	Class  *Class
+	Fields map[string]Object
+}
+
+func (i *Instance) Type() ObjectType { return INSTANCE_OBJ }
+func (i *Instance) Inspect() string  { return fmt.Sprintf("<%s instance>", i.Class.Name) }
+
+// BoundMethod represents a method bound to an instance.
+type BoundMethod struct {
+	Instance *Instance // nil for static methods
+	Method   *ClassMethod
+}
+
+func (bm *BoundMethod) Type() ObjectType { return FUNCTION_OBJ }
+func (bm *BoundMethod) Inspect() string  { return fmt.Sprintf("<method %s>", bm.Method.Name) }

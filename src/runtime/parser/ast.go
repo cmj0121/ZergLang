@@ -264,3 +264,79 @@ type MemberExpression struct {
 
 func (me *MemberExpression) expressionNode()      {}
 func (me *MemberExpression) TokenLiteral() string { return me.Token.Literal }
+
+// ClassDeclaration represents a class definition: class Name { fields }
+type ClassDeclaration struct {
+	Token  lexer.Token // the 'class' token
+	Name   *Identifier
+	Fields []*FieldDeclaration
+}
+
+func (cd *ClassDeclaration) statementNode()       {}
+func (cd *ClassDeclaration) TokenLiteral() string { return cd.Token.Literal }
+
+// FieldDeclaration represents a class field: pub mut name: type = default
+type FieldDeclaration struct {
+	Token   lexer.Token // the field name token
+	Name    *Identifier
+	Public  bool
+	Mutable bool
+	Default Expression // optional default value
+}
+
+func (fd *FieldDeclaration) statementNode()       {}
+func (fd *FieldDeclaration) TokenLiteral() string { return fd.Token.Literal }
+
+// ImplDeclaration represents method implementations: impl ClassName { methods }
+type ImplDeclaration struct {
+	Token   lexer.Token // the 'impl' token
+	Class   *Identifier
+	Methods []*MethodDeclaration
+}
+
+func (id *ImplDeclaration) statementNode()       {}
+func (id *ImplDeclaration) TokenLiteral() string { return id.Token.Literal }
+
+// MethodDeclaration represents a method: pub static mut fn name(params) { body }
+type MethodDeclaration struct {
+	Token      lexer.Token // the 'fn' token
+	Name       *Identifier
+	Parameters []*Parameter
+	Body       *BlockStatement
+	Public     bool
+	Static     bool
+	Mutable    bool // mut receiver (self)
+}
+
+func (md *MethodDeclaration) statementNode()       {}
+func (md *MethodDeclaration) TokenLiteral() string { return md.Token.Literal }
+
+// ThisExpression represents 'this' keyword.
+type ThisExpression struct {
+	Token lexer.Token
+}
+
+func (te *ThisExpression) expressionNode()      {}
+func (te *ThisExpression) TokenLiteral() string { return te.Token.Literal }
+
+// MemberAssignmentStatement represents member assignment: obj.field = value
+type MemberAssignmentStatement struct {
+	Token  lexer.Token // the '=' token
+	Object Expression
+	Member *Identifier
+	Value  Expression
+}
+
+func (mas *MemberAssignmentStatement) statementNode()       {}
+func (mas *MemberAssignmentStatement) TokenLiteral() string { return mas.Token.Literal }
+
+// IndexAssignmentStatement represents index assignment: arr[idx] = value
+type IndexAssignmentStatement struct {
+	Token lexer.Token // the '=' token
+	Left  Expression
+	Index Expression
+	Value Expression
+}
+
+func (ias *IndexAssignmentStatement) statementNode()       {}
+func (ias *IndexAssignmentStatement) TokenLiteral() string { return ias.Token.Literal }
