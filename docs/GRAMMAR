@@ -38,9 +38,10 @@ SIMPLE_STMT  ::= VIS "mut"? IDENTIFIER ( ":=" EXPRESSION | ":" TYPE "=" EXPRESSI
 
 COMPOUND_STMT::= IF_STMT | MATCH_STMT
                | "for" IDENTIFIER ( "," IDENTIFIER )* "in" EXPRESSION BLOCK
-               | "while" EXPRESSION BLOCK
+               | "for" EXPRESSION BLOCK
+               | "for" BLOCK
                | "try" BLOCK ( "expect" TYPE "as" IDENTIFIER BLOCK )+ ( "finally" BLOCK )?
-               | "with" IDENTIFIER ":=" EXPRESSION BLOCK
+               | "with" ( IDENTIFIER ":=" )? EXPRESSION BLOCK
                | FN_DECL | CLASS_DECL | IMPL_BLOCK
                | SPEC_DECL | ENUM_DECL
 
@@ -48,7 +49,7 @@ COMPOUND_STMT::= IF_STMT | MATCH_STMT
 # Control Flow
 # ============================================================================
 
-IF_STMT    ::= "if" EXPRESSION BLOCK ( "else" "if" EXPRESSION BLOCK )* ( "else" BLOCK )?
+IF_STMT    ::= "if" EXPRESSION BLOCK ( "else" BLOCK )?
 
 MATCH_STMT ::= "match" EXPRESSION "{" ( PATTERN ( "," PATTERN )* ( "if" EXPRESSION )? "=>" BLOCK )+ "}"
 PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
@@ -58,9 +59,9 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 # Declarations
 # ============================================================================
 
-FN_DECL    ::= VIS "mut"? "fn" FN_SIG BLOCK
-FN_SIG     ::= IDENTIFIER "(" PARAMS? ")" ( "->" TYPE )?
-PARAM      ::= IDENTIFIER "..."? ":" "mut"? TYPE ( "=" EXPRESSION )?
+FN_DECL    ::= VIS "static"? "mut"? "fn" FN_SIG BLOCK
+FN_SIG     ::= IDENTIFIER TYPE_PARAMS? "(" PARAMS? ")" ( "->" TYPE )?
+PARAM      ::= "mut"? IDENTIFIER ":" "&"? TYPE ( "=" EXPRESSION )?
 PARAMS     ::= PARAM ( "," PARAM )* ","?
 
 CLASS_DECL ::= VIS "class" IDENTIFIER TYPE_PARAMS? "{" CLASS_MEMBER* "}"
@@ -82,7 +83,9 @@ TYPE       ::= IDENTIFIER TYPE_ARGS? "?"?
              | "fn" "(" ( TYPE ( "," TYPE )* )? ")" ( "->" TYPE )?
              | "Self"
 TYPE_ARGS  ::= "[" TYPE ( "," TYPE )* "]"
-TYPE_PARAMS::= "[" IDENTIFIER ( "," IDENTIFIER )* "]"
+TYPE_PARAMS::= "[" TYPE_PARAM ( "," TYPE_PARAM )* "]"
+TYPE_PARAM ::= IDENTIFIER ( ":" CONSTRAINT )?
+CONSTRAINT ::= IDENTIFIER TYPE_ARGS? ( "+" IDENTIFIER TYPE_ARGS? )*
 
 EXPR_LIST  ::= EXPRESSION ( "," EXPRESSION )*
 
@@ -105,7 +108,7 @@ SHIFT      ::= RANGE ( ( "<<" | ">>" ) RANGE )*
 RANGE      ::= ADDITION ( ( ".." | "..=" ) ADDITION )?
 ADDITION   ::= MULTIPLY ( ( "+" | "-" ) MULTIPLY )*
 MULTIPLY   ::= UNARY ( ( "*" | "/" | "//" | "%" ) UNARY )*
-UNARY      ::= ( "-" | "not" | "~" | "<-" ) UNARY | POWER
+UNARY      ::= ( "-" | "not" | "~" | "<-" | "&" ) UNARY | POWER
 POWER      ::= POSTFIX ( "**" UNARY )?
 ARGUMENT   ::= ( IDENTIFIER "=" )? EXPRESSION
 POSTFIX    ::= PRIMARY ( "(" ( ARGUMENT ( "," ARGUMENT )* ","? )? ")"
@@ -120,17 +123,15 @@ PRIMARY    ::= LITERAL | IDENTIFIER | "(" EXPRESSION ")"
              | "{" EXPRESSION ":" EXPRESSION ( "," EXPRESSION ":" EXPRESSION )* ","? "}"
              | "{" EXPRESSION ( "," EXPRESSION )* ","? "}"
              | "{" "}"
-             | LAMBDA
+             | ANON_FN
 
-LAMBDA       ::= "|" LAMBDA_PARAMS? "|" "=>" ( EXPRESSION | "nop" )
-LAMBDA_PARAM ::= IDENTIFIER ( ":" TYPE )?
-LAMBDA_PARAMS::= LAMBDA_PARAM ( "," LAMBDA_PARAM )* ","?
+ANON_FN    ::= "fn" "(" PARAMS? ")" ( "->" TYPE )? BLOCK
 
 # ============================================================================
 # Built-in Functions (see BUILTINS.md)
 # ============================================================================
 
-# print(args...) -- write arguments to stdout, space-separated, with newline.
+# print(v) -- write a Stringable value to stdout with newline.
 
 # ============================================================================
 # Lexical Rules
@@ -159,8 +160,8 @@ RAW_STRING ::= 'r"' ( <any Unicode char except '"'> )* '"'
 IDENTIFIER ::= ( "a"..."z" | "A"..."Z" | "_" ) ( "a"..."z" | "A"..."Z" | DIGIT | "_" )*
 
 # The following words are reserved and cannot be used as identifiers:
-#   pub mut const this fn return break continue del raise yield go assert import nop
-#   if else match for while in try expect finally with class impl spec enum type
+#   pub mut const static this fn return break continue del raise yield go assert import nop
+#   if else match for in try expect finally with class impl spec enum type
 #   and or xor not is true false nil Ok Err Self
 
 COMMENT    ::= "#" <any char except newline>*

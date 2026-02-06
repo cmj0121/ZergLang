@@ -524,7 +524,7 @@ The `enum` keyword is syntax sugar -- the underlying data representation is an i
 by the compiler. User code should treat enums as opaque and access variants only through pattern matching.
 
 The `match` statement handles values by pattern matching. It is a **statement**, not an expression -- it
-cannot be assigned to a variable. Internally, `match` is syntax sugar for `if-elif-else` chains.
+cannot be assigned to a variable. Internally, `match` is syntax sugar for chained conditionals.
 
 When matching enum variants, the compiler requires all variants to be covered exhaustively. The compiler
 rejects any `match` that does not handle every variant, ensuring no case is silently ignored. Each branch
