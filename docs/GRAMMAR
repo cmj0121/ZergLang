@@ -59,7 +59,7 @@ PATTERN    ::= IDENTIFIER ( "(" ( IDENTIFIER ( "," IDENTIFIER )* ","? )? ")" )?
 # Declarations
 # ============================================================================
 
-FN_DECL    ::= VIS "static"? "mut"? "fn" FN_SIG BLOCK
+FN_DECL    ::= VIS ( "static" | "mut" )? "fn" FN_SIG BLOCK
 FN_SIG     ::= IDENTIFIER TYPE_PARAMS? "(" PARAMS? ")" ( "->" TYPE )?
 PARAM      ::= "mut"? IDENTIFIER ":" "&"? TYPE ( "=" EXPRESSION )?
 PARAMS     ::= PARAM ( "," PARAM )* ","?

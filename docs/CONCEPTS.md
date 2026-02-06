@@ -724,6 +724,9 @@ By default, methods cannot modify the receiver. A method that needs to mutate `t
 `mut fn`. The compiler enforces this -- calling a `mut fn` method on an immutable variable is a compile-time
 error.
 
+Note: `static` and `mut` are mutually exclusive. A static method has no instance to mutate, so `static mut fn`
+is invalid.
+
 Parameters can also be declared mutable using `mut` before the parameter name:
 
 ```txt
