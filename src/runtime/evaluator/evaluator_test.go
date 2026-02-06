@@ -233,6 +233,48 @@ func TestPrefixExpressions(t *testing.T) {
 	}
 }
 
+func TestFunctionDeclaration(t *testing.T) {
+	input := `fn add(a, b) {
+    return a + b
+}
+add(10, 20)`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 30)
+}
+
+func TestAnonymousFunction(t *testing.T) {
+	input := `double := fn(x) { return x * 2 }
+double(5)`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}
+
+func TestClosures(t *testing.T) {
+	input := `fn makeAdder(x) {
+    return fn(y) { return x + y }
+}
+add5 := makeAdder(5)
+add5(10)`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 15)
+}
+
+func TestDefaultParameters(t *testing.T) {
+	input := `fn greet(name = "world") {
+    return "hello " + name
+}
+greet()`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+	if str.Value != "hello world" {
+		t.Fatalf("expected 'hello world', got %s", str.Value)
+	}
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)
