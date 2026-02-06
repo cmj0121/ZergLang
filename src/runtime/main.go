@@ -82,7 +82,7 @@ func run(filename string) error {
 
 	log.Debug().Int("statements", len(program.Statements)).Msg("parsed program")
 
-	env := evaluator.NewEnvironment()
+	env := evaluator.NewEnvironmentWithBuiltins()
 	result := evaluator.Eval(program, env)
 
 	if result != nil {

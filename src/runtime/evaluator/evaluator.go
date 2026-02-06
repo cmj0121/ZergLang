@@ -441,6 +441,15 @@ func NewEnvironment() *Environment {
 	return &Environment{store: make(map[string]*binding), outer: nil}
 }
 
+// NewEnvironmentWithBuiltins creates a new Environment with all builtins pre-declared.
+func NewEnvironmentWithBuiltins() *Environment {
+	env := NewEnvironment()
+	for name, builtin := range Builtins {
+		env.Declare(name, builtin, false)
+	}
+	return env
+}
+
 // NewEnclosedEnvironment creates a new Environment with an outer scope.
 func NewEnclosedEnvironment(outer *Environment) *Environment {
 	env := NewEnvironment()
