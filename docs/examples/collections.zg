@@ -1,0 +1,39 @@
+#! /usr/bin/env zerg
+#
+# Collections -- demonstrates list, map, set, nullable collections, and anonymous functions.
+
+fn main() {
+    numbers := [1, 2, 3, 4, 5]                      # List
+    scores := {"alice": 95, "bob": 87, "carol": 92} # Map
+    tags := {"go", "rust", "zerg"}                  # Set
+
+    # Multi-value for loop (index + element)
+    for i, num in numbers {
+        print("  [{i}] = {num}")
+    }
+
+    # Map iterates keys only
+    for name in scores {
+        print("  {name}: {scores[name]}")
+    }
+
+    # Anonymous function with collections
+    high_scores := scores.filter(fn(k: string, v: int) -> bool { return v >= 90 })
+    print("High scores: {high_scores}")
+
+    labels := tags.map(fn(t: string) -> string { return "lang:{t}" })
+    print("Labels: {labels}")
+
+    # Empty collections
+    empty_list: list[int] = []
+    empty_map: map[string, int] = {:}
+    empty_set: set[string] = {}
+
+    # Nullable collections
+    data: list[string?] = ["hello", nil, "world"]
+    clean := data.filter(fn(x: string?) -> bool { return x != nil })
+    print("Clean: {clean}")
+
+    maybe_list: list[int]? = nil
+    print("Fallback: {maybe_list ?? []}")
+}

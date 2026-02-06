@@ -14,7 +14,8 @@ The Zerg language is designed to follow principles of:
 - procedural
 - concurrent
 - garbage-collected
-- strongly-typed language
+- strongly-typed
+- copy-by-value
 
 ## DDD (Dream-Driven Development)
 

@@ -1,0 +1,33 @@
+#! /usr/bin/env zerg
+#
+# Fibonacci sequence -- demonstrates functions, recursion, range, and anonymous functions.
+
+fn fib(n: int) -> int {
+    if n <= 1 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn fib_iter(n: int) -> int {
+    mut a := 0
+    mut b := 1
+    for _ in 0..n {
+        a, b = b, a + b
+    }
+    return a
+}
+
+fn main() {
+    print("Recursive:")
+    for i in 0..10 {
+        print("  fib({i}) = {fib(i)}")
+    }
+
+    print("Iterative:")
+    for i in 0..=20 {
+        print("  fib({i}) = {fib_iter(i)}")
+    }
+
+    # Anonymous function for reusable formulas
+    cube := fn(x: int) -> int { return x ** 3 }
+    print("5 cubed = {cube(5)}")
+}

@@ -8,22 +8,23 @@ time. This document describes the available operators, their behavior, and their
 Operators are listed from **lowest** to **highest** precedence. Operators at the same precedence level are
 evaluated **left to right** (left-associative), except for unary operators which are right-associative.
 
-| Precedence   | Operator                    | Description            | Associativity |
-| ------------ | --------------------------- | ---------------------- | ------------- |
-| 1 (lowest)   | `??`                        | Nil coalescing         | Left          |
-| 2            | `or`                        | Logical OR             | Left          |
-| 3            | `xor`                       | Logical XOR            | Left          |
-| 4            | `and`                       | Logical AND            | Left          |
-| 5            | `==` `!=` `<` `>` `<=` `>=` | Comparison (chainable) | Left          |
-| 6            | `\|`                        | Bitwise OR             | Left          |
-| 7            | `^`                         | Bitwise XOR            | Left          |
-| 8            | `&`                         | Bitwise AND            | Left          |
-| 9            | `<<` `>>`                   | Bit shift              | Left          |
-| 10           | `+` `-`                     | Addition, Subtraction  | Left          |
-| 11           | `*` `/` `//` `%`            | Multiply, Divide, Mod  | Left          |
-| 12           | `-` `not` `~`               | Negation, NOT, Bit NOT | Right         |
-| 13           | `**`                        | Power                  | Right         |
-| 14 (highest) | `()` `[]` `.` `?.` `?[]`    | Call, Index, Member    | Left          |
+| Precedence   | Operator                         | Description                 | Associativity |
+| ------------ | -------------------------------- | --------------------------- | ------------- |
+| 1 (lowest)   | `??`                             | Nil coalescing              | Left          |
+| 2            | `or`                             | Logical OR                  | Left          |
+| 3            | `xor`                            | Logical XOR                 | Left          |
+| 4            | `and`                            | Logical AND                 | Left          |
+| 5            | `==` `!=` `<` `>` `<=` `>=` `is` | Comparison (chainable)      | Left          |
+| 6            | `\|`                             | Bitwise OR                  | Left          |
+| 7            | `^`                              | Bitwise XOR                 | Left          |
+| 8            | `&`                              | Bitwise AND                 | Left          |
+| 9            | `<<` `>>`                        | Bit shift                   | Left          |
+| 10           | `..` `..=`                       | Range                       | None          |
+| 11           | `+` `-`                          | Addition, Subtraction       | Left          |
+| 12           | `*` `/` `//` `%`                 | Multiply, Divide, Mod       | Left          |
+| 13           | `-` `not` `~` `<-` `&`           | Negation, NOT, Receive, Ref | Right         |
+| 14           | `**`                             | Power                       | Right         |
+| 15 (highest) | `()` `[]` `.` `?.` `?[]`         | Call, Index, Member         | Left          |
 
 Parentheses `( )` can be used to override the default precedence.
 
@@ -62,6 +63,35 @@ Division, floor division, or modulo by zero raises an exception.
 There is **no implicit type coercion** between `int` and `float`. Mixing `int` and `float` operands in an
 arithmetic expression is a compile-time error. Use explicit conversion functions to convert between types.
 
+## Compound Assignment
+
+Compound assignment operators combine an arithmetic or bitwise operation with assignment. The variable must
+be `mut`. The expression `x += y` is equivalent to `x = x + y`.
+
+| Operator | Equivalent   | Operator | Equivalent   |
+| -------- | ------------ | -------- | ------------ |
+| `+=`     | `x = x + y`  | `&=`     | `x = x & y`  |
+| `-=`     | `x = x - y`  | `\|=`    | `x = x \| y` |
+| `*=`     | `x = x * y`  | `^=`     | `x = x ^ y`  |
+| `/=`     | `x = x / y`  | `<<=`    | `x = x << y` |
+| `//=`    | `x = x // y` | `>>=`    | `x = x >> y` |
+| `%=`     | `x = x % y`  |          |              |
+| `**=`    | `x = x ** y` |          |              |
+
+## Increment and Decrement
+
+The `++` and `--` postfix operators are **statements**, not expressions. They require the variable to be
+`mut` and the type to implement the `Incremental` spec (see [SPECS.md](SPECS.md#incremental)).
+
+```txt
+mut i := 0
+i++            # equivalent to: i.inc()
+i--            # equivalent to: i.dec()
+```
+
+The built-in `int` and `float` types implement `Incremental`. Because `++` and `--` are statements, they
+cannot be used inside expressions -- `x := i++` is a syntax error.
+
 ## Comparison Operators
 
 Comparison operators return a `bool` value. All comparison operators share the same precedence level.
@@ -96,6 +126,25 @@ a == b == c          # equivalent to: a == b and b == c
 
 The chain short-circuits: if any comparison in the chain is `false`, the remaining comparisons are not
 evaluated. For example, in `a < b < c`, if `a < b` is `false`, `c` is never evaluated.
+
+### Type Checking with `is`
+
+The `is` operator checks whether a value is of a given type or implements a given spec. It returns a `bool`
+and shares the same precedence level as comparison operators.
+
+```txt
+x is int              # true if x is type int
+x is Comparable       # true if x implements Comparable
+```
+
+The right-hand side of `is` must be a type name or spec name (not an expression). The `is` operator can be
+combined with `not` for negative checks:
+
+```txt
+if not x is string {
+    print("x is not a string")
+}
+```
 
 ## Logical Operators
 
@@ -132,8 +181,23 @@ Bitwise operators work on `int` values and perform bit-level manipulation.
 All bitwise operators require `int` operands and produce an `int` result. They are not defined for `float`,
 `bool`, or any other type.
 
+Note: `&` has two meanings depending on context. As a binary operator (`a & b`), it performs bitwise AND.
+As a unary prefix operator (`&x`), it creates a reference. See [Reference Operator](#reference-operator).
+
 The shift amount must be a non-negative `int`. Shifting by a negative amount or by more than 63 bits raises
 an exception.
+
+## Range Operators
+
+The range operators create `range` values representing sequences of integers.
+
+| Operator | Description   | Example | Result        |
+| -------- | ------------- | ------- | ------------- |
+| `..`     | Exclusive end | `1..5`  | 1, 2, 3, 4    |
+| `..=`    | Inclusive end | `1..=5` | 1, 2, 3, 4, 5 |
+
+Both operands must be `int`. Range operators are non-associative -- `a..b..c` is a syntax error.
+See [BUILTINS.md](BUILTINS.md#range) for details on the `range` type.
 
 ## Unary Operators
 
@@ -143,6 +207,58 @@ an exception.
 |          |                  | `float`      | `float`     |
 | `not`    | Logical negation | `bool`       | `bool`      |
 | `~`      | Bitwise NOT      | `int`        | `int`       |
+| `<-`     | Channel receive  | `chan[T]`    | `T`         |
+| `&`      | Reference        | `T`          | `&T`        |
+
+## Reference Operator
+
+The `&` operator creates a reference to a variable. References are used exclusively in function parameters
+to allow a function to modify the caller's value.
+
+```txt
+mut x := 10
+increment(&x)              # pass a reference to x
+```
+
+The reference type `&T` can only appear in function parameter declarations with `mut`:
+
+```txt
+fn increment(mut n: &int) {
+    n = n + 1              # modifies the caller's value
+}
+```
+
+References cannot be stored in variables or returned from functions -- they exist only for the duration of
+the function call. This ensures that references are always valid and prevents dangling references.
+
+## Anonymous Functions
+
+An anonymous function is a function literal without a name. It uses the same syntax as a named function
+declaration but omits the function name:
+
+```txt
+fn(x: int) -> int { return x ** 2 }
+fn(a: int, b: int) -> int { return a + b }
+fn() -> int { return 42 }
+```
+
+Parameter types must be declared explicitly -- they cannot be inferred. Anonymous functions are expressions
+and can be assigned to variables, passed as arguments, or invoked immediately:
+
+```txt
+square := fn(x: int) -> int { return x ** 2 }
+numbers.filter(fn(x: int) -> bool { return x > 0 })
+result := fn() -> int { return 42 }()           # immediate invocation
+```
+
+Anonymous functions can capture variables from the enclosing scope (closures). Captured variables are
+copied by value. To modify external state, use reference parameters just like regular functions:
+
+```txt
+fn(mut count: &int) { count = count + 1 }
+```
+
+See [Closures](CONCEPTS.md#closures) for details.
 
 ## Function Calls
 
@@ -156,6 +272,22 @@ A trailing comma after the last argument is permitted. The number and types of a
 function's parameter list at compile time.
 
 Since functions are first-class values, any expression that evaluates to a function type can be called.
+
+### Named Arguments
+
+Arguments can be passed by name using `name=value` syntax. Named arguments can appear in any order, but all
+positional arguments must come before any named arguments. This works for all function calls, including class
+constructors.
+
+```txt
+print("hello", end="\n")
+Animal(name="Rex", age=3)
+Animal("Rex", age=3)           # mixed: positional first, then named
+```
+
+A named argument binds the value to the parameter with the matching name. It is a compile-time error to pass
+a named argument that does not correspond to any parameter, or to provide the same parameter both positionally
+and by name.
 
 ## Member Access
 
@@ -182,21 +314,40 @@ raises an exception.
 
 ## Collection Literals
 
-Zerg supports inline literals for `list` and `map`:
+Zerg supports inline literals for `list`, `map`, and `set`. The type of a `{}` literal is disambiguated by
+its contents:
 
 ```txt
+# List literals
 [1, 2, 3]                    # list[int]
 ["a", "b", "c"]              # list[string]
 []                           # empty list (requires type annotation)
 
-{"name": "zerg", "ver": 1}   # map[string, int] -- compile error, mixed value types
-{"name": "zerg"}             # map[string, string]
-{}                           # empty map (requires type annotation)
+# Map literals (key: value pairs)
+{"name": "zerg", "ver": "1"} # map[string, string]
+{:}                          # empty map (requires type annotation)
+
+# Set literals (values only, no colons)
+{1, 2, 3}                   # set[int]
+{"a", "b", "c"}              # set[string]
+{}                           # empty set (requires type annotation)
 ```
 
-A trailing comma after the last element is permitted. The element type for lists and the key/value types for
-maps are inferred from the contents. Empty collection literals (`[]`, `{}`) require an explicit type
-annotation on the variable since the compiler cannot infer the element type.
+The distinction between `set` and `map` is syntactic: if elements contain `:` separators, it is a `map`;
+otherwise it is a `set`. The special `{:}` syntax creates an empty map, while `{}` creates an empty set.
+Both require an explicit type annotation on the variable.
+
+Type constructors can also be used to create collections:
+
+```txt
+list[int]()
+map[string, int]()
+set[string]()
+chan[int](10)                 # buffered channel with capacity 10
+```
+
+A trailing comma after the last element is permitted. The element type for lists, the key/value types for
+maps, and the element type for sets are inferred from the contents.
 
 ## Null-Safe Operators
 

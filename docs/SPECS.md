@@ -1,0 +1,126 @@
+# Built-in Specs
+
+Zerg provides a set of built-in specs (interfaces) that define standard behavior across types. These specs
+are available without importing and form the foundation of Zerg's type system. See
+[CONCEPTS.md](CONCEPTS.md) for how to implement specs using `impl ClassName for SpecName`.
+
+## `Self` Type
+
+`Self` refers to the type of the current instance. Inside a spec definition, `Self` resolves to the class
+that implements the spec. For example, when `Dog` implements `Equatable`, `Self` resolves to `Dog`. This
+allows specs to define methods that accept or return the implementing type without knowing it in advance.
+
+A method that uses `Self` in its signature (as a parameter type or return type) is always an instance method
+-- it must be called on an instance and has access to `this`. `Self` cannot be used in standalone functions
+or static contexts; it is only valid inside `spec` definitions and `impl` blocks.
+
+## Stringable
+
+Converts a value to its string representation. All types implement `Stringable` via the `object` root class.
+
+```txt
+spec Stringable {
+    fn string() -> string
+}
+```
+
+Called implicitly by `print()`, string interpolation `{expr}`, and `str()`.
+
+## Equatable
+
+Defines equality comparison between values of the same type.
+
+```txt
+spec Equatable {
+    fn equals(other: Self) -> bool
+}
+```
+
+The `==` and `!=` operators delegate to `equals()`. The default implementation from `object` performs
+structural equality (field-by-field comparison).
+
+## Hashable
+
+Produces an integer hash for use in `map` keys and `set` elements.
+
+```txt
+spec Hashable {
+    fn hash() -> int
+}
+```
+
+Two values that are equal (via `Equatable`) must produce the same hash. The default implementation from
+`object` computes a structural hash from all fields.
+
+## Comparable
+
+Defines ordering between values. Uses a generic type parameter `T` to allow cross-type comparison when
+needed, though most implementations compare against their own type.
+
+```txt
+spec Comparable[T] {
+    fn compare(other: T) -> int
+}
+```
+
+Returns a negative integer if `this < other`, zero if equal, and a positive integer if `this > other`. The
+ordering operators (`<`, `>`, `<=`, `>=`) delegate to `compare()`.
+
+## Disposable
+
+Manages resource acquisition and release. Types that hold external resources (files, network connections,
+channels) implement this spec to ensure proper cleanup.
+
+```txt
+spec Disposable {
+    fn open()
+    fn close()
+}
+```
+
+Used by the `with` statement (calls `open()` on entry, `close()` on exit) and `del` (calls `close()` before
+removing the binding). See [Resource Management](CONCEPTS.md#resource-management) for details.
+
+## Iterable
+
+Produces an iterator for sequential access to elements. Any type implementing `Iterable` can be used with
+`for` loops.
+
+```txt
+spec Iterable[T] {
+    fn iterator() -> iter[T]
+}
+```
+
+The `for` loop calls `iterator()` once to obtain an `iter[T]`, then repeatedly calls `next()` on the
+iterator. See [Iteration](CONCEPTS.md#iteration) for details.
+
+## Iterator
+
+Produces values one at a time from a sequence. When the sequence is exhausted, `next()` raises
+`StopIteration`.
+
+```txt
+spec Iterator[T] {
+    fn next() -> T
+}
+```
+
+The built-in `iter[T]` type implements both `Iterator` and `Iterable` (returning itself). Coroutines that
+use `yield` return an `iter[T]` that implements this spec.
+
+## Incremental
+
+Supports increment (`++`) and decrement (`--`) operations. The `++` and `--` postfix statements desugar to
+calls to `inc()` and `dec()` respectively.
+
+```txt
+spec Incremental {
+    mut fn inc() -> Self
+    mut fn dec() -> Self
+}
+```
+
+Both methods mutate `this` in place and return `Self` to allow method chaining. The built-in `int` and `float`
+types implement `Incremental`. `x++` is equivalent to `x.inc()` and `x--` is equivalent to `x.dec()`. Both
+require the variable to be `mut`.
