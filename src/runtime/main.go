@@ -23,13 +23,13 @@ type CLI struct {
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli,
-		kong.Name("zerg"),
-		kong.Description("Zerg programming language runtime"),
+		kong.Name("zerg-bootstrap"),
+		kong.Description("Zerg bootstrap runtime interpreter"),
 		kong.UsageOnError(),
 	)
 
 	if cli.Version {
-		fmt.Printf("zerg version %s\n", Version)
+		fmt.Printf("zerg-bootstrap version %s\n", Version)
 		os.Exit(0)
 	}
 
