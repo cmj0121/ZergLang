@@ -524,6 +524,91 @@ sum`
 	testIntegerObject(t, evaluated, 10)
 }
 
+func TestClassDeclaration(t *testing.T) {
+	input := `class Point {
+    pub mut x = 0
+    pub mut y = 0
+}
+Point`
+	evaluated := testEval(input)
+
+	class, ok := evaluated.(*Class)
+	if !ok {
+		t.Fatalf("expected Class, got %T", evaluated)
+	}
+
+	if class.Name != "Point" {
+		t.Fatalf("expected class name 'Point', got %s", class.Name)
+	}
+
+	if len(class.Fields) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(class.Fields))
+	}
+}
+
+func TestClassInstantiation(t *testing.T) {
+	input := `class Counter {
+    pub mut value = 0
+}
+c := Counter()
+c.value`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 0)
+}
+
+func TestClassMethods(t *testing.T) {
+	input := `class Point {
+    pub mut x = 0
+    pub mut y = 0
+}
+impl Point {
+    fn init(x, y) {
+        this.x = x
+        this.y = y
+    }
+    fn sum() {
+        return this.x + this.y
+    }
+}
+p := Point(3, 4)
+p.sum()`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 7)
+}
+
+func TestStaticMethods(t *testing.T) {
+	input := `class Math {
+    pub mut dummy = 0
+}
+impl Math {
+    pub static fn add(a, b) {
+        return a + b
+    }
+}
+Math.add(10, 20)`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 30)
+}
+
+func TestMemberAssignment(t *testing.T) {
+	input := `class Box {
+    pub mut value = 0
+}
+b := Box()
+b.value = 42
+b.value`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 42)
+}
+
+func TestIndexAssignment(t *testing.T) {
+	input := `mut arr := [1, 2, 3]
+arr[1] = 99
+arr[1]`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 99)
+}
+
 func testEval(input string) Object {
 	l := lexer.New(input)
 	p := parser.New(l)

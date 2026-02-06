@@ -99,6 +99,16 @@ func Eval(node parser.Node, env *Environment) Object {
 			return obj
 		}
 		return evalMemberExpression(obj, node.Member.Value)
+	case *parser.ClassDeclaration:
+		return evalClassDeclaration(node, env)
+	case *parser.ImplDeclaration:
+		return evalImplDeclaration(node, env)
+	case *parser.ThisExpression:
+		return evalThis(env)
+	case *parser.MemberAssignmentStatement:
+		return evalMemberAssignment(node, env)
+	case *parser.IndexAssignmentStatement:
+		return evalIndexAssignment(node, env)
 	}
 
 	return nil
@@ -153,14 +163,18 @@ func evalExpressions(exps []parser.Expression, env *Environment) []Object {
 }
 
 func applyFunction(fn Object, args []Object) Object {
-	function, ok := fn.(*Function)
-	if !ok {
+	switch f := fn.(type) {
+	case *Function:
+		extendedEnv := extendFunctionEnv(f, args)
+		evaluated := Eval(f.Body, extendedEnv)
+		return unwrapReturnValue(evaluated)
+	case *Class:
+		return instantiateClass(f, args)
+	case *BoundMethod:
+		return applyMethod(f, args)
+	default:
 		return newError("not a function: %s", fn.Type())
 	}
-
-	extendedEnv := extendFunctionEnv(function, args)
-	evaluated := Eval(function.Body, extendedEnv)
-	return unwrapReturnValue(evaluated)
 }
 
 func extendFunctionEnv(fn *Function, args []Object) *Environment {
@@ -691,6 +705,231 @@ func evalMemberExpression(obj Object, member string) Object {
 		case "length":
 			return &Integer{Value: int64(len(o.Value))}
 		}
+	case *Instance:
+		// First check for field
+		if val, ok := o.Fields[member]; ok {
+			return val
+		}
+		// Then check for method
+		if method, ok := o.Class.Methods[member]; ok {
+			return &BoundMethod{Instance: o, Method: method}
+		}
+		return newError("no member '%s' on instance of %s", member, o.Class.Name)
+	case *Class:
+		// Static method access
+		if method, ok := o.StaticMethods[member]; ok {
+			return &BoundMethod{Instance: nil, Method: method}
+		}
+		return newError("no static member '%s' on class %s", member, o.Name)
 	}
 	return newError("no member '%s' on type %s", member, obj.Type())
+}
+
+func evalClassDeclaration(cd *parser.ClassDeclaration, env *Environment) Object {
+	class := &Class{
+		Name:          cd.Name.Value,
+		Fields:        make(map[string]*ClassField),
+		Methods:       make(map[string]*ClassMethod),
+		StaticMethods: make(map[string]*ClassMethod),
+	}
+
+	for _, field := range cd.Fields {
+		var defaultVal Object
+		if field.Default != nil {
+			defaultVal = Eval(field.Default, env)
+			if IsError(defaultVal) {
+				return defaultVal
+			}
+		}
+
+		class.Fields[field.Name.Value] = &ClassField{
+			Name:    field.Name.Value,
+			Default: defaultVal,
+			Public:  field.Public,
+			Mutable: field.Mutable,
+		}
+	}
+
+	env.Declare(cd.Name.Value, class, false)
+	return class
+}
+
+func evalImplDeclaration(id *parser.ImplDeclaration, env *Environment) Object {
+	classObj, ok := env.Get(id.Class.Value)
+	if !ok {
+		return newError("class not found: %s", id.Class.Value)
+	}
+
+	class, ok := classObj.(*Class)
+	if !ok {
+		return newError("%s is not a class", id.Class.Value)
+	}
+
+	for _, method := range id.Methods {
+		cm := &ClassMethod{
+			Name:       method.Name.Value,
+			Parameters: []string{},
+			Body:       method.Body,
+			Public:     method.Public,
+			Static:     method.Static,
+			Mutable:    method.Mutable,
+			Env:        env,
+		}
+
+		for _, param := range method.Parameters {
+			cm.Parameters = append(cm.Parameters, param.Name.Value)
+		}
+
+		if method.Static {
+			class.StaticMethods[method.Name.Value] = cm
+		} else {
+			class.Methods[method.Name.Value] = cm
+		}
+	}
+
+	return NULL
+}
+
+func evalThis(env *Environment) Object {
+	val, ok := env.Get("this")
+	if !ok {
+		return newError("'this' used outside of method")
+	}
+	return val
+}
+
+func instantiateClass(class *Class, args []Object) Object {
+	instance := &Instance{
+		Class:  class,
+		Fields: make(map[string]Object),
+	}
+
+	// Initialize fields with defaults
+	for name, field := range class.Fields {
+		if field.Default != nil {
+			instance.Fields[name] = field.Default
+		} else {
+			instance.Fields[name] = NULL
+		}
+	}
+
+	// Call init method if it exists
+	if initMethod, ok := class.Methods["init"]; ok {
+		applyMethodOnInstance(initMethod, instance, args)
+	}
+
+	return instance
+}
+
+func applyMethod(bm *BoundMethod, args []Object) Object {
+	if bm.Instance == nil {
+		// Static method
+		return applyStaticMethod(bm.Method, args)
+	}
+	return applyMethodOnInstance(bm.Method, bm.Instance, args)
+}
+
+func applyMethodOnInstance(method *ClassMethod, instance *Instance, args []Object) Object {
+	env := NewEnclosedEnvironment(method.Env)
+
+	// Bind 'this' to the instance
+	env.Declare("this", instance, false)
+
+	// Bind parameters
+	for i, param := range method.Parameters {
+		if i < len(args) {
+			env.Declare(param, args[i], false)
+		}
+	}
+
+	body := method.Body.(*parser.BlockStatement)
+	evaluated := Eval(body, env)
+	return unwrapReturnValue(evaluated)
+}
+
+func applyStaticMethod(method *ClassMethod, args []Object) Object {
+	env := NewEnclosedEnvironment(method.Env)
+
+	// Bind parameters
+	for i, param := range method.Parameters {
+		if i < len(args) {
+			env.Declare(param, args[i], false)
+		}
+	}
+
+	body := method.Body.(*parser.BlockStatement)
+	evaluated := Eval(body, env)
+	return unwrapReturnValue(evaluated)
+}
+
+func evalMemberAssignment(mas *parser.MemberAssignmentStatement, env *Environment) Object {
+	obj := Eval(mas.Object, env)
+	if IsError(obj) {
+		return obj
+	}
+
+	value := Eval(mas.Value, env)
+	if IsError(value) {
+		return value
+	}
+
+	switch o := obj.(type) {
+	case *Instance:
+		// Check if field exists and is mutable
+		field, ok := o.Class.Fields[mas.Member.Value]
+		if !ok {
+			return newError("no field '%s' on class %s", mas.Member.Value, o.Class.Name)
+		}
+		if !field.Mutable {
+			return newError("cannot assign to immutable field '%s'", mas.Member.Value)
+		}
+		o.Fields[mas.Member.Value] = value
+		return value
+	case *Map:
+		// Allow map member assignment via dot notation
+		key := &String{Value: mas.Member.Value}
+		o.Pairs[key.HashKey()] = MapPair{Key: key, Value: value}
+		return value
+	default:
+		return newError("cannot assign member on type %s", obj.Type())
+	}
+}
+
+func evalIndexAssignment(ias *parser.IndexAssignmentStatement, env *Environment) Object {
+	left := Eval(ias.Left, env)
+	if IsError(left) {
+		return left
+	}
+
+	index := Eval(ias.Index, env)
+	if IsError(index) {
+		return index
+	}
+
+	value := Eval(ias.Value, env)
+	if IsError(value) {
+		return value
+	}
+
+	switch o := left.(type) {
+	case *List:
+		idx, ok := index.(*Integer)
+		if !ok {
+			return newError("list index must be integer, got %s", index.Type())
+		}
+		if idx.Value < 0 || idx.Value >= int64(len(o.Elements)) {
+			return newError("list index out of bounds: %d", idx.Value)
+		}
+		o.Elements[idx.Value] = value
+		return value
+	case *Map:
+		hashKey, ok := index.(Hashable)
+		if !ok {
+			return newError("unusable as hash key: %s", index.Type())
+		}
+		o.Pairs[hashKey.HashKey()] = MapPair{Key: index, Value: value}
+		return value
+	default:
+		return newError("cannot assign index on type %s", left.Type())
+	}
 }
