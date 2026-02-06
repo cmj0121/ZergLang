@@ -14,9 +14,11 @@ const (
 	STRING TokenType = "STRING"
 
 	// Operators
+	ASSIGN  TokenType = "="
 	DECLARE TokenType = ":="
 
 	// Delimiters
+	COMMA  TokenType = ","
 	LPAREN TokenType = "("
 	RPAREN TokenType = ")"
 
@@ -24,6 +26,7 @@ const (
 	TRUE  TokenType = "TRUE"
 	FALSE TokenType = "FALSE"
 	NIL   TokenType = "NIL"
+	MUT   TokenType = "MUT"
 )
 
 // Token represents a lexical token.
@@ -38,6 +41,7 @@ var keywords = map[string]TokenType{
 	"true":  TRUE,
 	"false": FALSE,
 	"nil":   NIL,
+	"mut":   MUT,
 }
 
 // LookupIdent returns the token type for an identifier.

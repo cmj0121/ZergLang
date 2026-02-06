@@ -50,14 +50,37 @@ func (p *Parser) nextToken() {
 }
 
 func (p *Parser) parseStatement() Statement {
-	if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.DECLARE {
-		return p.parseDeclarationStatement()
+	// mut x := expr
+	if p.curToken.Type == lexer.MUT {
+		return p.parseMutableDeclaration()
 	}
+
+	// x := expr
+	if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.DECLARE {
+		return p.parseDeclarationStatement(false)
+	}
+
+	// x = expr or x, y = a, b
+	if p.curToken.Type == lexer.IDENT && (p.peekToken.Type == lexer.ASSIGN || p.peekToken.Type == lexer.COMMA) {
+		return p.parseAssignmentStatement()
+	}
+
 	return p.parseExpressionStatement()
 }
 
-func (p *Parser) parseDeclarationStatement() *DeclarationStatement {
-	stmt := &DeclarationStatement{}
+func (p *Parser) parseMutableDeclaration() *DeclarationStatement {
+	p.nextToken() // skip 'mut'
+
+	if p.curToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, fmt.Sprintf("expected identifier after 'mut', got %s", p.curToken.Type))
+		return nil
+	}
+
+	return p.parseDeclarationStatement(true)
+}
+
+func (p *Parser) parseDeclarationStatement(mutable bool) *DeclarationStatement {
+	stmt := &DeclarationStatement{Mutable: mutable}
 
 	name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	stmt.Name = name
@@ -67,6 +90,57 @@ func (p *Parser) parseDeclarationStatement() *DeclarationStatement {
 
 	p.nextToken() // move to expression
 	stmt.Value = p.parseExpression()
+
+	return stmt
+}
+
+func (p *Parser) parseAssignmentStatement() *AssignmentStatement {
+	stmt := &AssignmentStatement{}
+
+	// Collect left-hand side identifiers
+	stmt.Names = append(stmt.Names, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to next identifier
+
+		if p.curToken.Type != lexer.IDENT {
+			p.errors = append(p.errors, fmt.Sprintf("expected identifier, got %s", p.curToken.Type))
+			return nil
+		}
+		stmt.Names = append(stmt.Names, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+	}
+
+	if p.peekToken.Type != lexer.ASSIGN {
+		p.errors = append(p.errors, fmt.Sprintf("expected '=', got %s", p.peekToken.Type))
+		return nil
+	}
+
+	p.nextToken() // move to =
+	stmt.Token = p.curToken
+
+	// Collect right-hand side expressions
+	p.nextToken() // move to first expression
+	expr := p.parseExpression()
+	if expr != nil {
+		stmt.Values = append(stmt.Values, expr)
+	}
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // move to comma
+		p.nextToken() // move to next expression
+
+		expr := p.parseExpression()
+		if expr != nil {
+			stmt.Values = append(stmt.Values, expr)
+		}
+	}
+
+	if len(stmt.Names) != len(stmt.Values) {
+		p.errors = append(p.errors, fmt.Sprintf("assignment count mismatch: %d names, %d values",
+			len(stmt.Names), len(stmt.Values)))
+		return nil
+	}
 
 	return stmt
 }
