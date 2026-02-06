@@ -170,3 +170,59 @@ type ReturnStatement struct {
 
 func (rs *ReturnStatement) statementNode()       {}
 func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
+
+// IfStatement represents an if statement.
+type IfStatement struct {
+	Token       lexer.Token // the 'if' token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement // optional
+}
+
+func (is *IfStatement) statementNode()       {}
+func (is *IfStatement) TokenLiteral() string { return is.Token.Literal }
+
+// ForInStatement represents a for-in loop: for item in collection { }
+type ForInStatement struct {
+	Token      lexer.Token // the 'for' token
+	Variable   *Identifier
+	Iterable   Expression
+	Body       *BlockStatement
+}
+
+func (fis *ForInStatement) statementNode()       {}
+func (fis *ForInStatement) TokenLiteral() string { return fis.Token.Literal }
+
+// ForConditionStatement represents a for loop with condition: for condition { }
+type ForConditionStatement struct {
+	Token     lexer.Token // the 'for' token
+	Condition Expression  // nil for infinite loop
+	Body      *BlockStatement
+}
+
+func (fcs *ForConditionStatement) statementNode()       {}
+func (fcs *ForConditionStatement) TokenLiteral() string { return fcs.Token.Literal }
+
+// BreakStatement represents a break statement.
+type BreakStatement struct {
+	Token lexer.Token
+}
+
+func (bs *BreakStatement) statementNode()       {}
+func (bs *BreakStatement) TokenLiteral() string { return bs.Token.Literal }
+
+// ContinueStatement represents a continue statement.
+type ContinueStatement struct {
+	Token lexer.Token
+}
+
+func (cs *ContinueStatement) statementNode()       {}
+func (cs *ContinueStatement) TokenLiteral() string { return cs.Token.Literal }
+
+// NopStatement represents a no-operation statement.
+type NopStatement struct {
+	Token lexer.Token
+}
+
+func (ns *NopStatement) statementNode()       {}
+func (ns *NopStatement) TokenLiteral() string { return ns.Token.Literal }
