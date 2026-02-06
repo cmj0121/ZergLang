@@ -14,6 +14,8 @@ const (
 	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
 	BREAK_OBJ        ObjectType = "BREAK"
 	CONTINUE_OBJ     ObjectType = "CONTINUE"
+	LIST_OBJ         ObjectType = "LIST"
+	MAP_OBJ          ObjectType = "MAP"
 )
 
 // Object is the interface for all runtime values.
@@ -91,3 +93,79 @@ var (
 	BREAK    = &BreakSignal{}
 	CONTINUE = &ContinueSignal{}
 )
+
+// List represents a list value.
+type List struct {
+	Elements []Object
+}
+
+func (l *List) Type() ObjectType { return LIST_OBJ }
+func (l *List) Inspect() string {
+	var out string
+	out += "["
+	for i, el := range l.Elements {
+		if i > 0 {
+			out += ", "
+		}
+		out += el.Inspect()
+	}
+	out += "]"
+	return out
+}
+
+// HashKey is used for map keys.
+type HashKey struct {
+	Type  ObjectType
+	Value uint64
+}
+
+// Hashable is the interface for objects that can be used as map keys.
+type Hashable interface {
+	HashKey() HashKey
+}
+
+func (i *Integer) HashKey() HashKey {
+	return HashKey{Type: i.Type(), Value: uint64(i.Value)}
+}
+
+func (s *String) HashKey() HashKey {
+	var h uint64 = 5381
+	for i := 0; i < len(s.Value); i++ {
+		h = (h << 5) + h + uint64(s.Value[i])
+	}
+	return HashKey{Type: s.Type(), Value: h}
+}
+
+func (b *Boolean) HashKey() HashKey {
+	if b.Value {
+		return HashKey{Type: b.Type(), Value: 1}
+	}
+	return HashKey{Type: b.Type(), Value: 0}
+}
+
+// MapPair represents a key-value pair in a map.
+type MapPair struct {
+	Key   Object
+	Value Object
+}
+
+// Map represents a map value.
+type Map struct {
+	Pairs map[HashKey]MapPair
+}
+
+func (m *Map) Type() ObjectType { return MAP_OBJ }
+func (m *Map) Inspect() string {
+	var out string
+	out += "{"
+	first := true
+	for _, pair := range m.Pairs {
+		if !first {
+			out += ", "
+		}
+		out += pair.Key.Inspect() + ": " + pair.Value.Inspect()
+		first = false
+	}
+	out += "}"
+	return out
+}

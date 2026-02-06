@@ -21,6 +21,7 @@ const (
 	POWER_PREC   // **
 	PREFIX       // -x, not x
 	CALL         // fn()
+	INDEX        // arr[0], obj.field
 )
 
 var precedences = map[lexer.TokenType]int{
@@ -39,6 +40,8 @@ var precedences = map[lexer.TokenType]int{
 	lexer.PERCENT:  PRODUCT,
 	lexer.POWER:    POWER_PREC,
 	lexer.LPAREN:   CALL,
+	lexer.LBRACKET: INDEX,
+	lexer.DOT:      INDEX,
 }
 
 type (
@@ -72,6 +75,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.NOT, p.parsePrefixExpression)
 	p.registerPrefix(lexer.LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(lexer.FN, p.parseFunctionLiteral)
+	p.registerPrefix(lexer.LBRACKET, p.parseListLiteral)
+	p.registerPrefix(lexer.LBRACE, p.parseMapLiteral)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -89,6 +94,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(lexer.AND, p.parseInfixExpression)
 	p.registerInfix(lexer.OR, p.parseInfixExpression)
 	p.registerInfix(lexer.LPAREN, p.parseCallExpression)
+	p.registerInfix(lexer.LBRACKET, p.parseIndexExpression)
+	p.registerInfix(lexer.DOT, p.parseMemberExpression)
 
 	p.nextToken()
 	p.nextToken()
@@ -583,4 +590,102 @@ func (p *Parser) parseForStatement() Statement {
 	body := p.parseBlockStatement()
 
 	return &ForConditionStatement{Token: token, Condition: condition, Body: body}
+}
+
+func (p *Parser) parseListLiteral() Expression {
+	list := &ListLiteral{Token: p.curToken}
+	list.Elements = p.parseExpressionList(lexer.RBRACKET)
+	return list
+}
+
+func (p *Parser) parseExpressionList(end lexer.TokenType) []Expression {
+	list := []Expression{}
+
+	if p.peekToken.Type == end {
+		p.nextToken()
+		return list
+	}
+
+	p.nextToken()
+	list = append(list, p.parseExpression(LOWEST))
+
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken()
+		p.nextToken()
+		list = append(list, p.parseExpression(LOWEST))
+	}
+
+	if p.peekToken.Type != end {
+		p.errors = append(p.errors, fmt.Sprintf("expected %s", end))
+		return nil
+	}
+	p.nextToken()
+
+	return list
+}
+
+func (p *Parser) parseMapLiteral() Expression {
+	mapLit := &MapLiteral{Token: p.curToken}
+	mapLit.Pairs = make(map[Expression]Expression)
+
+	for p.peekToken.Type != lexer.RBRACE {
+		p.nextToken()
+		key := p.parseExpression(LOWEST)
+
+		if p.peekToken.Type != lexer.COLON {
+			p.errors = append(p.errors, "expected : in map literal")
+			return nil
+		}
+		p.nextToken()
+
+		p.nextToken()
+		value := p.parseExpression(LOWEST)
+
+		mapLit.Pairs[key] = value
+
+		if p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.COMMA {
+			p.errors = append(p.errors, "expected } or , in map literal")
+			return nil
+		}
+
+		if p.peekToken.Type == lexer.COMMA {
+			p.nextToken()
+		}
+	}
+
+	if p.peekToken.Type != lexer.RBRACE {
+		p.errors = append(p.errors, "expected } at end of map literal")
+		return nil
+	}
+	p.nextToken()
+
+	return mapLit
+}
+
+func (p *Parser) parseIndexExpression(left Expression) Expression {
+	exp := &IndexExpression{Token: p.curToken, Left: left}
+
+	p.nextToken()
+	exp.Index = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type != lexer.RBRACKET {
+		p.errors = append(p.errors, "expected ] after index")
+		return nil
+	}
+	p.nextToken()
+
+	return exp
+}
+
+func (p *Parser) parseMemberExpression(left Expression) Expression {
+	exp := &MemberExpression{Token: p.curToken, Object: left}
+
+	p.nextToken()
+	if p.curToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected identifier after .")
+		return nil
+	}
+
+	exp.Member = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	return exp
 }
