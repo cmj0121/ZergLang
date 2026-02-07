@@ -7,6 +7,7 @@ type ObjectType string
 
 const (
 	INTEGER_OBJ      ObjectType = "INTEGER"
+	FLOAT_OBJ        ObjectType = "FLOAT"
 	STRING_OBJ       ObjectType = "STRING"
 	BOOLEAN_OBJ      ObjectType = "BOOLEAN"
 	NULL_OBJ         ObjectType = "NULL"
@@ -24,6 +25,11 @@ const (
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	MODULE_OBJ       ObjectType = "MODULE"
 	FILE_HANDLE_OBJ  ObjectType = "FILE_HANDLE"
+	ENUM_TYPE_OBJ    ObjectType = "ENUM_TYPE"
+	ENUM_VALUE_OBJ   ObjectType = "ENUM_VALUE"
+	RESULT_OK_OBJ    ObjectType = "RESULT_OK"
+	RESULT_ERR_OBJ   ObjectType = "RESULT_ERR"
+	RANGE_OBJ        ObjectType = "RANGE"
 )
 
 // Object is the interface for all runtime values.
@@ -39,6 +45,18 @@ type Integer struct {
 
 func (i *Integer) Type() ObjectType { return INTEGER_OBJ }
 func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
+
+// Float represents a floating-point value.
+type Float struct {
+	Value float64
+}
+
+func (f *Float) Type() ObjectType { return FLOAT_OBJ }
+func (f *Float) Inspect() string {
+	// Format without trailing zeros
+	s := fmt.Sprintf("%g", f.Value)
+	return s
+}
 
 // String represents a string value.
 type String struct {
@@ -295,3 +313,72 @@ type FileHandle struct {
 
 func (fh *FileHandle) Type() ObjectType { return FILE_HANDLE_OBJ }
 func (fh *FileHandle) Inspect() string  { return fmt.Sprintf("<file %s>", fh.Path) }
+
+// EnumType represents an enum definition.
+type EnumType struct {
+	Name     string
+	Variants []string
+}
+
+func (et *EnumType) Type() ObjectType { return ENUM_TYPE_OBJ }
+func (et *EnumType) Inspect() string  { return fmt.Sprintf("<enum %s>", et.Name) }
+
+// EnumValue represents an enum variant value.
+type EnumValue struct {
+	EnumName    string
+	VariantName string
+}
+
+func (ev *EnumValue) Type() ObjectType { return ENUM_VALUE_OBJ }
+func (ev *EnumValue) Inspect() string  { return fmt.Sprintf("%s.%s", ev.EnumName, ev.VariantName) }
+
+// EnumValue implements Hashable for use in maps and match statements
+func (ev *EnumValue) HashKey() HashKey {
+	// Use a combined hash of enum name and variant name
+	combined := ev.EnumName + "." + ev.VariantName
+	var h uint64 = 5381
+	for i := 0; i < len(combined); i++ {
+		h = (h << 5) + h + uint64(combined[i])
+	}
+	return HashKey{Type: ev.Type(), Value: h}
+}
+
+// ResultOk represents Ok(value) - success result.
+type ResultOk struct {
+	Value Object
+}
+
+func (ro *ResultOk) Type() ObjectType { return RESULT_OK_OBJ }
+func (ro *ResultOk) Inspect() string  { return fmt.Sprintf("Ok(%s)", ro.Value.Inspect()) }
+
+// ResultErr represents Err(error) - failure result.
+type ResultErr struct {
+	Error Object
+}
+
+func (re *ResultErr) Type() ObjectType { return RESULT_ERR_OBJ }
+func (re *ResultErr) Inspect() string  { return fmt.Sprintf("Err(%s)", re.Error.Inspect()) }
+
+// Range represents a range of integers.
+type Range struct {
+	Start     int64
+	End       int64
+	Inclusive bool
+}
+
+func (r *Range) Type() ObjectType { return RANGE_OBJ }
+func (r *Range) Inspect() string {
+	if r.Inclusive {
+		return fmt.Sprintf("%d..=%d", r.Start, r.End)
+	}
+	return fmt.Sprintf("%d..%d", r.Start, r.End)
+}
+
+// UserModule represents a user-defined module loaded from a file.
+type UserModule struct {
+	Name string
+	Env  *Environment // The module's top-level environment
+}
+
+func (um *UserModule) Type() ObjectType { return MODULE_OBJ }
+func (um *UserModule) Inspect() string  { return fmt.Sprintf("<module %s>", um.Name) }
