@@ -15,14 +15,20 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalDeclarationStatement(node, env)
 	case *parser.AssignmentStatement:
 		return evalAssignmentStatement(node, env)
+	case *parser.CompoundAssignmentStatement:
+		return evalCompoundAssignmentStatement(node, env)
 	case *parser.ExpressionStatement:
 		return Eval(node.Expression, env)
 	case *parser.Identifier:
 		return evalIdentifier(node, env)
 	case *parser.IntegerLiteral:
 		return &Integer{Value: node.Value}
+	case *parser.FloatLiteral:
+		return &Float{Value: node.Value}
 	case *parser.StringLiteral:
 		return &String{Value: node.Value}
+	case *parser.InterpolatedString:
+		return evalInterpolatedString(node, env)
 	case *parser.BooleanLiteral:
 		return nativeBoolToBooleanObject(node.Value)
 	case *parser.NilLiteral:
@@ -123,6 +129,18 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalUnsafeBlock(node, env)
 	case *parser.AsmExpression:
 		return evalAsmExpression(node, env)
+	case *parser.EnumDeclaration:
+		return evalEnumDeclaration(node, env)
+	case *parser.MatchStatement:
+		return evalMatchStatement(node, env)
+	case *parser.WildcardPattern:
+		return &String{Value: "_"} // Wildcard marker
+	case *parser.IsExpression:
+		return evalIsExpression(node, env)
+	case *parser.RangeExpression:
+		return evalRangeExpression(node, env)
+	case *parser.ImportStatement:
+		return evalImportStatement(node, env)
 	}
 
 	return nil
@@ -251,6 +269,33 @@ func evalAssignmentStatement(as *parser.AssignmentStatement, env *Environment) O
 	return values[len(values)-1]
 }
 
+func evalCompoundAssignmentStatement(cas *parser.CompoundAssignmentStatement, env *Environment) Object {
+	// Get current value
+	currentVal, ok := env.Get(cas.Name.Value)
+	if !ok {
+		return newError("identifier not found: %s", cas.Name.Value)
+	}
+
+	// Evaluate the right-hand side
+	rightVal := Eval(cas.Value, env)
+	if IsError(rightVal) {
+		return rightVal
+	}
+
+	// Apply the operation
+	result := evalInfixExpression(cas.Operator, currentVal, rightVal)
+	if IsError(result) {
+		return result
+	}
+
+	// Assign the result
+	if err := env.Assign(cas.Name.Value, result); err != nil {
+		return newError("%s", err.Error())
+	}
+
+	return result
+}
+
 func evalIdentifier(node *parser.Identifier, env *Environment) Object {
 	val, ok := env.Get(node.Value)
 	if !ok {
@@ -271,11 +316,14 @@ func evalPrefixExpression(operator string, right Object) Object {
 }
 
 func evalMinusPrefixOperatorExpression(right Object) Object {
-	if right.Type() != INTEGER_OBJ {
+	switch right := right.(type) {
+	case *Integer:
+		return &Integer{Value: -right.Value}
+	case *Float:
+		return &Float{Value: -right.Value}
+	default:
 		return newError("unknown operator: -%s", right.Type())
 	}
-	value := right.(*Integer).Value
-	return &Integer{Value: -value}
 }
 
 func evalNotOperatorExpression(right Object) Object {
@@ -295,8 +343,20 @@ func evalInfixExpression(operator string, left, right Object) Object {
 	switch {
 	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
 		return evalIntegerInfixExpression(operator, left, right)
+	case left.Type() == FLOAT_OBJ && right.Type() == FLOAT_OBJ:
+		return evalFloatInfixExpression(operator, left, right)
+	case left.Type() == FLOAT_OBJ && right.Type() == INTEGER_OBJ:
+		// Promote integer to float
+		rightFloat := float64(right.(*Integer).Value)
+		return evalFloatInfixExpression(operator, left, &Float{Value: rightFloat})
+	case left.Type() == INTEGER_OBJ && right.Type() == FLOAT_OBJ:
+		// Promote integer to float
+		leftFloat := float64(left.(*Integer).Value)
+		return evalFloatInfixExpression(operator, &Float{Value: leftFloat}, right)
 	case left.Type() == STRING_OBJ && right.Type() == STRING_OBJ:
 		return evalStringInfixExpression(operator, left, right)
+	case left.Type() == ENUM_VALUE_OBJ && right.Type() == ENUM_VALUE_OBJ:
+		return evalEnumInfixExpression(operator, left, right)
 	case operator == "==":
 		return nativeBoolToBooleanObject(left == right)
 	case operator == "!=":
@@ -310,6 +370,81 @@ func evalInfixExpression(operator string, left, right Object) Object {
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
+}
+
+func evalEnumInfixExpression(operator string, left, right Object) Object {
+	leftEnum := left.(*EnumValue)
+	rightEnum := right.(*EnumValue)
+
+	switch operator {
+	case "==":
+		return nativeBoolToBooleanObject(
+			leftEnum.EnumName == rightEnum.EnumName &&
+				leftEnum.VariantName == rightEnum.VariantName,
+		)
+	case "!=":
+		return nativeBoolToBooleanObject(
+			leftEnum.EnumName != rightEnum.EnumName ||
+				leftEnum.VariantName != rightEnum.VariantName,
+		)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalFloatInfixExpression(operator string, left, right Object) Object {
+	leftVal := left.(*Float).Value
+	rightVal := right.(*Float).Value
+
+	switch operator {
+	case "+":
+		return &Float{Value: leftVal + rightVal}
+	case "-":
+		return &Float{Value: leftVal - rightVal}
+	case "*":
+		return &Float{Value: leftVal * rightVal}
+	case "/":
+		if rightVal == 0 {
+			return newError("division by zero")
+		}
+		return &Float{Value: leftVal / rightVal}
+	case "**":
+		return &Float{Value: floatPow(leftVal, rightVal)}
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case "<=":
+		return nativeBoolToBooleanObject(leftVal <= rightVal)
+	case ">=":
+		return nativeBoolToBooleanObject(leftVal >= rightVal)
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func floatPow(base, exp float64) float64 {
+	// Use math.Pow for float exponentiation
+	result := 1.0
+	if exp == 0 {
+		return 1.0
+	}
+	if exp < 0 {
+		base = 1 / base
+		exp = -exp
+	}
+	for exp >= 1 {
+		if int(exp)%2 == 1 {
+			result *= base
+		}
+		base *= base
+		exp /= 2
+	}
+	return result
 }
 
 func evalIntegerInfixExpression(operator string, left, right Object) Object {
@@ -545,6 +680,8 @@ func evalForInStatement(fis *parser.ForInStatement, env *Environment) Object {
 		return evalForInString(fis, obj.Value, env)
 	case *List:
 		return evalForInList(fis, obj, env)
+	case *Range:
+		return evalForInRange(fis, obj, env)
 	default:
 		return newError("cannot iterate over %s", iterable.Type())
 	}
@@ -618,6 +755,36 @@ func evalForInList(fis *parser.ForInStatement, list *List, env *Environment) Obj
 
 	for _, el := range list.Elements {
 		loopEnv.Declare(fis.Variable.Value, el, false)
+
+		result = Eval(fis.Body, loopEnv)
+
+		if result != nil {
+			switch result.Type() {
+			case BREAK_OBJ:
+				return NULL
+			case CONTINUE_OBJ:
+				continue
+			case RETURN_VALUE_OBJ, "ERROR":
+				return result
+			}
+		}
+	}
+
+	return result
+}
+
+func evalForInRange(fis *parser.ForInStatement, r *Range, env *Environment) Object {
+	var result Object = NULL
+
+	loopEnv := NewEnclosedEnvironment(env)
+
+	end := r.End
+	if r.Inclusive {
+		end++
+	}
+
+	for i := r.Start; i < end; i++ {
+		loopEnv.Declare(fis.Variable.Value, &Integer{Value: i}, false)
 
 		result = Eval(fis.Body, loopEnv)
 
@@ -717,11 +884,36 @@ func evalStringIndexExpression(str, index Object) Object {
 
 func evalMemberExpression(obj Object, member string) Object {
 	switch o := obj.(type) {
+	case *EnumType:
+		// Enum variant access: EnumType.VARIANT
+		for _, variant := range o.Variants {
+			if variant == member {
+				return &EnumValue{EnumName: o.Name, VariantName: member}
+			}
+		}
+		return newError("enum '%s' has no variant '%s'", o.Name, member)
+	case *ResultOk:
+		if member == "value" {
+			return o.Value
+		}
+		return newError("Ok has no member '%s'", member)
+	case *ResultErr:
+		if member == "error" {
+			return o.Error
+		}
+		return newError("Err has no member '%s'", member)
 	case *Module:
 		if method, ok := o.Methods[member]; ok {
 			return method
 		}
 		return newError("module '%s' has no method '%s'", o.Name, member)
+	case *UserModule:
+		// Access member from the module's environment
+		val, ok := o.Env.Get(member)
+		if !ok {
+			return newError("module '%s' has no member '%s'", o.Name, member)
+		}
+		return val
 	case *Map:
 		// Check for builtin methods first
 		if methodFn := GetMapMethod(member); methodFn != nil {
@@ -1188,4 +1380,242 @@ func evalAsmExpression(ae *parser.AsmExpression, env *Environment) Object {
 	}
 
 	return fn(args...)
+}
+
+func evalEnumDeclaration(ed *parser.EnumDeclaration, env *Environment) Object {
+	enumType := &EnumType{
+		Name:     ed.Name.Value,
+		Variants: ed.Variants,
+	}
+
+	env.Declare(ed.Name.Value, enumType, false)
+	return enumType
+}
+
+func evalMatchStatement(ms *parser.MatchStatement, env *Environment) Object {
+	value := Eval(ms.Value, env)
+	if IsError(value) {
+		return value
+	}
+
+	for _, arm := range ms.Arms {
+		matched := false
+
+		// Check all patterns in this arm (| alternatives)
+		for _, pattern := range arm.Patterns {
+			if matchPattern(pattern, value, env) {
+				matched = true
+				break
+			}
+		}
+
+		if matched {
+			// Check guard condition if present
+			if arm.Guard != nil {
+				guardResult := Eval(arm.Guard, env)
+				if IsError(guardResult) {
+					return guardResult
+				}
+				if !isTruthy(guardResult) {
+					continue // Guard failed, try next arm
+				}
+			}
+
+			// Execute the body
+			result := Eval(arm.Body, env)
+			return unwrapReturnValue(result)
+		}
+	}
+
+	// No arm matched
+	return NULL
+}
+
+func matchPattern(pattern parser.Expression, value Object, env *Environment) bool {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern:
+		// Wildcard matches everything
+		return true
+
+	case *parser.IntegerLiteral:
+		if intVal, ok := value.(*Integer); ok {
+			return intVal.Value == p.Value
+		}
+		return false
+
+	case *parser.StringLiteral:
+		if strVal, ok := value.(*String); ok {
+			return strVal.Value == p.Value
+		}
+		return false
+
+	case *parser.BooleanLiteral:
+		if boolVal, ok := value.(*Boolean); ok {
+			return boolVal.Value == p.Value
+		}
+		return false
+
+	case *parser.NilLiteral:
+		return value == NULL
+
+	case *parser.Identifier:
+		// Check if this is Ok or Err
+		if p.Value == "Ok" {
+			_, ok := value.(*ResultOk)
+			return ok
+		}
+		if p.Value == "Err" {
+			_, ok := value.(*ResultErr)
+			return ok
+		}
+		// Otherwise evaluate as expression and compare
+		patternVal := Eval(pattern, env)
+		if IsError(patternVal) {
+			return false
+		}
+		return objectsEqual(patternVal, value)
+
+	case *parser.MemberExpression:
+		// Enum variant access: EnumType.VARIANT
+		patternVal := Eval(pattern, env)
+		if IsError(patternVal) {
+			return false
+		}
+
+		// Compare enum values
+		if patternEnum, ok := patternVal.(*EnumValue); ok {
+			if valueEnum, ok := value.(*EnumValue); ok {
+				return patternEnum.EnumName == valueEnum.EnumName &&
+					patternEnum.VariantName == valueEnum.VariantName
+			}
+		}
+
+		return objectsEqual(patternVal, value)
+
+	default:
+		// Evaluate the pattern and compare
+		patternVal := Eval(pattern, env)
+		if IsError(patternVal) {
+			return false
+		}
+		return objectsEqual(patternVal, value)
+	}
+}
+
+func evalInterpolatedString(is *parser.InterpolatedString, env *Environment) Object {
+	var result string
+
+	for _, part := range is.Parts {
+		val := Eval(part, env)
+		if IsError(val) {
+			return val
+		}
+		result += val.Inspect()
+	}
+
+	return &String{Value: result}
+}
+
+func evalRangeExpression(re *parser.RangeExpression, env *Environment) Object {
+	start := Eval(re.Start, env)
+	if IsError(start) {
+		return start
+	}
+
+	end := Eval(re.End, env)
+	if IsError(end) {
+		return end
+	}
+
+	startInt, ok := start.(*Integer)
+	if !ok {
+		return newError("range start must be an integer, got %s", start.Type())
+	}
+
+	endInt, ok := end.(*Integer)
+	if !ok {
+		return newError("range end must be an integer, got %s", end.Type())
+	}
+
+	return &Range{
+		Start:     startInt.Value,
+		End:       endInt.Value,
+		Inclusive: re.Inclusive,
+	}
+}
+
+func evalIsExpression(ie *parser.IsExpression, env *Environment) Object {
+	left := Eval(ie.Left, env)
+	if IsError(left) {
+		return left
+	}
+
+	// Get the type name from the right side
+	var typeName string
+	switch t := ie.Right.(type) {
+	case *parser.Identifier:
+		typeName = t.Value
+	case *parser.NilLiteral:
+		// Handle "x is nil"
+		return nativeBoolToBooleanObject(left == NULL)
+	case *parser.MemberExpression:
+		// For enum variant checking: value is EnumType.VARIANT
+		rightVal := Eval(ie.Right, env)
+		if IsError(rightVal) {
+			return rightVal
+		}
+		if enumVal, ok := rightVal.(*EnumValue); ok {
+			if leftEnum, ok := left.(*EnumValue); ok {
+				return nativeBoolToBooleanObject(
+					leftEnum.EnumName == enumVal.EnumName &&
+						leftEnum.VariantName == enumVal.VariantName,
+				)
+			}
+			return FALSE
+		}
+		return newError("invalid type in is expression")
+	default:
+		// Try to check if the right side evaluates to a type
+		return newError("invalid type in is expression: expected identifier or member expression")
+	}
+
+	// Check built-in type names
+	switch typeName {
+	case "Ok":
+		_, ok := left.(*ResultOk)
+		return nativeBoolToBooleanObject(ok)
+	case "Err":
+		_, ok := left.(*ResultErr)
+		return nativeBoolToBooleanObject(ok)
+	case "int", "Integer":
+		_, ok := left.(*Integer)
+		return nativeBoolToBooleanObject(ok)
+	case "float", "Float":
+		_, ok := left.(*Float)
+		return nativeBoolToBooleanObject(ok)
+	case "string", "String":
+		_, ok := left.(*String)
+		return nativeBoolToBooleanObject(ok)
+	case "bool", "Boolean":
+		_, ok := left.(*Boolean)
+		return nativeBoolToBooleanObject(ok)
+	case "list", "List":
+		_, ok := left.(*List)
+		return nativeBoolToBooleanObject(ok)
+	case "map", "Map":
+		_, ok := left.(*Map)
+		return nativeBoolToBooleanObject(ok)
+	case "nil", "Nil":
+		return nativeBoolToBooleanObject(left == NULL)
+	default:
+		// Check if it's an instance of a class
+		if instance, ok := left.(*Instance); ok {
+			return nativeBoolToBooleanObject(instance.Class.Name == typeName)
+		}
+		// Check if it's an enum type
+		if enumVal, ok := left.(*EnumValue); ok {
+			return nativeBoolToBooleanObject(enumVal.EnumName == typeName)
+		}
+		return FALSE
+	}
 }

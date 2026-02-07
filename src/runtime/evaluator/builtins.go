@@ -13,6 +13,9 @@ var Builtins = map[string]*Builtin{
 	"len":    {Name: "len", Fn: builtinLen},
 	"string": {Name: "string", Fn: builtinStr},
 	"int":    {Name: "int", Fn: builtinInt},
+	"float":  {Name: "float", Fn: builtinFloat},
+	"Ok":     {Name: "Ok", Fn: builtinOk},
+	"Err":    {Name: "Err", Fn: builtinErr},
 }
 
 // builtinPrint outputs arguments to stdout with a newline.
@@ -52,7 +55,7 @@ func builtinStr(args ...Object) Object {
 	return &String{Value: args[0].Inspect()}
 }
 
-// builtinInt converts a string or bool to an integer.
+// builtinInt converts a string, bool, or float to an integer.
 func builtinInt(args ...Object) Object {
 	if len(args) != 1 {
 		return newError("int() takes exactly 1 argument (%d given)", len(args))
@@ -61,6 +64,8 @@ func builtinInt(args ...Object) Object {
 	switch arg := args[0].(type) {
 	case *Integer:
 		return arg
+	case *Float:
+		return &Integer{Value: int64(arg.Value)}
 	case *String:
 		val, err := strconv.ParseInt(arg.Value, 10, 64)
 		if err != nil {
@@ -73,8 +78,46 @@ func builtinInt(args ...Object) Object {
 		}
 		return &Integer{Value: 0}
 	default:
-		return newError("int() argument must be string, integer, or bool, not %s", args[0].Type())
+		return newError("int() argument must be string, integer, float, or bool, not %s", args[0].Type())
 	}
+}
+
+// builtinFloat converts a value to a float.
+func builtinFloat(args ...Object) Object {
+	if len(args) != 1 {
+		return newError("float() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	switch arg := args[0].(type) {
+	case *Float:
+		return arg
+	case *Integer:
+		return &Float{Value: float64(arg.Value)}
+	case *String:
+		val, err := strconv.ParseFloat(arg.Value, 64)
+		if err != nil {
+			return newError("float() argument is not a valid float: %s", arg.Value)
+		}
+		return &Float{Value: val}
+	default:
+		return newError("float() argument must be string, integer, or float, not %s", args[0].Type())
+	}
+}
+
+// builtinOk creates an Ok result value.
+func builtinOk(args ...Object) Object {
+	if len(args) != 1 {
+		return newError("Ok() takes exactly 1 argument (%d given)", len(args))
+	}
+	return &ResultOk{Value: args[0]}
+}
+
+// builtinErr creates an Err result value.
+func builtinErr(args ...Object) Object {
+	if len(args) != 1 {
+		return newError("Err() takes exactly 1 argument (%d given)", len(args))
+	}
+	return &ResultErr{Error: args[0]}
 }
 
 // List method implementations
