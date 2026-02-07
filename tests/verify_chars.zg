@@ -1,0 +1,43 @@
+# Test character classification for self-hosting
+
+print("=== Character Classification Test ===")
+
+# Test is_digit
+assert char.is_digit("0") == true, "is_digit 0"
+assert char.is_digit("5") == true, "is_digit 5"
+assert char.is_digit("9") == true, "is_digit 9"
+assert char.is_digit("a") == false, "is_digit a"
+assert char.is_digit(" ") == false, "is_digit space"
+
+# Test is_alpha
+assert char.is_alpha("a") == true, "is_alpha a"
+assert char.is_alpha("z") == true, "is_alpha z"
+assert char.is_alpha("A") == true, "is_alpha A"
+assert char.is_alpha("Z") == true, "is_alpha Z"
+assert char.is_alpha("0") == false, "is_alpha 0"
+assert char.is_alpha(" ") == false, "is_alpha space"
+
+# Test is_alnum
+assert char.is_alnum("a") == true, "is_alnum a"
+assert char.is_alnum("5") == true, "is_alnum 5"
+assert char.is_alnum("_") == false, "is_alnum underscore"
+assert char.is_alnum(" ") == false, "is_alnum space"
+
+# Test is_space
+assert char.is_space(" ") == true, "is_space space"
+assert char.is_space("\t") == true, "is_space tab"
+assert char.is_space("\n") == true, "is_space newline"
+assert char.is_space("a") == false, "is_space a"
+
+# Test ord and chr
+assert char.ord("A") == 65, "ord A"
+assert char.ord("a") == 97, "ord a"
+assert char.ord("0") == 48, "ord 0"
+assert char.chr(65) == "A", "chr 65"
+assert char.chr(97) == "a", "chr 97"
+assert char.chr(48) == "0", "chr 48"
+
+# Test round-trip
+assert char.chr(char.ord("X")) == "X", "ord/chr round-trip"
+
+print("All character tests passed!")

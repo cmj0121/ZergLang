@@ -1,0 +1,129 @@
+# Test enums and match for self-hosting
+
+print("=== Enums and Match Test ===")
+
+# Basic enum
+enum TokenType {
+    INT
+    STRING
+    IDENT
+    PLUS
+    MINUS
+    LPAREN
+    RPAREN
+    EOF
+}
+
+# Enum comparison
+assert TokenType.INT == TokenType.INT, "Enum equality"
+assert TokenType.INT != TokenType.STRING, "Enum inequality"
+
+# Store enum in variable
+t := TokenType.PLUS
+assert t == TokenType.PLUS, "Enum variable"
+
+# Basic match
+fn token_name(t) -> string {
+    match t {
+        TokenType.INT => { return "integer" }
+        TokenType.STRING => { return "string" }
+        TokenType.IDENT => { return "identifier" }
+        TokenType.PLUS => { return "plus" }
+        TokenType.MINUS => { return "minus" }
+        _ => { return "other" }
+    }
+}
+
+assert token_name(TokenType.INT) == "integer", "Match INT"
+assert token_name(TokenType.STRING) == "string", "Match STRING"
+assert token_name(TokenType.PLUS) == "plus", "Match PLUS"
+assert token_name(TokenType.EOF) == "other", "Match wildcard"
+
+# Match with values
+fn describe_char(ch) -> string {
+    match ch {
+        "+" => { return "plus operator" }
+        "-" => { return "minus operator" }
+        "*" => { return "multiply operator" }
+        "/" => { return "divide operator" }
+        _ => { return "unknown" }
+    }
+}
+
+assert describe_char("+") == "plus operator", "Match string +"
+assert describe_char("-") == "minus operator", "Match string -"
+assert describe_char("x") == "unknown", "Match string unknown"
+
+# Match with number
+fn classify_number(n) -> string {
+    match n {
+        0 => { return "zero" }
+        1 => { return "one" }
+        2 => { return "two" }
+        _ => { return "many" }
+    }
+}
+
+assert classify_number(0) == "zero", "Match number 0"
+assert classify_number(1) == "one", "Match number 1"
+assert classify_number(100) == "many", "Match number many"
+
+# Enum in class
+class Token {
+    pub mut tok_type: TokenType
+    pub mut literal: string
+}
+
+fn make_token(t, lit) -> Token {
+    tok := Token()
+    tok.tok_type = t
+    tok.literal = lit
+    return tok
+}
+
+tok := make_token(TokenType.INT, "42")
+assert tok.tok_type == TokenType.INT, "Enum in class"
+
+# Match on enum from class
+fn is_operator(tok) -> bool {
+    match tok.tok_type {
+        TokenType.PLUS => { return true }
+        TokenType.MINUS => { return true }
+        _ => { return false }
+    }
+}
+
+assert is_operator(make_token(TokenType.PLUS, "+")) == true, "Operator check PLUS"
+assert is_operator(make_token(TokenType.MINUS, "-")) == true, "Operator check MINUS"
+assert is_operator(make_token(TokenType.INT, "1")) == false, "Operator check INT"
+
+# List of enum values
+mut tokens := []
+tokens = tokens.append(TokenType.INT)
+tokens = tokens.append(TokenType.PLUS)
+tokens = tokens.append(TokenType.INT)
+
+assert tokens[0] == TokenType.INT, "Enum in list 0"
+assert tokens[1] == TokenType.PLUS, "Enum in list 1"
+
+# Enum for AST node types
+enum NodeType {
+    Number
+    BinaryOp
+    UnaryOp
+    Identifier
+}
+
+fn node_type_name(n) -> string {
+    match n {
+        NodeType.Number => { return "Number" }
+        NodeType.BinaryOp => { return "BinaryOp" }
+        NodeType.UnaryOp => { return "UnaryOp" }
+        NodeType.Identifier => { return "Identifier" }
+    }
+}
+
+assert node_type_name(NodeType.Number) == "Number", "NodeType Number"
+assert node_type_name(NodeType.BinaryOp) == "BinaryOp", "NodeType BinaryOp"
+
+print("All enum and match tests passed!")

@@ -1,0 +1,44 @@
+# Test file I/O for self-hosting
+
+print("=== File I/O Test ===")
+
+# Test file exists
+test_file := "tests/verify_io.zg"
+assert io.exists(test_file) == true, "File exists"
+assert io.exists("nonexistent_file.xyz") == false, "File not exists"
+
+# Read file
+content := io.read_file(test_file)
+assert len(content) > 0, "Read file not empty"
+
+# Check we can read ourselves
+assert str.contains(content, "File I/O Test") == true, "Content contains expected text"
+
+# Split into lines
+lines := str.split(content, "\n")
+assert len(lines) > 10, "Has multiple lines"
+assert str.contains(lines[0], "Test file I/O") == true, "First line is comment"
+
+# Write and read back
+temp_file := "/tmp/zerg_verify_io_test.txt"
+test_content := "Line 1\nLine 2\nLine 3"
+io.write_file(temp_file, test_content)
+
+read_back := io.read_file(temp_file)
+assert read_back == test_content, "Write/read round-trip"
+
+# Using file handles
+handle := io.open(test_file, "r")
+file_content := io.read(handle)
+io.close(handle)
+assert len(file_content) == len(content), "Handle read matches direct read"
+
+# Write using handle
+write_handle := io.open("/tmp/zerg_handle_test.txt", "w")
+io.write(write_handle, "Hello from handle")
+io.close(write_handle)
+
+verify := io.read_file("/tmp/zerg_handle_test.txt")
+assert verify == "Hello from handle", "Handle write verification"
+
+print("All I/O tests passed!")

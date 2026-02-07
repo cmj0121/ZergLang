@@ -1,0 +1,110 @@
+# Test collections (lists and maps) for self-hosting
+
+print("=== Collections Test ===")
+
+# === Lists ===
+print("Testing lists...")
+
+# Empty list
+mut tokens := []
+assert len(tokens) == 0, "Empty list length"
+
+# Append
+tokens = tokens.append("INT")
+assert len(tokens) == 1, "After first append"
+assert tokens[0] == "INT", "First element"
+
+tokens = tokens.append("PLUS")
+tokens = tokens.append("INT")
+assert len(tokens) == 3, "After three appends"
+assert tokens[1] == "PLUS", "Second element"
+assert tokens[2] == "INT", "Third element"
+
+# List literal
+nums := [1, 2, 3, 4, 5]
+assert len(nums) == 5, "List literal length"
+assert nums[0] == 1, "List literal first"
+assert nums[4] == 5, "List literal last"
+
+# Slice
+sliced := nums.slice(1, 4)
+assert len(sliced) == 3, "Slice length"
+assert sliced[0] == 2, "Slice first"
+assert sliced[2] == 4, "Slice last"
+
+# Index method
+assert nums.index(3) == 2, "Index found"
+assert nums.index(10) == -1, "Index not found"
+
+# Sort
+unsorted := [3, 1, 4, 1, 5, 9, 2, 6]
+sorted := unsorted.sort()
+assert sorted[0] == 1, "Sort first"
+assert sorted[1] == 1, "Sort second"
+assert sorted[7] == 9, "Sort last"
+
+# Reverse
+reversed := [1, 2, 3].reverse()
+assert reversed[0] == 3, "Reverse first"
+assert reversed[2] == 1, "Reverse last"
+
+# Join
+joined := [1, 2, 3].join("-")
+assert joined == "1-2-3", "Join list"
+
+# Iteration
+mut sum := 0
+for n in nums {
+    sum = sum + n
+}
+assert sum == 15, "Iteration sum"
+
+# === Maps ===
+print("Testing maps...")
+
+# Empty map
+empty_map := {}
+assert len(empty_map) == 0, "Empty map length"
+
+# Map literal
+keywords := {"if": 1, "else": 2, "for": 3}
+assert len(keywords) == 3, "Map literal length"
+
+# Map access
+assert keywords["if"] == 1, "Map access if"
+assert keywords["else"] == 2, "Map access else"
+assert keywords["for"] == 3, "Map access for"
+
+# Contains
+assert keywords.contains("if") == true, "Contains existing"
+assert keywords.contains("while") == false, "Contains missing"
+
+# Keys
+keys := keywords.keys()
+assert len(keys) == 3, "Keys length"
+
+# Map assignment
+mut m := {}
+m["key1"] = "value1"
+m["key2"] = "value2"
+assert m["key1"] == "value1", "Map assignment 1"
+assert m["key2"] == "value2", "Map assignment 2"
+assert len(m) == 2, "Map length after assignment"
+
+# Map iteration
+mut count := 0
+for key in keywords.keys() {
+    count = count + 1
+}
+assert count == 3, "Map iteration"
+
+# Nested structures
+mut ast_nodes := []
+ast_nodes = ast_nodes.append({"type": "BinaryOp", "op": "+"})
+ast_nodes = ast_nodes.append({"type": "Number", "value": 42})
+assert len(ast_nodes) == 2, "Nested list of maps"
+assert ast_nodes[0]["type"] == "BinaryOp", "Nested access type"
+assert ast_nodes[0]["op"] == "+", "Nested access op"
+assert ast_nodes[1]["value"] == 42, "Nested access value"
+
+print("All collection tests passed!")

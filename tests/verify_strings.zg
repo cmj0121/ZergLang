@@ -1,0 +1,54 @@
+# Test string operations for self-hosting
+
+print("=== String Operations Test ===")
+
+# Test string indexing
+s := "hello"
+assert s[0] == "h", "String indexing s[0]"
+assert s[1] == "e", "String indexing s[1]"
+assert s[4] == "o", "String indexing s[4]"
+
+# Test string length
+assert len(s) == 5, "String length"
+assert len("") == 0, "Empty string length"
+assert len("a") == 1, "Single char length"
+
+# Test substring
+assert str.substring(s, 1, 4) == "ell", "Substring middle"
+assert str.substring(s, 0, 5) == "hello", "Substring full"
+assert str.substring(s, 0, 1) == "h", "Substring single char"
+
+# Test string concatenation
+assert "hello" + " " + "world" == "hello world", "String concat"
+assert "" + "a" == "a", "Concat with empty"
+
+# Test string comparison
+assert "abc" == "abc", "String equality"
+assert "abc" != "abd", "String inequality"
+
+# Test str module functions
+text := "  Hello, World!  "
+assert str.trim(text) == "Hello, World!", "String trim"
+assert str.upper("hello") == "HELLO", "String upper"
+assert str.lower("HELLO") == "hello", "String lower"
+
+# Test split and join
+csv := "apple,banana,cherry"
+parts := str.split(csv, ",")
+assert len(parts) == 3, "Split count"
+assert parts[0] == "apple", "Split first"
+assert parts[1] == "banana", "Split second"
+assert parts[2] == "cherry", "Split third"
+assert str.join(parts, "-") == "apple-banana-cherry", "Join"
+
+# Test contains
+assert str.contains("hello world", "world") == true, "Contains true"
+assert str.contains("hello", "xyz") == false, "Contains false"
+
+# Test starts_with and ends_with
+assert str.starts_with("hello", "hel") == true, "starts_with true"
+assert str.starts_with("hello", "ell") == false, "starts_with false"
+assert str.ends_with("hello", "llo") == true, "ends_with true"
+assert str.ends_with("hello", "hel") == false, "ends_with false"
+
+print("All string tests passed!")

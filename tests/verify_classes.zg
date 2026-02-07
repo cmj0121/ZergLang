@@ -1,0 +1,133 @@
+# Test classes for self-hosting
+
+print("=== Classes Test ===")
+
+# Basic class definition
+class Token {
+    pub mut tok_type: string
+    pub mut literal: string
+    pub mut line: int
+}
+
+# Create instance and set fields
+tok := Token()
+tok.tok_type = "INT"
+tok.literal = "42"
+tok.line = 1
+assert tok.tok_type == "INT", "Field tok_type"
+assert tok.literal == "42", "Field literal"
+assert tok.line == 1, "Field line"
+
+# Class with impl block
+class Point {
+    pub mut x: int
+    pub mut y: int
+}
+
+impl Point {
+    fn distance_from_origin() -> int {
+        # Simplified: just sum of absolute values
+        return this.x + this.y
+    }
+
+    fn to_string() -> string {
+        return "(" + string(this.x) + ", " + string(this.y) + ")"
+    }
+
+    mut fn move_by(dx, dy) {
+        this.x = this.x + dx
+        this.y = this.y + dy
+    }
+}
+
+p := Point()
+p.x = 3
+p.y = 4
+assert p.distance_from_origin() == 7, "Method call"
+assert p.to_string() == "(3, 4)", "to_string method"
+
+p.move_by(2, 3)
+assert p.x == 5, "Mutating method x"
+assert p.y == 7, "Mutating method y"
+
+# Factory function pattern
+fn make_token(t, lit) -> Token {
+    tok := Token()
+    tok.tok_type = t
+    tok.literal = lit
+    tok.line = 0
+    return tok
+}
+
+t := make_token("STRING", "hello")
+assert t.tok_type == "STRING", "Factory tok_type"
+assert t.literal == "hello", "Factory literal"
+
+# Lexer-like class
+class Lexer {
+    pub mut input: string
+    pub mut pos: int
+    pub mut ch: string
+}
+
+impl Lexer {
+    fn current_char() -> string {
+        if this.pos >= len(this.input) {
+            return ""
+        }
+        return this.input[this.pos]
+    }
+
+    mut fn advance() {
+        this.pos = this.pos + 1
+        if this.pos < len(this.input) {
+            this.ch = this.input[this.pos]
+        } else {
+            this.ch = ""
+        }
+    }
+
+    fn is_at_end() -> bool {
+        return this.pos >= len(this.input)
+    }
+}
+
+fn make_lexer(input) -> Lexer {
+    l := Lexer()
+    l.input = input
+    l.pos = 0
+    if len(input) > 0 {
+        l.ch = input[0]
+    } else {
+        l.ch = ""
+    }
+    return l
+}
+
+lex := make_lexer("abc")
+assert lex.current_char() == "a", "Lexer current char"
+assert lex.is_at_end() == false, "Lexer not at end"
+
+lex.advance()
+assert lex.current_char() == "b", "Lexer after advance"
+
+lex.advance()
+lex.advance()
+assert lex.is_at_end() == true, "Lexer at end"
+
+# Class with multiple instances
+t1 := make_token("INT", "1")
+t2 := make_token("PLUS", "+")
+t3 := make_token("INT", "2")
+
+mut tokens := []
+tokens = tokens.append(t1)
+tokens = tokens.append(t2)
+tokens = tokens.append(t3)
+
+assert len(tokens) == 3, "Multiple instances in list"
+assert tokens[0].tok_type == "INT", "First token type"
+assert tokens[1].tok_type == "PLUS", "Second token type"
+assert tokens[2].literal == "2", "Third token literal"
+
+print("All class tests passed!")

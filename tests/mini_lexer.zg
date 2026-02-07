@@ -1,0 +1,232 @@
+# Mini Lexer Test
+# End-to-end verification that Zerg can implement a lexer
+
+print("=== Mini Lexer Test ===")
+
+# Token types
+enum TokenType {
+    INT
+    PLUS
+    MINUS
+    STAR
+    SLASH
+    LPAREN
+    RPAREN
+    EOF
+}
+
+# Token class
+class Token {
+    pub mut tok_type: TokenType
+    pub mut literal: string
+}
+
+fn make_token(t, lit) -> Token {
+    tok := Token()
+    tok.tok_type = t
+    tok.literal = lit
+    return tok
+}
+
+fn token_to_string(tok) -> string {
+    match tok.tok_type {
+        TokenType.INT => { return "INT(" + tok.literal + ")" }
+        TokenType.PLUS => { return "PLUS" }
+        TokenType.MINUS => { return "MINUS" }
+        TokenType.STAR => { return "STAR" }
+        TokenType.SLASH => { return "SLASH" }
+        TokenType.LPAREN => { return "LPAREN" }
+        TokenType.RPAREN => { return "RPAREN" }
+        TokenType.EOF => { return "EOF" }
+    }
+}
+
+# Lexer class
+class Lexer {
+    pub mut input: string
+    pub mut pos: int
+}
+
+fn make_lexer(input) -> Lexer {
+    l := Lexer()
+    l.input = input
+    l.pos = 0
+    return l
+}
+
+impl Lexer {
+    fn current_char() -> string {
+        if this.pos >= len(this.input) {
+            return ""
+        }
+        return this.input[this.pos]
+    }
+
+    fn peek_char() -> string {
+        next := this.pos + 1
+        if next >= len(this.input) {
+            return ""
+        }
+        return this.input[next]
+    }
+
+    mut fn advance() {
+        this.pos = this.pos + 1
+    }
+
+    mut fn skip_whitespace() {
+        for char.is_space(this.current_char()) {
+            this.advance()
+        }
+    }
+
+    mut fn read_number() -> string {
+        mut num := ""
+        for char.is_digit(this.current_char()) {
+            num = num + this.current_char()
+            this.advance()
+        }
+        return num
+    }
+
+    mut fn next_token() -> Token {
+        this.skip_whitespace()
+        ch := this.current_char()
+
+        if ch == "" {
+            return make_token(TokenType.EOF, "")
+        }
+
+        if ch == "+" {
+            this.advance()
+            return make_token(TokenType.PLUS, "+")
+        }
+
+        if ch == "-" {
+            this.advance()
+            return make_token(TokenType.MINUS, "-")
+        }
+
+        if ch == "*" {
+            this.advance()
+            return make_token(TokenType.STAR, "*")
+        }
+
+        if ch == "/" {
+            this.advance()
+            return make_token(TokenType.SLASH, "/")
+        }
+
+        if ch == "(" {
+            this.advance()
+            return make_token(TokenType.LPAREN, "(")
+        }
+
+        if ch == ")" {
+            this.advance()
+            return make_token(TokenType.RPAREN, ")")
+        }
+
+        if char.is_digit(ch) {
+            num := this.read_number()
+            return make_token(TokenType.INT, num)
+        }
+
+        # Unknown character - skip it
+        this.advance()
+        return this.next_token()
+    }
+}
+
+# Tokenize function that returns all tokens
+fn tokenize(input) -> list {
+    l := make_lexer(input)
+    mut tokens := []
+
+    for true {
+        tok := l.next_token()
+        tokens = tokens.append(tok)
+        if tok.tok_type == TokenType.EOF {
+            break
+        }
+    }
+
+    return tokens
+}
+
+# ====== Tests ======
+
+# Test 1: Simple expression "1 + 2"
+print("Test 1: Tokenizing '1 + 2'")
+l := make_lexer("1 + 2")
+
+t1 := l.next_token()
+assert t1.tok_type == TokenType.INT, "t1 should be INT"
+assert t1.literal == "1", "t1 literal should be '1'"
+
+t2 := l.next_token()
+assert t2.tok_type == TokenType.PLUS, "t2 should be PLUS"
+assert t2.literal == "+", "t2 literal should be '+'"
+
+t3 := l.next_token()
+assert t3.tok_type == TokenType.INT, "t3 should be INT"
+assert t3.literal == "2", "t3 literal should be '2'"
+
+t4 := l.next_token()
+assert t4.tok_type == TokenType.EOF, "t4 should be EOF"
+
+print("  OK: 1 + 2 -> INT(1) PLUS INT(2) EOF")
+
+# Test 2: More complex expression
+print("Test 2: Tokenizing '(10 + 20) * 3'")
+tokens := tokenize("(10 + 20) * 3")
+
+assert len(tokens) == 8, "Should have 8 tokens (including EOF)"
+assert tokens[0].tok_type == TokenType.LPAREN, "First should be LPAREN"
+assert tokens[1].tok_type == TokenType.INT, "Second should be INT"
+assert tokens[1].literal == "10", "Second literal should be '10'"
+assert tokens[2].tok_type == TokenType.PLUS, "Third should be PLUS"
+assert tokens[3].tok_type == TokenType.INT, "Fourth should be INT"
+assert tokens[3].literal == "20", "Fourth literal should be '20'"
+assert tokens[4].tok_type == TokenType.RPAREN, "Fifth should be RPAREN"
+assert tokens[5].tok_type == TokenType.STAR, "Sixth should be STAR"
+assert tokens[6].tok_type == TokenType.INT, "Seventh should be INT"
+assert tokens[6].literal == "3", "Seventh literal should be '3'"
+assert tokens[7].tok_type == TokenType.EOF, "Eighth should be EOF"
+
+print("  OK: (10 + 20) * 3 -> LPAREN INT(10) PLUS INT(20) RPAREN STAR INT(3) EOF")
+
+# Test 3: Multi-digit numbers
+print("Test 3: Tokenizing '123 + 456'")
+tokens := tokenize("123 + 456")
+assert tokens[0].literal == "123", "First number should be '123'"
+assert tokens[2].literal == "456", "Second number should be '456'"
+print("  OK: Multi-digit numbers work")
+
+# Test 4: No whitespace
+print("Test 4: Tokenizing '1+2*3'")
+tokens := tokenize("1+2*3")
+assert len(tokens) == 6, "Should have 6 tokens"
+assert tokens[0].tok_type == TokenType.INT, "First is INT"
+assert tokens[1].tok_type == TokenType.PLUS, "Second is PLUS"
+assert tokens[2].tok_type == TokenType.INT, "Third is INT"
+assert tokens[3].tok_type == TokenType.STAR, "Fourth is STAR"
+assert tokens[4].tok_type == TokenType.INT, "Fifth is INT"
+print("  OK: No whitespace works")
+
+# Test 5: Print all tokens
+print("Test 5: Token string representation")
+tokens := tokenize("1 - 2 / 3")
+mut result := ""
+for tok in tokens {
+    if result != "" {
+        result = result + " "
+    }
+    result = result + token_to_string(tok)
+}
+assert result == "INT(1) MINUS INT(2) SLASH INT(3) EOF", "Token string output"
+print("  OK: " + result)
+
+print("")
+print("=== Mini Lexer Test PASSED! ===")
+print("The Zerg runtime is ready for self-hosting!")
