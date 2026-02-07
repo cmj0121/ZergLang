@@ -8,6 +8,8 @@ type Lexer struct {
 	ch           byte
 	line         int
 	column       int
+	inInterp     bool // true when inside interpolation (after INTERP_START/INTERP_MID, before })
+	interpDepth  int  // brace depth within interpolation expression
 }
 
 // New creates a new Lexer for the given input.
@@ -64,12 +66,22 @@ func (l *Lexer) NextToken() Token {
 			tok = l.newToken(GT, l.ch)
 		}
 	case '+':
-		tok = l.newToken(PLUS, l.ch)
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: PLUS_ASSIGN, Literal: string(ch) + "=", Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(PLUS, l.ch)
+		}
 	case '-':
 		if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
 			tok = Token{Type: ARROW, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: MINUS_ASSIGN, Literal: string(ch) + "=", Line: l.line, Column: l.column - 1}
 		} else {
 			tok = l.newToken(MINUS, l.ch)
 		}
@@ -78,13 +90,29 @@ func (l *Lexer) NextToken() Token {
 			ch := l.ch
 			l.readChar()
 			tok = Token{Type: POWER, Literal: string(ch) + string(l.ch), Line: l.line, Column: l.column - 1}
+		} else if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: ASTERISK_ASSIGN, Literal: string(ch) + "=", Line: l.line, Column: l.column - 1}
 		} else {
 			tok = l.newToken(ASTERISK, l.ch)
 		}
 	case '/':
-		tok = l.newToken(SLASH, l.ch)
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: SLASH_ASSIGN, Literal: string(ch) + "=", Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(SLASH, l.ch)
+		}
 	case '%':
-		tok = l.newToken(PERCENT, l.ch)
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = Token{Type: PERCENT_ASSIGN, Literal: string(ch) + "=", Line: l.line, Column: l.column - 1}
+		} else {
+			tok = l.newToken(PERCENT, l.ch)
+		}
 	case ',':
 		tok = l.newToken(COMMA, l.ch)
 	case '(':
@@ -100,20 +128,49 @@ func (l *Lexer) NextToken() Token {
 			tok = l.newToken(COLON, l.ch)
 		}
 	case '{':
+		if l.inInterp {
+			l.interpDepth++
+		}
 		tok = l.newToken(LBRACE, l.ch)
 	case '}':
-		tok = l.newToken(RBRACE, l.ch)
+		if l.inInterp {
+			if l.interpDepth > 0 {
+				l.interpDepth--
+				tok = l.newToken(RBRACE, l.ch)
+			} else {
+				// End of interpolation expression, continue reading string
+				l.inInterp = false
+				l.readChar() // consume }
+				tok.Type, tok.Literal = l.readStringOrInterpContinue()
+				return tok
+			}
+		} else {
+			tok = l.newToken(RBRACE, l.ch)
+		}
 	case '[':
 		tok = l.newToken(LBRACKET, l.ch)
 	case ']':
 		tok = l.newToken(RBRACKET, l.ch)
 	case '.':
-		tok = l.newToken(DOT, l.ch)
+		if l.peekChar() == '.' {
+			ch := l.ch
+			l.readChar()
+			if l.peekChar() == '=' {
+				l.readChar()
+				tok = Token{Type: DOTDOTEQ, Literal: string(ch) + "." + "=", Line: l.line, Column: l.column - 2}
+			} else {
+				tok = Token{Type: DOTDOT, Literal: string(ch) + ".", Line: l.line, Column: l.column - 1}
+			}
+		} else {
+			tok = l.newToken(DOT, l.ch)
+		}
 	case '&':
 		tok = l.newToken(AMPERSAND, l.ch)
+	case '|':
+		tok = l.newToken(PIPE, l.ch)
 	case '"':
-		tok.Type = STRING
-		tok.Literal = l.readString()
+		tok.Type, tok.Literal = l.readStringOrInterp()
+		return tok
 	case 0:
 		tok.Literal = ""
 		tok.Type = EOF
@@ -123,8 +180,7 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = LookupIdent(tok.Literal)
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Type = INT
-			tok.Literal = l.readNumber()
+			tok.Literal, tok.Type = l.readNumber()
 			return tok
 		} else {
 			tok = l.newToken(ILLEGAL, l.ch)
@@ -188,12 +244,26 @@ func (l *Lexer) readIdentifier() string {
 	return l.input[position:l.position]
 }
 
-func (l *Lexer) readNumber() string {
+func (l *Lexer) readNumber() (string, TokenType) {
 	position := l.position
+	tokenType := INT
+
+	// Read integer part
 	for isDigit(l.ch) || l.ch == '_' {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+
+	// Check for decimal point
+	if l.ch == '.' && isDigit(l.peekChar()) {
+		tokenType = FLOAT
+		l.readChar() // consume the dot
+		// Read fractional part
+		for isDigit(l.ch) || l.ch == '_' {
+			l.readChar()
+		}
+	}
+
+	return l.input[position:l.position], tokenType
 }
 
 func (l *Lexer) readString() string {
@@ -216,6 +286,10 @@ func (l *Lexer) readString() string {
 				result = append(result, '\\')
 			case '"':
 				result = append(result, '"')
+			case '{':
+				result = append(result, '{')
+			case '}':
+				result = append(result, '}')
 			default:
 				// Unknown escape, keep as-is
 				result = append(result, '\\', l.ch)
@@ -226,6 +300,101 @@ func (l *Lexer) readString() string {
 		l.readChar()
 	}
 	return string(result)
+}
+
+// readStringOrInterp reads a string and detects if it contains interpolation.
+func (l *Lexer) readStringOrInterp() (TokenType, string) {
+	var result []byte
+	l.readChar() // skip opening quote
+
+	for {
+		if l.ch == '"' || l.ch == 0 {
+			// End of string - regular string, consume closing quote
+			if l.ch == '"' {
+				l.readChar()
+			}
+			return STRING, string(result)
+		}
+		if l.ch == '{' {
+			// Start of interpolation
+			l.inInterp = true
+			l.interpDepth = 0
+			l.readChar() // consume {
+			return INTERP_START, string(result)
+		}
+		if l.ch == '\\' {
+			l.readChar() // read the escaped character
+			switch l.ch {
+			case 'n':
+				result = append(result, '\n')
+			case 't':
+				result = append(result, '\t')
+			case 'r':
+				result = append(result, '\r')
+			case '\\':
+				result = append(result, '\\')
+			case '"':
+				result = append(result, '"')
+			case '{':
+				result = append(result, '{')
+			case '}':
+				result = append(result, '}')
+			default:
+				// Unknown escape, keep as-is
+				result = append(result, '\\', l.ch)
+			}
+		} else {
+			result = append(result, l.ch)
+		}
+		l.readChar()
+	}
+}
+
+// readStringOrInterpContinue continues reading after an interpolation expression.
+func (l *Lexer) readStringOrInterpContinue() (TokenType, string) {
+	var result []byte
+
+	for {
+		if l.ch == '"' || l.ch == 0 {
+			// End of string - consume the closing quote
+			if l.ch == '"' {
+				l.readChar()
+			}
+			return INTERP_END, string(result)
+		}
+		if l.ch == '{' {
+			// Another interpolation
+			l.inInterp = true
+			l.interpDepth = 0
+			l.readChar() // consume {
+			return INTERP_MID, string(result)
+		}
+		if l.ch == '\\' {
+			l.readChar() // read the escaped character
+			switch l.ch {
+			case 'n':
+				result = append(result, '\n')
+			case 't':
+				result = append(result, '\t')
+			case 'r':
+				result = append(result, '\r')
+			case '\\':
+				result = append(result, '\\')
+			case '"':
+				result = append(result, '"')
+			case '{':
+				result = append(result, '{')
+			case '}':
+				result = append(result, '}')
+			default:
+				// Unknown escape, keep as-is
+				result = append(result, '\\', l.ch)
+			}
+		} else {
+			result = append(result, l.ch)
+		}
+		l.readChar()
+	}
 }
 
 func isLetter(ch byte) bool {

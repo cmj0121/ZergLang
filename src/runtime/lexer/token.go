@@ -9,9 +9,13 @@ const (
 	EOF     TokenType = "EOF"
 
 	// Identifiers and literals
-	IDENT  TokenType = "IDENT"
-	INT    TokenType = "INT"
-	STRING TokenType = "STRING"
+	IDENT        TokenType = "IDENT"
+	INT          TokenType = "INT"
+	FLOAT        TokenType = "FLOAT"
+	STRING       TokenType = "STRING"
+	INTERP_START TokenType = "INTERP_START" // Start of interpolated string "...{
+	INTERP_MID   TokenType = "INTERP_MID"   // Middle part }...{
+	INTERP_END   TokenType = "INTERP_END"   // End part }..."
 
 	// Operators
 	ASSIGN  TokenType = "="
@@ -85,6 +89,31 @@ const (
 	// Low-level
 	UNSAFE TokenType = "UNSAFE"
 	ASM    TokenType = "ASM"
+
+	// Module system
+	IMPORT TokenType = "IMPORT"
+	AS     TokenType = "AS"
+
+	// Enum and Result types
+	ENUM       TokenType = "ENUM"
+	UNDERSCORE TokenType = "_"
+
+	// Type checking
+	IS TokenType = "IS"
+
+	// Pipe for match alternatives
+	PIPE TokenType = "|"
+
+	// Range operators
+	DOTDOT   TokenType = ".."
+	DOTDOTEQ TokenType = "..="
+
+	// Compound assignment operators
+	PLUS_ASSIGN     TokenType = "+="
+	MINUS_ASSIGN    TokenType = "-="
+	ASTERISK_ASSIGN TokenType = "*="
+	SLASH_ASSIGN    TokenType = "/="
+	PERCENT_ASSIGN  TokenType = "%="
 )
 
 // Token represents a lexical token.
@@ -123,6 +152,11 @@ var keywords = map[string]TokenType{
 	"assert":   ASSERT,
 	"unsafe":   UNSAFE,
 	"asm":      ASM,
+	"enum":     ENUM,
+	"_":        UNDERSCORE,
+	"is":       IS,
+	"import":   IMPORT,
+	"as":       AS,
 }
 
 // LookupIdent returns the token type for an identifier.
