@@ -1,0 +1,13 @@
+# Utils module - imports math and provides higher-level utilities
+
+import "math"
+
+fn square(x) {
+    return math.multiply(x, x)
+}
+
+fn double(x) {
+    return math.add(x, x)
+}
+
+VERSION := "1.0"
