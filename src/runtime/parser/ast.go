@@ -79,6 +79,15 @@ type IntegerLiteral struct {
 func (il *IntegerLiteral) expressionNode()      {}
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 
+// FloatLiteral represents a floating-point value.
+type FloatLiteral struct {
+	Token lexer.Token
+	Value float64
+}
+
+func (fl *FloatLiteral) expressionNode()      {}
+func (fl *FloatLiteral) TokenLiteral() string { return fl.Token.Literal }
+
 // StringLiteral represents a string value.
 type StringLiteral struct {
 	Token lexer.Token
@@ -87,6 +96,17 @@ type StringLiteral struct {
 
 func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
+
+// InterpolatedString represents a string with embedded expressions.
+// e.g., "hello {name}, you are {age} years old"
+// Parts: ["hello ", name, ", you are ", age, " years old"]
+type InterpolatedString struct {
+	Token lexer.Token // the opening " token
+	Parts []Expression
+}
+
+func (is *InterpolatedString) expressionNode()      {}
+func (is *InterpolatedString) TokenLiteral() string { return is.Token.Literal }
 
 // BooleanLiteral represents a boolean value.
 type BooleanLiteral struct {
@@ -419,3 +439,84 @@ type AsmExpression struct {
 
 func (ae *AsmExpression) expressionNode()      {}
 func (ae *AsmExpression) TokenLiteral() string { return ae.Token.Literal }
+
+// EnumDeclaration represents: enum TokenType { INT, STRING, PLUS }
+type EnumDeclaration struct {
+	Token    lexer.Token // the 'enum' token
+	Name     *Identifier
+	Variants []string // ["INT", "STRING", "PLUS"]
+}
+
+func (ed *EnumDeclaration) statementNode()       {}
+func (ed *EnumDeclaration) TokenLiteral() string { return ed.Token.Literal }
+
+// MatchStatement represents: match expr { pattern => body, ... }
+type MatchStatement struct {
+	Token lexer.Token // the 'match' token
+	Value Expression
+	Arms  []*MatchArm
+}
+
+func (ms *MatchStatement) statementNode()       {}
+func (ms *MatchStatement) TokenLiteral() string { return ms.Token.Literal }
+
+// MatchArm represents: pattern => body or pattern | pattern => body
+type MatchArm struct {
+	Token    lexer.Token  // the '=>' token
+	Patterns []Expression // Patterns can be EnumAccess, Literal, Wildcard, or multiple separated by |
+	Guard    Expression   // optional if condition
+	Body     *BlockStatement
+}
+
+func (ma *MatchArm) statementNode()       {}
+func (ma *MatchArm) TokenLiteral() string { return ma.Token.Literal }
+
+// WildcardPattern represents: _ (matches anything)
+type WildcardPattern struct {
+	Token lexer.Token // the '_' token
+}
+
+func (wp *WildcardPattern) expressionNode()      {}
+func (wp *WildcardPattern) TokenLiteral() string { return wp.Token.Literal }
+
+// IsExpression represents: expr is Type (type checking)
+type IsExpression struct {
+	Token lexer.Token // the 'is' token
+	Left  Expression
+	Right Expression // type identifier (Ok, Err, SomeClass)
+}
+
+func (ie *IsExpression) expressionNode()      {}
+func (ie *IsExpression) TokenLiteral() string { return ie.Token.Literal }
+
+// RangeExpression represents: start..end or start..=end
+type RangeExpression struct {
+	Token     lexer.Token // the '..' or '..=' token
+	Start     Expression
+	End       Expression
+	Inclusive bool // true for ..=, false for ..
+}
+
+func (re *RangeExpression) expressionNode()      {}
+func (re *RangeExpression) TokenLiteral() string { return re.Token.Literal }
+
+// CompoundAssignmentStatement represents: x += 5, x -= 3, etc.
+type CompoundAssignmentStatement struct {
+	Token    lexer.Token // the compound operator token (+=, -=, etc.)
+	Name     *Identifier
+	Operator string // +, -, *, /, %
+	Value    Expression
+}
+
+func (cas *CompoundAssignmentStatement) statementNode()       {}
+func (cas *CompoundAssignmentStatement) TokenLiteral() string { return cas.Token.Literal }
+
+// ImportStatement represents: import "path/to/module" or import "path" as alias
+type ImportStatement struct {
+	Token lexer.Token // the 'import' token
+	Path  string      // the module path, e.g., "std/math"
+	Alias string      // optional alias, e.g., "m" for "import ... as m"
+}
+
+func (is *ImportStatement) statementNode()       {}
+func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }

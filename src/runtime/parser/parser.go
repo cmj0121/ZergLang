@@ -12,8 +12,10 @@ import (
 const (
 	_ int = iota
 	LOWEST
+	RANGE_PREC   // .. ..=
 	OR_PREC      // or
 	AND_PREC     // and
+	IS_PREC      // is (type checking)
 	EQUALS       // == !=
 	LESSGREATER  // < > <= >=
 	SUM          // + -
@@ -25,8 +27,11 @@ const (
 )
 
 var precedences = map[lexer.TokenType]int{
+	lexer.DOTDOT:   RANGE_PREC,
+	lexer.DOTDOTEQ: RANGE_PREC,
 	lexer.OR:       OR_PREC,
 	lexer.AND:      AND_PREC,
+	lexer.IS:       IS_PREC,
 	lexer.EQ:       EQUALS,
 	lexer.NOT_EQ:   EQUALS,
 	lexer.LT:       LESSGREATER,
@@ -67,7 +72,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.prefixParseFns = make(map[lexer.TokenType]prefixParseFn)
 	p.registerPrefix(lexer.IDENT, p.parseIdentifier)
 	p.registerPrefix(lexer.INT, p.parseIntegerLiteral)
+	p.registerPrefix(lexer.FLOAT, p.parseFloatLiteral)
 	p.registerPrefix(lexer.STRING, p.parseStringLiteral)
+	p.registerPrefix(lexer.INTERP_START, p.parseInterpolatedString)
 	p.registerPrefix(lexer.TRUE, p.parseBoolean)
 	p.registerPrefix(lexer.FALSE, p.parseBoolean)
 	p.registerPrefix(lexer.NIL, p.parseNil)
@@ -81,6 +88,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(lexer.SELF, p.parseSelf)
 	p.registerPrefix(lexer.AMPERSAND, p.parseReferenceExpression)
 	p.registerPrefix(lexer.ASM, p.parseAsmExpression)
+	p.registerPrefix(lexer.UNDERSCORE, p.parseWildcard)
 
 	p.infixParseFns = make(map[lexer.TokenType]infixParseFn)
 	p.registerInfix(lexer.PLUS, p.parseInfixExpression)
@@ -100,6 +108,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(lexer.LPAREN, p.parseCallExpression)
 	p.registerInfix(lexer.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(lexer.DOT, p.parseMemberExpression)
+	p.registerInfix(lexer.IS, p.parseIsExpression)
+	p.registerInfix(lexer.DOTDOT, p.parseRangeExpression)
+	p.registerInfix(lexer.DOTDOTEQ, p.parseRangeExpression)
 
 	p.nextToken()
 	p.nextToken()
@@ -177,6 +188,12 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseAssertStatement()
 	case lexer.UNSAFE:
 		return p.parseUnsafeBlock()
+	case lexer.ENUM:
+		return p.parseEnumDeclaration()
+	case lexer.MATCH:
+		return p.parseMatchStatement()
+	case lexer.IMPORT:
+		return p.parseImportStatement()
 	case lexer.FN:
 		if p.peekToken.Type == lexer.IDENT {
 			return p.parseFunctionDeclaration()
@@ -189,6 +206,10 @@ func (p *Parser) parseStatement() Statement {
 		}
 		if p.peekToken.Type == lexer.ASSIGN || p.peekToken.Type == lexer.COMMA {
 			return p.parseAssignmentStatement()
+		}
+		// Check for compound assignment: x +=, x -=, etc.
+		if isCompoundAssignmentOperator(p.peekToken.Type) {
+			return p.parseCompoundAssignmentStatement()
 		}
 		// Check for member/index assignment: ident.field = value or ident[idx] = value
 		if p.peekToken.Type == lexer.DOT || p.peekToken.Type == lexer.LBRACKET {
@@ -328,8 +349,80 @@ func (p *Parser) parseIntegerLiteral() Expression {
 	return lit
 }
 
+func (p *Parser) parseFloatLiteral() Expression {
+	lit := &FloatLiteral{Token: p.curToken}
+
+	// Remove underscores from the literal
+	cleanLiteral := strings.ReplaceAll(p.curToken.Literal, "_", "")
+
+	value, err := strconv.ParseFloat(cleanLiteral, 64)
+	if err != nil {
+		p.errors = append(p.errors, fmt.Sprintf("could not parse %q as float", p.curToken.Literal))
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
 func (p *Parser) parseStringLiteral() Expression {
 	return &StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseInterpolatedString() Expression {
+	interp := &InterpolatedString{Token: p.curToken}
+
+	// Add the initial string part if not empty
+	if p.curToken.Literal != "" {
+		interp.Parts = append(interp.Parts, &StringLiteral{
+			Token: p.curToken,
+			Value: p.curToken.Literal,
+		})
+	}
+
+	// Parse the expression after INTERP_START
+	p.nextToken()
+	expr := p.parseExpression(LOWEST)
+	if expr != nil {
+		interp.Parts = append(interp.Parts, expr)
+	}
+
+	// Continue parsing INTERP_MID and INTERP_END
+	for {
+		// After the expression, we should see INTERP_MID or INTERP_END
+		p.nextToken()
+
+		switch p.curToken.Type {
+		case lexer.INTERP_MID:
+			// Add the middle string part if not empty
+			if p.curToken.Literal != "" {
+				interp.Parts = append(interp.Parts, &StringLiteral{
+					Token: p.curToken,
+					Value: p.curToken.Literal,
+				})
+			}
+			// Parse the next expression
+			p.nextToken()
+			expr := p.parseExpression(LOWEST)
+			if expr != nil {
+				interp.Parts = append(interp.Parts, expr)
+			}
+
+		case lexer.INTERP_END:
+			// Add the final string part if not empty
+			if p.curToken.Literal != "" {
+				interp.Parts = append(interp.Parts, &StringLiteral{
+					Token: p.curToken,
+					Value: p.curToken.Literal,
+				})
+			}
+			return interp
+
+		default:
+			p.errors = append(p.errors, fmt.Sprintf("expected INTERP_MID or INTERP_END, got %s", p.curToken.Type))
+			return interp
+		}
+	}
 }
 
 func (p *Parser) parseBoolean() Expression {
@@ -1197,4 +1290,215 @@ func (p *Parser) parseAsmExpression() Expression {
 	p.nextToken() // move to )
 
 	return expr
+}
+
+func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
+	stmt := &EnumDeclaration{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, "expected enum name")
+		return nil
+	}
+	p.nextToken()
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after enum name")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Variants = p.parseEnumVariants()
+
+	return stmt
+}
+
+func (p *Parser) parseEnumVariants() []string {
+	variants := []string{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		if p.curToken.Type == lexer.IDENT {
+			variants = append(variants, p.curToken.Literal)
+		}
+		p.nextToken()
+	}
+
+	return variants
+}
+
+func (p *Parser) parseMatchStatement() *MatchStatement {
+	stmt := &MatchStatement{Token: p.curToken}
+
+	p.nextToken()
+	stmt.Value = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after match expression")
+		return nil
+	}
+	p.nextToken()
+
+	stmt.Arms = p.parseMatchArms()
+
+	return stmt
+}
+
+func (p *Parser) parseMatchArms() []*MatchArm {
+	arms := []*MatchArm{}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+		arm := p.parseMatchArm()
+		if arm != nil {
+			arms = append(arms, arm)
+		}
+		p.nextToken()
+	}
+
+	return arms
+}
+
+func (p *Parser) parseMatchArm() *MatchArm {
+	arm := &MatchArm{}
+
+	// Parse patterns (can be multiple separated by |)
+	patterns := []Expression{}
+	pattern := p.parseExpression(LOWEST)
+	if pattern != nil {
+		patterns = append(patterns, pattern)
+	}
+
+	// Check for alternative patterns with |
+	for p.peekToken.Type == lexer.PIPE {
+		p.nextToken() // move to |
+		p.nextToken() // move to next pattern
+		pattern := p.parseExpression(LOWEST)
+		if pattern != nil {
+			patterns = append(patterns, pattern)
+		}
+	}
+
+	arm.Patterns = patterns
+
+	// Check for guard condition: if condition
+	if p.peekToken.Type == lexer.IF {
+		p.nextToken() // move to if
+		p.nextToken() // move to guard condition
+		arm.Guard = p.parseExpression(LOWEST)
+	}
+
+	if p.peekToken.Type != lexer.FAT_ARROW {
+		p.errors = append(p.errors, "expected => after match pattern")
+		return nil
+	}
+	p.nextToken() // move to =>
+	arm.Token = p.curToken
+
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, "expected { after =>")
+		return nil
+	}
+	p.nextToken()
+	arm.Body = p.parseBlockStatement()
+
+	return arm
+}
+
+func (p *Parser) parseWildcard() Expression {
+	return &WildcardPattern{Token: p.curToken}
+}
+
+func (p *Parser) parseIsExpression(left Expression) Expression {
+	expr := &IsExpression{
+		Token: p.curToken,
+		Left:  left,
+	}
+
+	p.nextToken()
+	expr.Right = p.parseExpression(IS_PREC)
+
+	return expr
+}
+
+func (p *Parser) parseRangeExpression(left Expression) Expression {
+	expr := &RangeExpression{
+		Token:     p.curToken,
+		Start:     left,
+		Inclusive: p.curToken.Type == lexer.DOTDOTEQ,
+	}
+
+	p.nextToken()
+	expr.End = p.parseExpression(RANGE_PREC)
+
+	return expr
+}
+
+func isCompoundAssignmentOperator(t lexer.TokenType) bool {
+	switch t {
+	case lexer.PLUS_ASSIGN, lexer.MINUS_ASSIGN, lexer.ASTERISK_ASSIGN,
+		lexer.SLASH_ASSIGN, lexer.PERCENT_ASSIGN:
+		return true
+	}
+	return false
+}
+
+func compoundOperatorToArithmetic(t lexer.TokenType) string {
+	switch t {
+	case lexer.PLUS_ASSIGN:
+		return "+"
+	case lexer.MINUS_ASSIGN:
+		return "-"
+	case lexer.ASTERISK_ASSIGN:
+		return "*"
+	case lexer.SLASH_ASSIGN:
+		return "/"
+	case lexer.PERCENT_ASSIGN:
+		return "%"
+	}
+	return ""
+}
+
+func (p *Parser) parseCompoundAssignmentStatement() *CompoundAssignmentStatement {
+	stmt := &CompoundAssignmentStatement{}
+
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	p.nextToken() // move to compound operator
+	stmt.Token = p.curToken
+	stmt.Operator = compoundOperatorToArithmetic(p.curToken.Type)
+
+	p.nextToken() // move to value
+	stmt.Value = p.parseExpression(LOWEST)
+
+	return stmt
+}
+
+func (p *Parser) parseImportStatement() *ImportStatement {
+	stmt := &ImportStatement{Token: p.curToken}
+
+	p.nextToken() // move past 'import'
+
+	if p.curToken.Type != lexer.STRING {
+		p.errors = append(p.errors, fmt.Sprintf("expected string after 'import', got %s", p.curToken.Type))
+		return nil
+	}
+
+	stmt.Path = p.curToken.Literal
+
+	// Check for optional 'as' alias
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // move to 'as'
+		p.nextToken() // move to alias identifier
+
+		if p.curToken.Type != lexer.IDENT {
+			p.errors = append(p.errors, fmt.Sprintf("expected identifier after 'as', got %s", p.curToken.Type))
+			return nil
+		}
+		stmt.Alias = p.curToken.Literal
+	}
+
+	return stmt
 }
