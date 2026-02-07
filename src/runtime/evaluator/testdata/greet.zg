@@ -1,0 +1,7 @@
+# Test greet module
+
+fn hello(name) {
+    return "Hello, " + name
+}
+
+DEFAULT_GREETING := "Hi there"

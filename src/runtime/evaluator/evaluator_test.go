@@ -1445,3 +1445,988 @@ func TestModuleMethodChaining(t *testing.T) {
 		t.Fatalf("expected HELLO, got %s", str.Value)
 	}
 }
+
+// ============================================================================
+// Enum and Match tests
+// ============================================================================
+
+func TestEnumDeclaration(t *testing.T) {
+	input := `enum TokenType {
+		INT
+		STRING
+		PLUS
+	}
+	TokenType`
+	evaluated := testEval(input)
+
+	enumType, ok := evaluated.(*EnumType)
+	if !ok {
+		t.Fatalf("expected EnumType, got %T", evaluated)
+	}
+
+	if enumType.Name != "TokenType" {
+		t.Fatalf("expected name 'TokenType', got %s", enumType.Name)
+	}
+
+	if len(enumType.Variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(enumType.Variants))
+	}
+
+	expected := []string{"INT", "STRING", "PLUS"}
+	for i, v := range expected {
+		if enumType.Variants[i] != v {
+			t.Errorf("variant %d: expected %s, got %s", i, v, enumType.Variants[i])
+		}
+	}
+}
+
+func TestEnumVariantAccess(t *testing.T) {
+	input := `enum Color {
+		RED
+		GREEN
+		BLUE
+	}
+	Color.RED`
+	evaluated := testEval(input)
+
+	enumVal, ok := evaluated.(*EnumValue)
+	if !ok {
+		t.Fatalf("expected EnumValue, got %T", evaluated)
+	}
+
+	if enumVal.EnumName != "Color" {
+		t.Fatalf("expected enum name 'Color', got %s", enumVal.EnumName)
+	}
+
+	if enumVal.VariantName != "RED" {
+		t.Fatalf("expected variant 'RED', got %s", enumVal.VariantName)
+	}
+}
+
+func TestEnumComparison(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`enum Color { RED GREEN }
+		Color.RED == Color.RED`, true},
+		{`enum Color { RED GREEN }
+		Color.RED == Color.GREEN`, false},
+		{`enum Color { RED GREEN }
+		c := Color.RED
+		c == Color.RED`, true},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestMatchLiterals(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`match 1 {
+			1 => { "one" }
+			2 => { "two" }
+			_ => { "other" }
+		}`, "one"},
+		{`match 2 {
+			1 => { "one" }
+			2 => { "two" }
+			_ => { "other" }
+		}`, "two"},
+		{`match 3 {
+			1 => { "one" }
+			2 => { "two" }
+			_ => { "other" }
+		}`, "other"},
+		{`match "hello" {
+			"world" => { 1 }
+			"hello" => { 2 }
+			_ => { 3 }
+		}`, int64(2)},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("expected String, got %T (%+v)", evaluated, evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("expected %q, got %q", expected, str.Value)
+			}
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		}
+	}
+}
+
+func TestMatchEnum(t *testing.T) {
+	input := `enum Status {
+		OK
+		ERROR
+		PENDING
+	}
+	status := Status.OK
+	match status {
+		Status.OK => { "success" }
+		Status.ERROR => { "failure" }
+		_ => { "unknown" }
+	}`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "success" {
+		t.Fatalf("expected 'success', got %s", str.Value)
+	}
+}
+
+func TestMatchWildcard(t *testing.T) {
+	input := `match 42 {
+		1 => { "one" }
+		_ => { "anything else" }
+	}`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	if str.Value != "anything else" {
+		t.Fatalf("expected 'anything else', got %s", str.Value)
+	}
+}
+
+func TestMatchAlternatives(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`match 1 {
+			1 | 2 | 3 => { "small" }
+			_ => { "big" }
+		}`, "small"},
+		{`match 2 {
+			1 | 2 | 3 => { "small" }
+			_ => { "big" }
+		}`, "small"},
+		{`match 10 {
+			1 | 2 | 3 => { "small" }
+			_ => { "big" }
+		}`, "big"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("expected String, got %T (%+v)", evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, str.Value)
+		}
+	}
+}
+
+func TestMatchWithGuard(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`x := 5
+		match x {
+			_ if x > 10 => { "big" }
+			_ if x > 0 => { "positive" }
+			_ => { "zero or negative" }
+		}`, "positive"},
+		{`x := 15
+		match x {
+			_ if x > 10 => { "big" }
+			_ if x > 0 => { "positive" }
+			_ => { "zero or negative" }
+		}`, "big"},
+		{`x := -5
+		match x {
+			_ if x > 10 => { "big" }
+			_ if x > 0 => { "positive" }
+			_ => { "zero or negative" }
+		}`, "zero or negative"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("expected String, got %T (%+v)", evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, str.Value)
+		}
+	}
+}
+
+func TestResultOkErr(t *testing.T) {
+	// Test Ok() creation
+	okResult := testEval(`Ok(42)`)
+	resultOk, ok := okResult.(*ResultOk)
+	if !ok {
+		t.Fatalf("expected ResultOk, got %T", okResult)
+	}
+	testIntegerObject(t, resultOk.Value, 42)
+
+	// Test Err() creation
+	errResult := testEval(`Err("not found")`)
+	resultErr, ok := errResult.(*ResultErr)
+	if !ok {
+		t.Fatalf("expected ResultErr, got %T", errResult)
+	}
+	str, ok := resultErr.Error.(*String)
+	if !ok || str.Value != "not found" {
+		t.Fatalf("expected error 'not found', got %v", resultErr.Error)
+	}
+}
+
+func TestResultValueAccess(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`Ok(42).value`, int64(42)},
+		{`Err("oops").error`, "oops"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int64:
+			testIntegerObject(t, evaluated, expected)
+		case string:
+			str, ok := evaluated.(*String)
+			if !ok {
+				t.Errorf("expected String, got %T", evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("expected %q, got %q", expected, str.Value)
+			}
+		}
+	}
+}
+
+func TestIsExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`Ok(42) is Ok`, true},
+		{`Ok(42) is Err`, false},
+		{`Err("error") is Err`, true},
+		{`Err("error") is Ok`, false},
+		{`42 is int`, true},
+		{`42 is string`, false},
+		{`"hello" is string`, true},
+		{`[1, 2, 3] is list`, true},
+		{`{"a": 1} is map`, true},
+		{`true is bool`, true},
+		{`nil is nil`, true},
+	}
+
+	for i, tt := range tests {
+		evaluated := testEval(tt.input)
+		if !testBooleanObject(t, evaluated, tt.expected) {
+			t.Errorf("failed at test case %d: %s", i, tt.input)
+		}
+	}
+}
+
+func TestIsWithEnum(t *testing.T) {
+	input := `enum Color { RED GREEN BLUE }
+	c := Color.RED
+	c is Color`
+	evaluated := testEval(input)
+	testBooleanObject(t, evaluated, true)
+}
+
+func TestMatchOnResult(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`result := Ok(42)
+		match result {
+			Ok => { "success" }
+			Err => { "failure" }
+		}`, "success"},
+		{`result := Err("oops")
+		match result {
+			Ok => { "success" }
+			Err => { "failure" }
+		}`, "failure"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("expected String, got %T (%+v)", evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, str.Value)
+		}
+	}
+}
+
+func TestMatchNoMatch(t *testing.T) {
+	input := `match 5 {
+		1 => { "one" }
+		2 => { "two" }
+	}`
+	evaluated := testEval(input)
+
+	if evaluated != NULL {
+		t.Fatalf("expected NULL when no match, got %T (%+v)", evaluated, evaluated)
+	}
+}
+
+// ============================================================================
+// Float tests
+// ============================================================================
+
+func TestFloatLiteral(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"3.14", 3.14},
+		{"0.5", 0.5},
+		{"123.456", 123.456},
+		{"1_000.5", 1000.5},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestFloatArithmetic(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"1.5 + 2.5", 4.0},
+		{"5.0 - 2.0", 3.0},
+		{"2.5 * 4.0", 10.0},
+		{"10.0 / 4.0", 2.5},
+		{"-3.5", -3.5},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestFloatIntMixedArithmetic(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"1.5 + 2", 3.5},
+		{"5 - 2.5", 2.5},
+		{"2 * 3.5", 7.0},
+		{"10 / 4.0", 2.5},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestFloatComparison(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"3.14 < 3.15", true},
+		{"3.14 > 3.15", false},
+		{"3.14 == 3.14", true},
+		{"3.14 != 3.15", true},
+		{"3.14 <= 3.14", true},
+		{"3.14 >= 3.14", true},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestFloatBuiltin(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"float(42)", 42.0},
+		{`float("3.14")`, 3.14},
+		{"float(3.14)", 3.14},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestIntFromFloat(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"int(3.7)", 3},
+		{"int(3.14)", 3},
+		{"int(-2.9)", -2},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestFloatIsType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"3.14 is float", true},
+		{"3.14 is int", false},
+		{"42 is float", false},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func testFloatObject(t *testing.T, obj Object, expected float64) bool {
+	result, ok := obj.(*Float)
+	if !ok {
+		t.Errorf("expected Float, got %T (%+v)", obj, obj)
+		return false
+	}
+	// Use small epsilon for float comparison
+	if diff := result.Value - expected; diff < -0.0001 || diff > 0.0001 {
+		t.Errorf("expected %f, got %f", expected, result.Value)
+		return false
+	}
+	return true
+}
+
+// ============================================================================
+// Range tests
+// ============================================================================
+
+func TestRangeExpression(t *testing.T) {
+	input := `1..5`
+	evaluated := testEval(input)
+
+	r, ok := evaluated.(*Range)
+	if !ok {
+		t.Fatalf("expected Range, got %T", evaluated)
+	}
+
+	if r.Start != 1 {
+		t.Errorf("expected start 1, got %d", r.Start)
+	}
+	if r.End != 5 {
+		t.Errorf("expected end 5, got %d", r.End)
+	}
+	if r.Inclusive {
+		t.Errorf("expected exclusive range")
+	}
+}
+
+func TestRangeInclusiveExpression(t *testing.T) {
+	input := `1..=5`
+	evaluated := testEval(input)
+
+	r, ok := evaluated.(*Range)
+	if !ok {
+		t.Fatalf("expected Range, got %T", evaluated)
+	}
+
+	if r.Start != 1 {
+		t.Errorf("expected start 1, got %d", r.Start)
+	}
+	if r.End != 5 {
+		t.Errorf("expected end 5, got %d", r.End)
+	}
+	if !r.Inclusive {
+		t.Errorf("expected inclusive range")
+	}
+}
+
+func TestForInRange(t *testing.T) {
+	input := `mut sum := 0
+for i in 1..5 {
+    sum = sum + i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10) // 1+2+3+4 = 10
+}
+
+func TestForInRangeInclusive(t *testing.T) {
+	input := `mut sum := 0
+for i in 1..=5 {
+    sum = sum + i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 15) // 1+2+3+4+5 = 15
+}
+
+func TestForInRangeWithVariables(t *testing.T) {
+	input := `start := 2
+end := 6
+mut sum := 0
+for i in start..end {
+    sum = sum + i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 14) // 2+3+4+5 = 14
+}
+
+func TestForInRangeBreak(t *testing.T) {
+	input := `mut sum := 0
+for i in 1..10 {
+    if i == 5 {
+        break
+    }
+    sum = sum + i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10) // 1+2+3+4 = 10
+}
+
+func TestRangeInspect(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"1..5", "1..5"},
+		{"1..=5", "1..=5"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		r, ok := evaluated.(*Range)
+		if !ok {
+			t.Errorf("expected Range, got %T", evaluated)
+			continue
+		}
+		if r.Inspect() != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, r.Inspect())
+		}
+	}
+}
+
+// ============================================================================
+// Compound assignment tests
+// ============================================================================
+
+func TestCompoundPlusAssign(t *testing.T) {
+	input := `mut x := 10
+x += 5
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 15)
+}
+
+func TestCompoundMinusAssign(t *testing.T) {
+	input := `mut x := 10
+x -= 3
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 7)
+}
+
+func TestCompoundAsteriskAssign(t *testing.T) {
+	input := `mut x := 10
+x *= 2
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 20)
+}
+
+func TestCompoundSlashAssign(t *testing.T) {
+	input := `mut x := 10
+x /= 4
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 2)
+}
+
+func TestCompoundPercentAssign(t *testing.T) {
+	input := `mut x := 10
+x %= 3
+x`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 1)
+}
+
+func TestCompoundAssignWithFloat(t *testing.T) {
+	input := `mut x := 10.0
+x += 2.5
+x`
+	evaluated := testEval(input)
+	testFloatObject(t, evaluated, 12.5)
+}
+
+func TestCompoundAssignStringConcat(t *testing.T) {
+	input := `mut s := "hello"
+s += " world"
+s`
+	evaluated := testEval(input)
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+	if str.Value != "hello world" {
+		t.Fatalf("expected 'hello world', got %s", str.Value)
+	}
+}
+
+func TestCompoundAssignImmutableError(t *testing.T) {
+	input := `x := 10
+x += 5`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	expected := "cannot assign to immutable variable: x"
+	if err.Message != expected {
+		t.Fatalf("expected %q, got %q", expected, err.Message)
+	}
+}
+
+func TestCompoundAssignInLoop(t *testing.T) {
+	input := `mut sum := 0
+for i in 1..=5 {
+    sum += i
+}
+sum`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 15)
+}
+
+// ============================================================================
+// String interpolation tests
+// ============================================================================
+
+func TestStringInterpolation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`name := "World"
+"Hello, {name}!"`, "Hello, World!"},
+		{`x := 42
+"The answer is {x}"`, "The answer is 42"},
+		{`a := 2
+b := 3
+"{a} + {b} = {a + b}"`, "2 + 3 = 5"},
+		{`"no interpolation"`, "no interpolation"},
+		{`"{1 + 1}"`, "2"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		str, ok := evaluated.(*String)
+		if !ok {
+			t.Errorf("for %q: expected String, got %T (%+v)", tt.input, evaluated, evaluated)
+			continue
+		}
+		if str.Value != tt.expected {
+			t.Errorf("for %q: expected %q, got %q", tt.input, tt.expected, str.Value)
+		}
+	}
+}
+
+func TestStringInterpolationMultiple(t *testing.T) {
+	input := `first := "John"
+last := "Doe"
+age := 30
+"Name: {first} {last}, Age: {age}"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "Name: John Doe, Age: 30"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+func TestStringInterpolationWithExpressions(t *testing.T) {
+	input := `x := 10
+y := 5
+"{x} * {y} = {x * y}"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "10 * 5 = 50"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+func TestStringInterpolationEscape(t *testing.T) {
+	// Test escaping braces with \{
+	input := `"literal \{brace\}"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "literal {brace}"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+// ========== Import/Module System Tests ==========
+
+func TestImportModule(t *testing.T) {
+	// Set up the module loader to find testdata
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "math"
+result := math.add(2, 3)
+result`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
+func TestImportModuleWithAlias(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "math" as m
+result := m.multiply(4, 5)
+result`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 20)
+}
+
+func TestImportModuleFunctionCall(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "greet"
+msg := greet.hello("World")
+msg`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "Hello, World"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+func TestImportModuleConstant(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "math"
+math.PI`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 3)
+}
+
+func TestImportModuleConstantWithAlias(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "greet" as g
+g.DEFAULT_GREETING`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "Hi there"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+func TestImportModuleNotFound(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "nonexistent"`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message == "" {
+		t.Fatalf("expected error message, got empty string")
+	}
+}
+
+func TestImportModuleMemberNotFound(t *testing.T) {
+	DefaultLoader.SetCurrentDir("testdata")
+	defer DefaultLoader.SetCurrentDir(".")
+
+	input := `import "math"
+math.nonexistent`
+	evaluated := testEval(input)
+
+	err, ok := evaluated.(*Error)
+	if !ok {
+		t.Fatalf("expected Error, got %T", evaluated)
+	}
+
+	if err.Message == "" {
+		t.Fatalf("expected error message about missing member")
+	}
+}
+
+func TestImportNestedModule(t *testing.T) {
+	// Clear cache to ensure fresh load
+	DefaultLoader = NewModuleLoader()
+	DefaultLoader.SetCurrentDir("testdata")
+	defer func() {
+		DefaultLoader = NewModuleLoader()
+	}()
+
+	input := `import "utils"
+result := utils.square(5)
+result`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 25)
+}
+
+func TestImportNestedModuleDouble(t *testing.T) {
+	// Clear cache to ensure fresh load
+	DefaultLoader = NewModuleLoader()
+	DefaultLoader.SetCurrentDir("testdata")
+	defer func() {
+		DefaultLoader = NewModuleLoader()
+	}()
+
+	input := `import "utils"
+result := utils.double(7)
+result`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 14)
+}
+
+func TestImportNestedModuleConstant(t *testing.T) {
+	// Clear cache to ensure fresh load
+	DefaultLoader = NewModuleLoader()
+	DefaultLoader.SetCurrentDir("testdata")
+	defer func() {
+		DefaultLoader = NewModuleLoader()
+	}()
+
+	input := `import "utils"
+utils.VERSION`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "1.0"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
+
+func TestImportModuleCaching(t *testing.T) {
+	// Clear cache
+	DefaultLoader = NewModuleLoader()
+	DefaultLoader.SetCurrentDir("testdata")
+	defer func() {
+		DefaultLoader = NewModuleLoader()
+	}()
+
+	// Import same module twice, should use cached version
+	input := `import "math"
+import "math" as m2
+result := math.add(1, 2) + m2.add(3, 4)
+result`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10) // 3 + 7
+}
+
+func TestImportMultipleModules(t *testing.T) {
+	DefaultLoader = NewModuleLoader()
+	DefaultLoader.SetCurrentDir("testdata")
+	defer func() {
+		DefaultLoader = NewModuleLoader()
+	}()
+
+	input := `import "math"
+import "greet"
+sum := math.add(10, 20)
+msg := greet.hello("Zerg")
+"{msg} - Sum is {sum}"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*String)
+	if !ok {
+		t.Fatalf("expected String, got %T", evaluated)
+	}
+
+	expected := "Hello, Zerg - Sum is 30"
+	if str.Value != expected {
+		t.Fatalf("expected %q, got %q", expected, str.Value)
+	}
+}
