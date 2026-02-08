@@ -194,6 +194,8 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseMatchStatement()
 	case lexer.IMPORT:
 		return p.parseImportStatement()
+	case lexer.WITH:
+		return p.parseWithStatement()
 	case lexer.FN:
 		if p.peekToken.Type == lexer.IDENT {
 			return p.parseFunctionDeclaration()
@@ -1499,6 +1501,43 @@ func (p *Parser) parseImportStatement() *ImportStatement {
 		}
 		stmt.Alias = p.curToken.Literal
 	}
+
+	return stmt
+}
+
+// parseWithStatement parses: with expr as name { body }
+func (p *Parser) parseWithStatement() *WithStatement {
+	stmt := &WithStatement{Token: p.curToken}
+
+	p.nextToken() // move past 'with'
+
+	// Parse the resource expression
+	stmt.Resource = p.parseExpression(LOWEST)
+
+	// Expect 'as'
+	if p.peekToken.Type != lexer.AS {
+		p.errors = append(p.errors, fmt.Sprintf("expected 'as' after with expression, got %s", p.peekToken.Type))
+		return nil
+	}
+	p.nextToken() // move to 'as'
+	p.nextToken() // move to identifier
+
+	// Parse the binding name
+	if p.curToken.Type != lexer.IDENT {
+		p.errors = append(p.errors, fmt.Sprintf("expected identifier after 'as', got %s", p.curToken.Type))
+		return nil
+	}
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	// Expect '{'
+	if p.peekToken.Type != lexer.LBRACE {
+		p.errors = append(p.errors, fmt.Sprintf("expected '{' after with binding, got %s", p.peekToken.Type))
+		return nil
+	}
+	p.nextToken() // move to '{'
+
+	// Parse the body
+	stmt.Body = p.parseBlockStatement()
 
 	return stmt
 }

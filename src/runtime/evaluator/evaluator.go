@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/xrspace/zerglang/runtime/parser"
 )
@@ -141,6 +142,8 @@ func Eval(node parser.Node, env *Environment) Object {
 		return evalRangeExpression(node, env)
 	case *parser.ImportStatement:
 		return evalImportStatement(node, env)
+	case *parser.WithStatement:
+		return evalWithStatement(node, env)
 	}
 
 	return nil
@@ -936,6 +939,12 @@ func evalMemberExpression(obj Object, member string) Object {
 		case "length":
 			return &Integer{Value: int64(len(o.Elements))}
 		}
+	case *File:
+		// Check for File methods (read, write, seek, tell, close)
+		if methodFn := GetFileMethod(member); methodFn != nil {
+			return &BoundBuiltin{Name: member, Receiver: o, Fn: methodFn}
+		}
+		return newError("file has no method '%s'", member)
 	case *String:
 		// String built-in methods
 		switch member {
@@ -1315,6 +1324,32 @@ func evalUnsafeBlock(ub *parser.UnsafeBlock, env *Environment) Object {
 	unsafeEnv.Declare("__unsafe__", TRUE, false)
 
 	return Eval(ub.Body, unsafeEnv)
+}
+
+// evalWithStatement evaluates a with statement for automatic resource management.
+// The resource is automatically closed after the body executes.
+func evalWithStatement(ws *parser.WithStatement, env *Environment) Object {
+	// Evaluate the resource expression
+	resource := Eval(ws.Resource, env)
+	if IsError(resource) {
+		return resource
+	}
+
+	// Create a new scope and bind the resource
+	innerEnv := NewEnclosedEnvironment(env)
+	innerEnv.Declare(ws.Name.Value, resource, false)
+
+	// Evaluate the body
+	result := Eval(ws.Body, innerEnv)
+
+	// Auto-close: call close() if resource is a File
+	if f, ok := resource.(*File); ok {
+		if file, ok := f.Handle.(*os.File); ok {
+			file.Close()
+		}
+	}
+
+	return result
 }
 
 // AsmFunction is the signature for asm-callable functions.

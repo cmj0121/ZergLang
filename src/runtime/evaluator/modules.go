@@ -11,7 +11,7 @@ import (
 // BuiltinModules is the map of all builtin modules.
 var BuiltinModules = map[string]*Module{
 	"_sys": SysModule,
-	"io":   IoModule,
+	"_io":  IoModule,
 	"str":  StrModule,
 	"char": CharModule,
 }
@@ -29,17 +29,12 @@ var SysModule = &Module{
 }
 
 // IoModule provides I/O functions.
+// File methods (read, write, seek, tell, close) are handled by GetFileMethod.
 var IoModule = &Module{
-	Name: "io",
+	Name: "_io",
 	Methods: map[string]*Builtin{
-		"open":       {Name: "open", Fn: ioOpen},
-		"read":       {Name: "read", Fn: ioRead},
-		"read_lines": {Name: "read_lines", Fn: ioReadLines},
-		"write":      {Name: "write", Fn: ioWrite},
-		"close":      {Name: "close", Fn: ioClose},
-		"exists":     {Name: "exists", Fn: ioExists},
-		"read_file":  {Name: "read_file", Fn: ioReadFile},
-		"write_file": {Name: "write_file", Fn: ioWriteFile},
+		"open":   {Name: "open", Fn: ioOpen},
+		"exists": {Name: "exists", Fn: ioExists},
 	},
 }
 
@@ -189,7 +184,7 @@ func ioOpen(args ...Object) Object {
 		return newError("io.open() failed: %s", err.Error())
 	}
 
-	return &FileHandle{Path: path.Value, Mode: mode, Handle: file}
+	return &File{Path: path.Value, Mode: mode, Handle: file}
 }
 
 func ioRead(args ...Object) Object {
@@ -197,7 +192,7 @@ func ioRead(args ...Object) Object {
 		return newError("io.read() takes exactly 1 argument (%d given)", len(args))
 	}
 
-	fh, ok := args[0].(*FileHandle)
+	fh, ok := args[0].(*File)
 	if !ok {
 		return newError("io.read() argument must be a file handle, not %s", args[0].Type())
 	}
@@ -220,7 +215,7 @@ func ioReadLines(args ...Object) Object {
 		return newError("io.read_lines() takes exactly 1 argument (%d given)", len(args))
 	}
 
-	fh, ok := args[0].(*FileHandle)
+	fh, ok := args[0].(*File)
 	if !ok {
 		return newError("io.read_lines() argument must be a file handle, not %s", args[0].Type())
 	}
@@ -249,7 +244,7 @@ func ioWrite(args ...Object) Object {
 		return newError("io.write() takes exactly 2 arguments (%d given)", len(args))
 	}
 
-	fh, ok := args[0].(*FileHandle)
+	fh, ok := args[0].(*File)
 	if !ok {
 		return newError("io.write() first argument must be a file handle, not %s", args[0].Type())
 	}
@@ -277,7 +272,7 @@ func ioClose(args ...Object) Object {
 		return newError("io.close() takes exactly 1 argument (%d given)", len(args))
 	}
 
-	fh, ok := args[0].(*FileHandle)
+	fh, ok := args[0].(*File)
 	if !ok {
 		return newError("io.close() argument must be a file handle, not %s", args[0].Type())
 	}

@@ -8,6 +8,7 @@ type ObjectType string
 const (
 	INTEGER_OBJ      ObjectType = "INTEGER"
 	FLOAT_OBJ        ObjectType = "FLOAT"
+	BYTE_OBJ         ObjectType = "BYTE"
 	STRING_OBJ       ObjectType = "STRING"
 	BOOLEAN_OBJ      ObjectType = "BOOLEAN"
 	NULL_OBJ         ObjectType = "NULL"
@@ -24,7 +25,7 @@ const (
 	ERROR_OBJ        ObjectType = "ERROR"
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	MODULE_OBJ       ObjectType = "MODULE"
-	FILE_HANDLE_OBJ  ObjectType = "FILE_HANDLE"
+	FILE_OBJ         ObjectType = "FILE"
 	ENUM_TYPE_OBJ    ObjectType = "ENUM_TYPE"
 	ENUM_VALUE_OBJ   ObjectType = "ENUM_VALUE"
 	RESULT_OK_OBJ    ObjectType = "RESULT_OK"
@@ -57,6 +58,15 @@ func (f *Float) Inspect() string {
 	s := fmt.Sprintf("%g", f.Value)
 	return s
 }
+
+// Byte represents an 8-bit unsigned integer (0-255).
+type Byte struct {
+	Value uint8
+}
+
+func (b *Byte) Type() ObjectType { return BYTE_OBJ }
+func (b *Byte) Inspect() string  { return fmt.Sprintf("%d", b.Value) }
+func (b *Byte) HashKey() HashKey { return HashKey{Type: BYTE_OBJ, Value: uint64(b.Value)} }
 
 // String represents a string value.
 type String struct {
@@ -304,15 +314,15 @@ type Module struct {
 func (m *Module) Type() ObjectType { return MODULE_OBJ }
 func (m *Module) Inspect() string  { return fmt.Sprintf("<module %s>", m.Name) }
 
-// FileHandle represents an open file handle.
-type FileHandle struct {
+// File represents an open file with read/write/seek/close methods.
+type File struct {
 	Path   string
 	Mode   string
 	Handle interface{} // *os.File
 }
 
-func (fh *FileHandle) Type() ObjectType { return FILE_HANDLE_OBJ }
-func (fh *FileHandle) Inspect() string  { return fmt.Sprintf("<file %s>", fh.Path) }
+func (f *File) Type() ObjectType { return FILE_OBJ }
+func (f *File) Inspect() string  { return fmt.Sprintf("<file %s>", f.Path) }
 
 // EnumType represents an enum definition.
 type EnumType struct {

@@ -520,3 +520,15 @@ type ImportStatement struct {
 
 func (is *ImportStatement) statementNode()       {}
 func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }
+
+// WithStatement represents: with expr as name { body }
+// The resource is automatically closed after the body executes.
+type WithStatement struct {
+	Token    lexer.Token     // the 'with' token
+	Resource Expression      // the resource expression (e.g., io.open(...))
+	Name     *Identifier     // binding name (e.g., fd)
+	Body     *BlockStatement // the body to execute
+}
+
+func (ws *WithStatement) statementNode()       {}
+func (ws *WithStatement) TokenLiteral() string { return ws.Token.Literal }

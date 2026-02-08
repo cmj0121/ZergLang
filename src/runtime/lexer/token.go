@@ -94,6 +94,9 @@ const (
 	IMPORT TokenType = "IMPORT"
 	AS     TokenType = "AS"
 
+	// Resource management
+	WITH TokenType = "WITH"
+
 	// Enum and Result types
 	ENUM       TokenType = "ENUM"
 	UNDERSCORE TokenType = "_"
@@ -157,6 +160,7 @@ var keywords = map[string]TokenType{
 	"is":       IS,
 	"import":   IMPORT,
 	"as":       AS,
+	"with":     WITH,
 }
 
 // LookupIdent returns the token type for an identifier.

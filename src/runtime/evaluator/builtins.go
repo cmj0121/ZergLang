@@ -2,6 +2,8 @@ package evaluator
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ var Builtins = map[string]*Builtin{
 	"string": {Name: "string", Fn: builtinStr},
 	"int":    {Name: "int", Fn: builtinInt},
 	"float":  {Name: "float", Fn: builtinFloat},
+	"byte":   {Name: "byte", Fn: builtinByte},
 	"Ok":     {Name: "Ok", Fn: builtinOk},
 	"Err":    {Name: "Err", Fn: builtinErr},
 }
@@ -55,7 +58,7 @@ func builtinStr(args ...Object) Object {
 	return &String{Value: args[0].Inspect()}
 }
 
-// builtinInt converts a string, bool, or float to an integer.
+// builtinInt converts a string, bool, float, or byte to an integer.
 func builtinInt(args ...Object) Object {
 	if len(args) != 1 {
 		return newError("int() takes exactly 1 argument (%d given)", len(args))
@@ -64,6 +67,8 @@ func builtinInt(args ...Object) Object {
 	switch arg := args[0].(type) {
 	case *Integer:
 		return arg
+	case *Byte:
+		return &Integer{Value: int64(arg.Value)}
 	case *Float:
 		return &Integer{Value: int64(arg.Value)}
 	case *String:
@@ -78,7 +83,7 @@ func builtinInt(args ...Object) Object {
 		}
 		return &Integer{Value: 0}
 	default:
-		return newError("int() argument must be string, integer, float, or bool, not %s", args[0].Type())
+		return newError("int() argument must be string, integer, float, byte, or bool, not %s", args[0].Type())
 	}
 }
 
@@ -93,6 +98,8 @@ func builtinFloat(args ...Object) Object {
 		return arg
 	case *Integer:
 		return &Float{Value: float64(arg.Value)}
+	case *Byte:
+		return &Float{Value: float64(arg.Value)}
 	case *String:
 		val, err := strconv.ParseFloat(arg.Value, 64)
 		if err != nil {
@@ -100,7 +107,26 @@ func builtinFloat(args ...Object) Object {
 		}
 		return &Float{Value: val}
 	default:
-		return newError("float() argument must be string, integer, or float, not %s", args[0].Type())
+		return newError("float() argument must be string, integer, byte, or float, not %s", args[0].Type())
+	}
+}
+
+// builtinByte converts an integer to a byte (0-255).
+func builtinByte(args ...Object) Object {
+	if len(args) != 1 {
+		return newError("byte() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	switch arg := args[0].(type) {
+	case *Byte:
+		return arg
+	case *Integer:
+		if arg.Value < 0 || arg.Value > 255 {
+			return newError("byte() value out of range: %d (must be 0-255)", arg.Value)
+		}
+		return &Byte{Value: uint8(arg.Value)}
+	default:
+		return newError("byte() argument must be an integer, not %s", args[0].Type())
 	}
 }
 
@@ -452,6 +478,184 @@ func GetMapMethod(name string) BoundBuiltinFn {
 		return mapValues
 	case "contains":
 		return mapContains
+	default:
+		return nil
+	}
+}
+
+// File method implementations
+
+// fileRead reads bytes from a file.
+// read() reads all, read(n) reads n bytes.
+// Returns list[byte].
+func fileRead(receiver Object, args ...Object) Object {
+	f := receiver.(*File)
+	file, ok := f.Handle.(*os.File)
+	if !ok {
+		return newError("invalid file handle")
+	}
+
+	var data []byte
+	var err error
+
+	if len(args) == 0 || args[0] == NULL {
+		// Read all
+		data, err = io.ReadAll(file)
+	} else if len(args) == 1 {
+		// Read n bytes
+		n, ok := args[0].(*Integer)
+		if !ok {
+			return newError("read() size must be an integer, not %s", args[0].Type())
+		}
+		data = make([]byte, n.Value)
+		var bytesRead int
+		bytesRead, err = file.Read(data)
+		data = data[:bytesRead]
+	} else {
+		return newError("read() takes 0 or 1 argument (%d given)", len(args))
+	}
+
+	if err != nil && err != io.EOF {
+		return newError("read() failed: %s", err.Error())
+	}
+
+	// Convert to list[byte]
+	elements := make([]Object, len(data))
+	for i, b := range data {
+		elements[i] = &Byte{Value: b}
+	}
+	return &List{Elements: elements}
+}
+
+// fileWrite writes data to a file.
+// Accepts list[byte] or string.
+// Returns number of bytes written.
+func fileWrite(receiver Object, args ...Object) Object {
+	f := receiver.(*File)
+	file, ok := f.Handle.(*os.File)
+	if !ok {
+		return newError("invalid file handle")
+	}
+
+	if len(args) != 1 {
+		return newError("write() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	var data []byte
+
+	switch arg := args[0].(type) {
+	case *String:
+		data = []byte(arg.Value)
+	case *List:
+		data = make([]byte, len(arg.Elements))
+		for i, el := range arg.Elements {
+			b, ok := el.(*Byte)
+			if !ok {
+				return newError("write() list must contain bytes, not %s", el.Type())
+			}
+			data[i] = b.Value
+		}
+	default:
+		return newError("write() argument must be string or list[byte], not %s", args[0].Type())
+	}
+
+	n, err := file.Write(data)
+	if err != nil {
+		return newError("write() failed: %s", err.Error())
+	}
+
+	return &Integer{Value: int64(n)}
+}
+
+// fileSeek seeks to a position in the file.
+// seek(offset) or seek(offset, whence)
+// whence: 0=start, 1=current, 2=end
+// Returns new position.
+func fileSeek(receiver Object, args ...Object) Object {
+	f := receiver.(*File)
+	file, ok := f.Handle.(*os.File)
+	if !ok {
+		return newError("invalid file handle")
+	}
+
+	if len(args) < 1 || len(args) > 2 {
+		return newError("seek() takes 1 or 2 arguments (%d given)", len(args))
+	}
+
+	offset, ok := args[0].(*Integer)
+	if !ok {
+		return newError("seek() offset must be an integer, not %s", args[0].Type())
+	}
+
+	whence := 0 // default: from start
+	if len(args) == 2 {
+		w, ok := args[1].(*Integer)
+		if !ok {
+			return newError("seek() whence must be an integer, not %s", args[1].Type())
+		}
+		whence = int(w.Value)
+	}
+
+	pos, err := file.Seek(offset.Value, whence)
+	if err != nil {
+		return newError("seek() failed: %s", err.Error())
+	}
+
+	return &Integer{Value: pos}
+}
+
+// fileTell returns the current position in the file.
+func fileTell(receiver Object, args ...Object) Object {
+	f := receiver.(*File)
+	file, ok := f.Handle.(*os.File)
+	if !ok {
+		return newError("invalid file handle")
+	}
+
+	if len(args) != 0 {
+		return newError("tell() takes no arguments (%d given)", len(args))
+	}
+
+	pos, err := file.Seek(0, 1) // Seek 0 from current position
+	if err != nil {
+		return newError("tell() failed: %s", err.Error())
+	}
+
+	return &Integer{Value: pos}
+}
+
+// fileClose closes the file.
+func fileClose(receiver Object, args ...Object) Object {
+	f := receiver.(*File)
+	file, ok := f.Handle.(*os.File)
+	if !ok {
+		return newError("invalid file handle")
+	}
+
+	if len(args) != 0 {
+		return newError("close() takes no arguments (%d given)", len(args))
+	}
+
+	if err := file.Close(); err != nil {
+		return newError("close() failed: %s", err.Error())
+	}
+
+	return NULL
+}
+
+// GetFileMethod returns the builtin method for files by name, or nil if not found.
+func GetFileMethod(name string) BoundBuiltinFn {
+	switch name {
+	case "read":
+		return fileRead
+	case "write":
+		return fileWrite
+	case "seek":
+		return fileSeek
+	case "tell":
+		return fileTell
+	case "close":
+		return fileClose
 	default:
 		return nil
 	}
