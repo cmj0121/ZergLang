@@ -10,7 +10,7 @@ import (
 
 // BuiltinModules is the map of all builtin modules.
 var BuiltinModules = map[string]*Module{
-	"sys":  SysModule,
+	"_sys": SysModule,
 	"io":   IoModule,
 	"str":  StrModule,
 	"char": CharModule,
