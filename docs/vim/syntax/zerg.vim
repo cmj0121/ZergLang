@@ -27,7 +27,12 @@ syn keyword zergKeyword       Ok Err
 syn keyword zergNil           nil
 
 " --- Built-in types ---
-syn keyword zergType          int float bool string list map set chan object iter range Self
+syn keyword zergType          int float bool string byte file list map set chan object iter range Self
+
+" --- Nullable type marker ---
+" Match ? after type names (e.g., str?, int?, list[byte]?)
+syn match   zergNullable      /\]\@<=?/
+syn match   zergNullable      /\<\(int\|float\|bool\|string\|str\|byte\|file\)\>\@<=?/
 
 " --- Built-in functions ---
 syn keyword zergBuiltin       print len input str int float
@@ -110,6 +115,7 @@ hi def link zergOperatorSym   Operator
 hi def link zergBoolean       Boolean
 hi def link zergNil           Constant
 hi def link zergType          Type
+hi def link zergNullable      Special
 hi def link zergWildcard      Special
 hi def link zergNumber        Number
 hi def link zergFloat         Float

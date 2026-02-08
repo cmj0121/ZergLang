@@ -1,26 +1,73 @@
 # sys - Standard library system utilities
 # Wraps the _sys runtime module
 #
+# This module provides system-level operations including OS detection,
+# environment variables, command-line arguments, and program control.
+#
 # Functions:
-#   os()              - Returns OS name ("darwin", "linux", "windows")
-#   arch()            - Returns architecture ("arm64", "amd64")
-#   args()            - Returns command-line arguments list
-#   env(name, default?) - Returns env variable with optional default
-#   exit(code)        - Exit program with code
+#   os()                  -> str        Get operating system name
+#   arch()                -> str        Get CPU architecture
+#   args()                -> list[str]  Get command-line arguments
+#   env(name, default?)   -> str?       Get environment variable
+#   exit(code)                          Exit the program
 
+# os() -> str
+# Returns the operating system name.
+#
+# Returns:
+#   str - One of "darwin", "linux", "windows"
+#
+# Example:
+#   if sys.os() == "darwin" {
+#       print("Running on macOS")
+#   }
 fn os() -> str {
     return _sys.os()
 }
 
+# arch() -> str
+# Returns the CPU architecture.
+#
+# Returns:
+#   str - One of "amd64", "arm64", "386"
+#
+# Example:
+#   if sys.arch() == "arm64" {
+#       print("Running on ARM")
+#   }
 fn arch() -> str {
     return _sys.arch()
 }
 
-fn args() -> list {
+# args() -> list[str]
+# Returns the command-line arguments.
+#
+# Returns:
+#   list[str] - List of arguments, first element is program name
+#
+# Example:
+#   args := sys.args()
+#   if len(args) > 1 {
+#       print("First arg:", args[1])
+#   }
+fn args() -> list[str] {
     return _sys.args()
 }
 
-fn env(name, default = nil) {
+# env(name, default?) -> str?
+# Returns the value of an environment variable.
+#
+# Args:
+#   name: str - Name of the environment variable
+#   default - Value to return if variable is not set (default: nil)
+#
+# Returns:
+#   The variable value, default value, or nil if not set
+#
+# Example:
+#   home := sys.env("HOME")
+#   port := sys.env("PORT", "8080")
+fn env(name: str, default: str? = nil) -> str? {
     val := _sys.env(name)
     if val == "" {
         if default == nil {
@@ -31,6 +78,16 @@ fn env(name, default = nil) {
     return val
 }
 
-fn exit(code) {
+# exit(code)
+# Exits the program with the given exit code.
+#
+# Args:
+#   code: int - Exit code (0 for success, non-zero for error)
+#
+# Example:
+#   if error {
+#       sys.exit(1)
+#   }
+fn exit(code: int) {
     _sys.exit(code)
 }

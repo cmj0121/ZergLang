@@ -2,10 +2,9 @@
 
 import "src/std/io"
 
-# Test file write and read with 'with' statement
 test_file := "/tmp/zerg_io_test.txt"
 
-# Test write
+# Test write with 'with' statement
 with io.open(test_file, "w") as fd {
     n := fd.write("Hello, Zerg!")
     assert n == 12, "write should return 12 bytes"
@@ -23,7 +22,6 @@ with io.open(test_file, "r") as fd {
 with io.open(test_file, "r") as fd {
     chunk := fd.read(5)
     assert len(chunk) == 5, "read(5) should return 5 bytes"
-    # First 5 bytes should be "Hello" = [72, 101, 108, 108, 111]
     assert int(chunk[0]) == 72, "first byte should be 'H' (72)"
     print("read chunk:", chunk)
 }
@@ -33,13 +31,12 @@ with io.open(test_file, "r") as fd {
     mut pos := fd.tell()
     assert pos == 0, "initial position should be 0"
 
-    fd.seek(7)  # seek to "Zerg!"
+    fd.seek(7)
     pos = fd.tell()
     assert pos == 7, "position after seek should be 7"
 
     data := fd.read(5)
     assert len(data) == 5, "should read 5 bytes"
-    # "Zerg!" = [90, 101, 114, 103, 33]
     assert int(data[0]) == 90, "should be 'Z' (90)"
     print("read from position 7:", data)
 }
@@ -49,15 +46,20 @@ assert io.exists(test_file) == true, "test file should exist"
 assert io.exists("/tmp/nonexistent_zerg_file_12345") == false, "nonexistent file should not exist"
 print("exists() works")
 
-# Test write_file_bytes and read_file_bytes
+# Test binary write and read
 binary_file := "/tmp/zerg_binary_test.bin"
-test_bytes := [byte(137), byte(80), byte(78), byte(71)]  # PNG magic: 0x89, 0x50, 0x4E, 0x47
-io.write_file_bytes(binary_file, test_bytes)
+test_bytes := [byte(137), byte(80), byte(78), byte(71)]
 
-read_bytes := io.read_file_bytes(binary_file)
-assert len(read_bytes) == 4, "should read 4 bytes"
-assert int(read_bytes[0]) == 137, "first byte should be 137 (0x89)"
-assert int(read_bytes[1]) == 80, "second byte should be 80 (0x50)"
-print("binary file read/write works")
+with io.open(binary_file, "w") as fd {
+    fd.write(test_bytes)
+}
+
+with io.open(binary_file, "r") as fd {
+    read_bytes := fd.read()
+    assert len(read_bytes) == 4, "should read 4 bytes"
+    assert int(read_bytes[0]) == 137, "first byte should be 137"
+    assert int(read_bytes[1]) == 80, "second byte should be 80"
+    print("binary read/write works")
+}
 
 print("All io module tests passed!")

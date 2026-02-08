@@ -1,92 +1,101 @@
 # io - Standard library I/O utilities
+# Wraps the _io runtime module
 #
 # This module provides file I/O operations with automatic resource management.
+# Use the 'with' statement for safe file handling that auto-closes resources.
 #
-# Specs:
-#   Reader  - fn read(size: int? = nil) -> list[byte]
-#   Writer  - fn write(data) -> int
-#   Seeker  - fn seek(offset: int, whence: int = 0) -> int
-#           - fn tell() -> int
-#   Closer  - fn close()
-#
-# Functions:
-#   open(path, mode?)       -> File
-#   exists(path)            -> bool
-#   read_file(path)         -> str
-#   read_file_bytes(path)   -> list[byte]
-#   write_file(path, data)
-#   write_file_bytes(path, data)
-#
-# Best Practice - Use 'with' for automatic resource management:
-#
+# Example:
 #   with io.open("file.txt") as fd {
 #       data := fd.read()
-#       # fd.close() called automatically
-#   }
+#   }  # fd.close() called automatically
 #
-# Seek whence values:
-#   0 = SEEK_SET (from start)
-#   1 = SEEK_CUR (from current position)
-#   2 = SEEK_END (from end)
+# Functions:
+#   open(path, mode?)     -> file   Open file with mode "r", "w", "a", or "rw"
+#   exists(path) -> bool  Check if file exists
+#
+# file implements Reader, Writer, Seeker, and Closer:
+#   read(size?)           -> list[byte]  Read bytes (all if size is nil)
+#   write(data)           -> int         Write str or list[byte]
+#   seek(offset, whence?) -> int         Seek position (whence default: 0)
+#   tell()                -> int         Get current position
+#   close()               -> nil         Close the file
 
+# Reader - Objects that support reading bytes from a source.
 spec Reader {
+    # read(size?) -> list[byte]
+    # Reads bytes from the source.
+    # If size is nil, reads all remaining bytes.
+    # If size is an integer, reads up to that many bytes.
+    # Returns a list of bytes (may be shorter than size at EOF).
     fn read(size)
 }
 
+# Writer - Objects that support writing data to a destination.
 spec Writer {
+    # write(data) -> int
+    # Writes data to the destination.
+    # Accepts str or list[byte].
+    # Returns the number of bytes written.
     fn write(data)
 }
 
+# Seeker - Objects that support random access positioning.
 spec Seeker {
+    # seek(offset, whence) -> int
+    # Moves the read/write position.
+    # offset: number of bytes to move
+    # whence: 0=from start, 1=from current, 2=from end
+    # Returns the new absolute position.
     fn seek(offset, whence)
+
+    # tell() -> int
+    # Returns the current position in bytes from start.
     fn tell()
 }
 
+# Closer - Objects that hold resources requiring cleanup.
 spec Closer {
+    # close() -> nil
+    # Releases the underlying resource.
+    # After close(), the object should not be used.
     fn close()
 }
 
-# Open a file and return a File object.
-# mode: "r" (read), "w" (write), "a" (append), "rw" (read/write)
-fn open(path, mode = "r") {
+# open(path, mode?) -> file
+# Opens a file and returns a file object.
+#
+# Args:
+#   path: str - Path to the file
+#   mode: str - Open mode (default: "r")
+#     "r"  - Read only
+#     "w"  - Write only (creates/truncates)
+#     "a"  - Append (creates if needed)
+#     "rw" - Read and write
+#
+# Returns:
+#   file - A file object implementing Reader, Writer, Seeker, Closer
+#
+# Example:
+#   with io.open("data.txt", "w") as fd {
+#       fd.write("hello")
+#   }
+fn open(path: str, mode: str = "r") -> file {
     return _io.open(path, mode)
 }
 
-# Check if a file exists.
-fn exists(path) -> bool {
+# exists(path) -> bool
+# Checks if a file or directory exists at the given path.
+#
+# Args:
+#   path: str - Path to check
+#
+# Returns:
+#   bool - true if path exists, false otherwise
+#
+# Example:
+#   if io.exists("config.txt") {
+#       print("config found")
+#   }
+fn exists(path: str) -> bool {
     return _io.exists(path)
-}
-
-# Read entire file as string.
-fn read_file(path) -> str {
-    with open(path) as fd {
-        data := fd.read()
-        # Convert list[byte] to string
-        result := ""
-        for b in data {
-            result = result + string(b)
-        }
-        return result
-    }
-}
-
-# Read entire file as list[byte].
-fn read_file_bytes(path) -> list {
-    with open(path) as fd {
-        return fd.read()
-    }
-}
-
-# Write string to file.
-fn write_file(path, content) {
-    with open(path, "w") as fd {
-        fd.write(content)
-    }
-}
-
-# Write list[byte] to file.
-fn write_file_bytes(path, data) {
-    with open(path, "w") as fd {
-        fd.write(data)
-    }
 }

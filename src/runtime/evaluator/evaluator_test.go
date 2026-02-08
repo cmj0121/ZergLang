@@ -1044,38 +1044,38 @@ func TestMapContains(t *testing.T) {
 // ============================================================================
 
 func TestSysModule(t *testing.T) {
-	// Test sys.os()
-	osResult := testEval(`sys.os()`)
+	// Test _sys.os() (internal module, user should use src/std/sys.zg)
+	osResult := testEval(`_sys.os()`)
 	osStr, ok := osResult.(*String)
 	if !ok {
-		t.Fatalf("expected String for sys.os(), got %T", osResult)
+		t.Fatalf("expected String for _sys.os(), got %T", osResult)
 	}
 	if osStr.Value != "darwin" && osStr.Value != "linux" && osStr.Value != "windows" {
 		t.Fatalf("unexpected os: %s", osStr.Value)
 	}
 
-	// Test sys.arch()
-	archResult := testEval(`sys.arch()`)
+	// Test _sys.arch()
+	archResult := testEval(`_sys.arch()`)
 	archStr, ok := archResult.(*String)
 	if !ok {
-		t.Fatalf("expected String for sys.arch(), got %T", archResult)
+		t.Fatalf("expected String for _sys.arch(), got %T", archResult)
 	}
 	if archStr.Value != "amd64" && archStr.Value != "arm64" && archStr.Value != "386" {
 		t.Fatalf("unexpected arch: %s", archStr.Value)
 	}
 
-	// Test sys.args()
-	argsResult := testEval(`sys.args()`)
+	// Test _sys.args()
+	argsResult := testEval(`_sys.args()`)
 	_, ok = argsResult.(*List)
 	if !ok {
-		t.Fatalf("expected List for sys.args(), got %T", argsResult)
+		t.Fatalf("expected List for _sys.args(), got %T", argsResult)
 	}
 
-	// Test sys.env()
-	envResult := testEval(`sys.env("PATH")`)
+	// Test _sys.env()
+	envResult := testEval(`_sys.env("PATH")`)
 	_, ok = envResult.(*String)
 	if !ok {
-		t.Fatalf("expected String for sys.env(), got %T", envResult)
+		t.Fatalf("expected String for _sys.env(), got %T", envResult)
 	}
 }
 
@@ -1412,7 +1412,7 @@ func TestListSortStrings(t *testing.T) {
 // ============================================================================
 
 func TestPlatformDetection(t *testing.T) {
-	input := `os := sys.os()
+	input := `os := _sys.os()
 if os == "darwin" {
 	result := "macOS"
 } else {
