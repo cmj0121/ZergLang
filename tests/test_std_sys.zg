@@ -1,0 +1,32 @@
+# Test sys stdlib module
+
+import "src/std/sys"
+
+# Test platform() returns a valid OS name
+platform := sys.platform()
+assert platform == "darwin" or platform == "linux" or platform == "windows", "platform() should return valid OS"
+print("platform:", platform)
+
+# Test arch() returns a valid architecture
+arch := sys.arch()
+assert arch == "arm64" or arch == "amd64" or arch == "386", "arch() should return valid architecture"
+print("arch:", arch)
+
+# Test args() returns a list (check length >= 0)
+args := sys.args()
+assert len(args) >= 0, "args() should return a list with length"
+print("args:", args)
+
+# Test env() with existing variable
+home := sys.env("HOME")
+print("HOME:", home)
+
+# Test env() with non-existing variable returns nil
+missing := sys.env("ZERG_TEST_NONEXISTENT_VAR_12345")
+assert missing == nil, "env() should return nil for missing var"
+
+# Test env() with default value
+default_val := sys.env("ZERG_TEST_NONEXISTENT_VAR_12345", "default_value")
+assert default_val == "default_value", "env() should return default for missing var"
+
+print("All sys module tests passed!")
