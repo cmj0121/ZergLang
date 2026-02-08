@@ -1,0 +1,48 @@
+# Test with statement for resource management
+
+import "src/std/io"
+
+test_file := "/tmp/zerg_with_test.txt"
+
+# Test basic with statement
+with io.open(test_file, "w") as fd {
+    fd.write("test content")
+    print("wrote to file inside with block")
+}
+# File should be auto-closed here
+
+# Verify the write worked by reading
+with io.open(test_file, "r") as fd {
+    data := fd.read()
+    assert len(data) == 12, "should have written 12 bytes"
+    print("verified write, read", len(data), "bytes")
+}
+
+# Test nested with statements
+with io.open(test_file, "r") as fd1 {
+    data1 := fd1.read()
+
+    # Create another file
+    with io.open("/tmp/zerg_with_test2.txt", "w") as fd2 {
+        fd2.write("nested with")
+        print("nested with works")
+    }
+    # fd2 closed here
+
+    assert len(data1) == 12, "outer with should still work"
+}
+# fd1 closed here
+
+# Test with statement return value
+fn read_file_size(path) {
+    with io.open(path) as fd {
+        data := fd.read()
+        return len(data)
+    }
+}
+
+size := read_file_size(test_file)
+assert size == 12, "with should allow return from inside"
+print("with return value:", size)
+
+print("All with statement tests passed!")

@@ -1,0 +1,92 @@
+# io - Standard library I/O utilities
+#
+# This module provides file I/O operations with automatic resource management.
+#
+# Specs:
+#   Reader  - fn read(size: int? = nil) -> list[byte]
+#   Writer  - fn write(data) -> int
+#   Seeker  - fn seek(offset: int, whence: int = 0) -> int
+#           - fn tell() -> int
+#   Closer  - fn close()
+#
+# Functions:
+#   open(path, mode?)       -> File
+#   exists(path)            -> bool
+#   read_file(path)         -> str
+#   read_file_bytes(path)   -> list[byte]
+#   write_file(path, data)
+#   write_file_bytes(path, data)
+#
+# Best Practice - Use 'with' for automatic resource management:
+#
+#   with io.open("file.txt") as fd {
+#       data := fd.read()
+#       # fd.close() called automatically
+#   }
+#
+# Seek whence values:
+#   0 = SEEK_SET (from start)
+#   1 = SEEK_CUR (from current position)
+#   2 = SEEK_END (from end)
+
+spec Reader {
+    fn read(size)
+}
+
+spec Writer {
+    fn write(data)
+}
+
+spec Seeker {
+    fn seek(offset, whence)
+    fn tell()
+}
+
+spec Closer {
+    fn close()
+}
+
+# Open a file and return a File object.
+# mode: "r" (read), "w" (write), "a" (append), "rw" (read/write)
+fn open(path, mode = "r") {
+    return _io.open(path, mode)
+}
+
+# Check if a file exists.
+fn exists(path) -> bool {
+    return _io.exists(path)
+}
+
+# Read entire file as string.
+fn read_file(path) -> str {
+    with open(path) as fd {
+        data := fd.read()
+        # Convert list[byte] to string
+        result := ""
+        for b in data {
+            result = result + string(b)
+        }
+        return result
+    }
+}
+
+# Read entire file as list[byte].
+fn read_file_bytes(path) -> list {
+    with open(path) as fd {
+        return fd.read()
+    }
+}
+
+# Write string to file.
+fn write_file(path, content) {
+    with open(path, "w") as fd {
+        fd.write(content)
+    }
+}
+
+# Write list[byte] to file.
+fn write_file_bytes(path, data) {
+    with open(path, "w") as fd {
+        fd.write(data)
+    }
+}

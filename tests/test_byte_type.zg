@@ -1,0 +1,30 @@
+# Test byte type
+
+# Test byte creation
+b := byte(65)
+assert int(b) == 65, "byte(65) should convert back to 65"
+print("byte(65) =", b)
+
+# Test byte range (0-255)
+b0 := byte(0)
+b255 := byte(255)
+assert int(b0) == 0, "byte(0) should be 0"
+assert int(b255) == 255, "byte(255) should be 255"
+print("byte range: 0 to 255 OK")
+
+# Test byte in list
+bytes := [byte(72), byte(101), byte(108), byte(108), byte(111)]
+assert len(bytes) == 5, "list[byte] should have 5 elements"
+assert int(bytes[0]) == 72, "first byte should be 72 (H)"
+print("list[byte]:", bytes)
+
+# Test byte from int conversion
+i := 100
+b100 := byte(i)
+assert int(b100) == 100, "byte from int should preserve value"
+
+# Test float conversion
+f := float(byte(50))
+assert f == 50.0, "float(byte) should work"
+
+print("All byte type tests passed!")
