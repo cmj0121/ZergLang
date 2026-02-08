@@ -1,0 +1,36 @@
+# sys - Standard library system utilities
+# Wraps the _sys runtime module
+#
+# Functions:
+#   os()              - Returns OS name ("darwin", "linux", "windows")
+#   arch()            - Returns architecture ("arm64", "amd64")
+#   args()            - Returns command-line arguments list
+#   env(name, default?) - Returns env variable with optional default
+#   exit(code)        - Exit program with code
+
+fn os() -> str {
+    return _sys.os()
+}
+
+fn arch() -> str {
+    return _sys.arch()
+}
+
+fn args() -> list {
+    return _sys.args()
+}
+
+fn env(name, default = nil) {
+    val := _sys.env(name)
+    if val == "" {
+        if default == nil {
+            return nil
+        }
+        return default
+    }
+    return val
+}
+
+fn exit(code) {
+    _sys.exit(code)
+}
