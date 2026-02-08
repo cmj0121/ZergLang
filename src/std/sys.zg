@@ -1,7 +1,14 @@
 # sys - Standard library system utilities
 # Wraps the _sys runtime module
+#
+# Functions:
+#   os()              - Returns OS name ("darwin", "linux", "windows")
+#   arch()            - Returns architecture ("arm64", "amd64")
+#   args()            - Returns command-line arguments list
+#   env(name, default?) - Returns env variable with optional default
+#   exit(code)        - Exit program with code
 
-fn platform() -> str {
+fn os() -> str {
     return _sys.os()
 }
 
