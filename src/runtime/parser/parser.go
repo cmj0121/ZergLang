@@ -1502,7 +1502,8 @@ func (p *Parser) parseChainedAssignment(left Expression) Expression {
 	p.nextToken() // consume IDENT, now at =
 	p.nextToken() // consume =, now at value expression
 
-	value := p.parseExpression(LOWEST)
+	// Use RANGE_PREC to stop at .. for chaining
+	value := p.parseExpression(RANGE_PREC)
 
 	expr := &ChainedAssignment{
 		Token: token,

@@ -69,7 +69,44 @@ func Eval(node parser.Node, env *Environment) Object {
 		if len(args) == 1 && IsError(args[0]) {
 			return args[0]
 		}
-		return applyFunction(function, args)
+		// Evaluate named arguments
+		namedArgs := make(map[string]Object)
+		for _, na := range node.NamedArgs {
+			val := Eval(na.Value, env)
+			if IsError(val) {
+				return val
+			}
+			namedArgs[na.Name] = val
+		}
+		return applyFunctionWithNamedArgs(function, args, namedArgs)
+	case *parser.ChainedAssignment:
+		// Evaluate the left side (the object)
+		obj := Eval(node.Left, env)
+		if IsError(obj) {
+			return obj
+		}
+		// Must be an instance
+		instance, ok := obj.(*Instance)
+		if !ok {
+			return &Error{Message: "builder syntax (..) can only be used on class instances"}
+		}
+		// Evaluate the value
+		val := Eval(node.Value, env)
+		if IsError(val) {
+			return val
+		}
+		// Check if field exists and is mutable
+		field, exists := instance.Class.Fields[node.Name]
+		if !exists {
+			return &Error{Message: fmt.Sprintf("unknown field: %s", node.Name)}
+		}
+		if !field.Mutable {
+			return &Error{Message: fmt.Sprintf("cannot assign to immutable field: %s", node.Name)}
+		}
+		// Assign the value
+		instance.Fields[node.Name] = val
+		// Return the instance for chaining
+		return instance
 	case *parser.IfStatement:
 		return evalIfStatement(node, env)
 	case *parser.ForInStatement:
@@ -198,15 +235,19 @@ func evalExpressions(exps []parser.Expression, env *Environment) []Object {
 }
 
 func applyFunction(fn Object, args []Object) Object {
+	return applyFunctionWithNamedArgs(fn, args, nil)
+}
+
+func applyFunctionWithNamedArgs(fn Object, args []Object, namedArgs map[string]Object) Object {
 	switch f := fn.(type) {
 	case *Function:
-		extendedEnv := extendFunctionEnv(f, args)
+		extendedEnv := extendFunctionEnvWithNamedArgs(f, args, namedArgs)
 		evaluated := Eval(f.Body, extendedEnv)
 		return unwrapReturnValue(evaluated)
 	case *Class:
-		return instantiateClass(f, args)
+		return instantiateClassWithNamedArgs(f, args, namedArgs)
 	case *BoundMethod:
-		return applyMethod(f, args)
+		return applyMethodWithNamedArgs(f, args, namedArgs)
 	case *Builtin:
 		return f.Fn(args...)
 	case *BoundBuiltin:
@@ -217,15 +258,28 @@ func applyFunction(fn Object, args []Object) Object {
 }
 
 func extendFunctionEnv(fn *Function, args []Object) *Environment {
+	return extendFunctionEnvWithNamedArgs(fn, args, nil)
+}
+
+func extendFunctionEnvWithNamedArgs(fn *Function, args []Object, namedArgs map[string]Object) *Environment {
 	env := NewEnclosedEnvironment(fn.Env)
 
 	for i, param := range fn.Parameters {
+		paramName := param.Name.Value
+		// Check if this parameter was provided as named argument
+		if namedArgs != nil {
+			if val, ok := namedArgs[paramName]; ok {
+				env.Declare(paramName, val, false)
+				continue
+			}
+		}
+		// Otherwise use positional argument
 		if i < len(args) {
-			env.Declare(param.Name.Value, args[i], false)
+			env.Declare(paramName, args[i], false)
 		} else if param.Default != nil {
 			// Evaluate default value in function's closure environment
 			defaultVal := Eval(param.Default, fn.Env)
-			env.Declare(param.Name.Value, defaultVal, false)
+			env.Declare(paramName, defaultVal, false)
 		}
 	}
 
@@ -1099,6 +1153,66 @@ func applyStaticMethod(method *ClassMethod, args []Object) Object {
 
 	// Bind parameters
 	for i, param := range method.Parameters {
+		if i < len(args) {
+			env.Declare(param, args[i], false)
+		}
+	}
+
+	body := method.Body.(*parser.BlockStatement)
+	evaluated := Eval(body, env)
+	return unwrapReturnValue(evaluated)
+}
+
+// instantiateClassWithNamedArgs creates a new instance and calls init with named args
+func instantiateClassWithNamedArgs(class *Class, args []Object, namedArgs map[string]Object) Object {
+	instance := &Instance{
+		Class:  class,
+		Fields: make(map[string]Object),
+	}
+
+	// Initialize fields with defaults
+	for name, field := range class.Fields {
+		if field.Default != nil {
+			instance.Fields[name] = field.Default
+		} else {
+			instance.Fields[name] = NULL
+		}
+	}
+
+	// Call init method if it exists with named args support
+	if initMethod, ok := class.Methods["init"]; ok {
+		applyMethodOnInstanceWithNamedArgs(initMethod, instance, args, namedArgs)
+	}
+
+	return instance
+}
+
+// applyMethodWithNamedArgs applies a bound method with named argument support
+func applyMethodWithNamedArgs(bm *BoundMethod, args []Object, namedArgs map[string]Object) Object {
+	if bm.Instance == nil {
+		// Static method - named args not yet supported for static methods
+		return applyStaticMethod(bm.Method, args)
+	}
+	return applyMethodOnInstanceWithNamedArgs(bm.Method, bm.Instance, args, namedArgs)
+}
+
+// applyMethodOnInstanceWithNamedArgs applies a method with named args support
+func applyMethodOnInstanceWithNamedArgs(method *ClassMethod, instance *Instance, args []Object, namedArgs map[string]Object) Object {
+	env := NewEnclosedEnvironment(method.Env)
+
+	// Bind 'this' to the instance
+	env.Declare("this", instance, false)
+
+	// Bind parameters - check named args first, then positional
+	for i, param := range method.Parameters {
+		// Check if this parameter was provided as named argument
+		if namedArgs != nil {
+			if val, ok := namedArgs[param]; ok {
+				env.Declare(param, val, false)
+				continue
+			}
+		}
+		// Otherwise use positional argument
 		if i < len(args) {
 			env.Declare(param, args[i], false)
 		}
