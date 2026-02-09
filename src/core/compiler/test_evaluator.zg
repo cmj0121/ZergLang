@@ -320,6 +320,35 @@ check("self-eval str module", evaluator.run("str.substring(\"hello\", 0, 3)"), "
 check("self-eval char module", evaluator.run("char.ord(\"A\")"), "65")
 
 # ============================================================
+# Test 32: Self-Evaluation Integration (run test files through pipeline)
+# ============================================================
+print("=== Self-Evaluation Integration ===")
+
+compiler_result := evaluator.run_file("src/core/compiler/test_compiler.zg")
+compiler_type := evaluator.obj_type(compiler_result)
+test_count += 1
+if compiler_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_compiler.zg through self-hosted pipeline")
+}
+if compiler_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_compiler.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(compiler_result))
+}
+
+parser_result := evaluator.run_file("src/core/compiler/test_parser.zg")
+parser_type := evaluator.obj_type(parser_result)
+test_count += 1
+if parser_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_parser.zg through self-hosted pipeline")
+}
+if parser_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_parser.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(parser_result))
+}
+
+# ============================================================
 # Summary
 # ============================================================
 print("")
