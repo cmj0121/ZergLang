@@ -2456,10 +2456,78 @@ fn eval_interpolated_string(node: object, env: object) -> object {
 }
 
 fn eval_asm(node: object, env: object) -> object {
-    # Delegate to bootstrap's asm mechanism
-    # The self-hosted evaluator runs on the bootstrap, so asm calls
-    # need to be forwarded to the bootstrap runtime
-    return new_error("asm not yet supported in self-hosted evaluator: " + node.instruction)
+    # Evaluate argument expressions
+    mut eval_args := []
+    if node.args != nil {
+        for arg_expr in node.args {
+            val := eval(arg_expr, env)
+            if is_error(val) { return val }
+            eval_args = eval_args.append(val)
+        }
+    }
+
+    instr := node.instruction
+
+    # Delegate to Go bootstrap asm
+    if instr == "read_file" {
+        if len(eval_args) < 1 {
+            return new_error("asm read_file requires 1 argument")
+        }
+        if not (eval_args[0] is ZString) {
+            return new_error("asm read_file argument must be string")
+        }
+        mut result := ""
+        unsafe { result = asm("read_file", eval_args[0].value) }
+        return new_string(result)
+    }
+    if instr == "write_file" {
+        if len(eval_args) < 2 {
+            return new_error("asm write_file requires 2 arguments")
+        }
+        if not (eval_args[0] is ZString) {
+            return new_error("asm write_file first argument must be string")
+        }
+        if not (eval_args[1] is ZString) {
+            return new_error("asm write_file second argument must be string")
+        }
+        unsafe { asm("write_file", eval_args[0].value, eval_args[1].value) }
+        return Z_NULL
+    }
+    if instr == "file_exists" {
+        if len(eval_args) < 1 {
+            return new_error("asm file_exists requires 1 argument")
+        }
+        if not (eval_args[0] is ZString) {
+            return new_error("asm file_exists argument must be string")
+        }
+        mut result := false
+        unsafe { result = asm("file_exists", eval_args[0].value) }
+        return new_boolean(result)
+    }
+    if instr == "char_chr" {
+        if len(eval_args) < 1 {
+            return new_error("asm char_chr requires 1 argument")
+        }
+        if not (eval_args[0] is ZInteger) {
+            return new_error("asm char_chr argument must be integer")
+        }
+        mut result := ""
+        unsafe { result = asm("char_chr", eval_args[0].value) }
+        return new_string(result)
+    }
+    if instr == "char_ord" {
+        if len(eval_args) < 1 {
+            return new_error("asm char_ord requires 1 argument")
+        }
+        if not (eval_args[0] is ZString) {
+            return new_error("asm char_ord argument must be string")
+        }
+        mut result := 0
+        unsafe { result = asm("char_ord", eval_args[0].value) }
+        return new_integer(result)
+    }
+
+    return new_error("unknown asm instruction: " + instr)
 }
 
 fn eval_unsafe(node: object, env: object) -> object {
