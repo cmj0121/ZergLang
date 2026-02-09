@@ -488,40 +488,40 @@ fn eval(node: object, env: object) -> object {
         return eval_block(node, env)
     }
     if node is DeclareStmt {
-        return new_error("not yet implemented: " + "DeclareStmt")
+        return eval_declare(node, env)
     }
     if node is AssignStmt {
-        return new_error("not yet implemented: " + "AssignStmt")
+        return eval_assign(node, env)
     }
     if node is CompoundAssignStmt {
-        return new_error("not yet implemented: " + "CompoundAssignStmt")
+        return eval_compound_assign(node, env)
     }
     if node is ReturnStmt {
-        return new_error("not yet implemented: " + "ReturnStmt")
+        return eval_return(node, env)
     }
     if node is BreakStmt {
-        return new_error("not yet implemented: " + "BreakStmt")
+        return eval_break(node, env)
     }
     if node is ContinueStmt {
-        return new_error("not yet implemented: " + "ContinueStmt")
+        return eval_continue(node, env)
     }
     if node is NopStmt {
         return Z_NULL
     }
     if node is IfStmt {
-        return new_error("not yet implemented: " + "IfStmt")
+        return eval_if(node, env)
     }
     if node is ForInStmt {
-        return new_error("not yet implemented: " + "ForInStmt")
+        return eval_for_in(node, env)
     }
     if node is ForCondStmt {
-        return new_error("not yet implemented: " + "ForCondStmt")
+        return eval_for_cond(node, env)
     }
     if node is MatchStmt {
-        return new_error("not yet implemented: " + "MatchStmt")
+        return eval_match(node, env)
     }
     if node is AssertStmt {
-        return new_error("not yet implemented: " + "AssertStmt")
+        return eval_assert(node, env)
     }
     if node is ImportStmt {
         return new_error("not yet implemented: " + "ImportStmt")
@@ -563,32 +563,32 @@ fn eval(node: object, env: object) -> object {
         return eval_identifier(node, env)
     }
     if node is MemberExpr {
-        return new_error("not yet implemented: " + "MemberExpr")
+        return eval_member(node, env)
     }
     if node is IndexExpr {
-        return new_error("not yet implemented: " + "IndexExpr")
+        return eval_index(node, env)
     }
     if node is CallExpr {
-        return new_error("not yet implemented: " + "CallExpr")
+        return eval_call(node, env)
     }
 
     # Expressions - Collections
     if node is ListLit {
-        return new_error("not yet implemented: " + "ListLit")
+        return eval_list(node, env)
     }
     if node is MapLit {
-        return new_error("not yet implemented: " + "MapLit")
+        return eval_map_lit(node, env)
     }
     if node is RangeExpr {
-        return new_error("not yet implemented: " + "RangeExpr")
+        return eval_range(node, env)
     }
     if node is ChainedAssignment {
-        return new_error("not yet implemented: " + "ChainedAssignment")
+        return eval_chained_assignment(node, env)
     }
 
     # Expressions - Functions
     if node is FunctionLit {
-        return new_error("not yet implemented: " + "FunctionLit")
+        return eval_function_lit(node, env)
     }
 
     # Expressions - Advanced
@@ -839,6 +839,398 @@ fn eval_string_infix(op: string, left: string, right: string) -> object {
     return new_error("unknown operator: STRING " + op + " STRING")
 }
 
+# ============================================================
+# Statement Evaluation
+# ============================================================
+
+fn eval_declare(node: object, env: object) -> object {
+    val := eval(node.value, env)
+    if is_error(val) { return val }
+    env_declare(env, node.name.value, val, node.is_mut)
+    return val
+}
+
+fn eval_assign(node: object, env: object) -> object {
+    val := eval(node.value, env)
+    if is_error(val) { return val }
+
+    target := node.target
+    # Simple identifier assignment
+    if target is Identifier {
+        result := env_assign(env, target.value, val)
+        if is_error(result) { return result }
+        return val
+    }
+    # Member assignment: obj.field = value
+    if target is MemberExpr {
+        return eval_member_assign(target, val, env)
+    }
+    # Index assignment: obj[key] = value
+    if target is IndexExpr {
+        return eval_index_assign(target, val, env)
+    }
+    return new_error("invalid assignment target")
+}
+
+fn eval_member_assign(target: object, val: object, env: object) -> object {
+    obj := eval(target.object, env)
+    if is_error(obj) { return obj }
+    member := target.member.value
+
+    if obj is ZInstance {
+        field_def := obj.class_def.fields[member]
+        if field_def != nil {
+            if not field_def.is_mut {
+                return new_error("cannot assign to immutable field '" + member + "'")
+            }
+            obj.fields[member] = val
+            return val
+        }
+        return new_error("no field '" + member + "' on class " + obj.class_def.name)
+    }
+    if obj is ZMap {
+        # Allow map member assignment via dot notation
+        mut found := false
+        for i in 0..len(obj.pairs) {
+            pair := obj.pairs[i]
+            if pair[0] is ZString {
+                if pair[0].value == member {
+                    obj.pairs[i] = [pair[0], val]
+                    found = true
+                    break
+                }
+            }
+        }
+        if not found {
+            obj.pairs = obj.pairs.append([new_string(member), val])
+        }
+        return val
+    }
+    return new_error("cannot assign member on type " + obj_type(obj))
+}
+
+fn eval_index_assign(target: object, val: object, env: object) -> object {
+    left := eval(target.left, env)
+    if is_error(left) { return left }
+    index := eval(target.index, env)
+    if is_error(index) { return index }
+
+    if left is ZList {
+        if index is ZInteger {
+            if index.value < 0 or index.value >= len(left.elements) {
+                return new_error("list index out of bounds: " + string(index.value))
+            }
+            left.elements[index.value] = val
+            return val
+        }
+        return new_error("list index must be integer, got " + obj_type(index))
+    }
+    if left is ZMap {
+        mut found := false
+        for i in 0..len(left.pairs) {
+            pair := left.pairs[i]
+            if objects_equal(pair[0], index) {
+                left.pairs[i] = [pair[0], val]
+                found = true
+                break
+            }
+        }
+        if not found {
+            left.pairs = left.pairs.append([index, val])
+        }
+        return val
+    }
+    return new_error("cannot assign index on type " + obj_type(left))
+}
+
+fn eval_compound_assign(node: object, env: object) -> object {
+    target := node.target
+    # Strip trailing = from operator (self-hosted parser stores +=, Go bootstrap stores +)
+    mut op := node.operator
+    if op == "+=" { op = "+" }
+    if op == "-=" { op = "-" }
+    if op == "*=" { op = "*" }
+    if op == "/=" { op = "/" }
+    if op == "%=" { op = "%" }
+
+    # Simple identifier compound assignment
+    if target is Identifier {
+        current := env_get_value(env, target.value)
+        if current == nil {
+            return new_error("identifier not found: " + target.value)
+        }
+        right := eval(node.value, env)
+        if is_error(right) { return right }
+        result := eval_infix_values(op, current, right)
+        if is_error(result) { return result }
+        assign_result := env_assign(env, target.value, result)
+        if is_error(assign_result) { return assign_result }
+        return result
+    }
+    # Member compound assignment: obj.field += value
+    if target is MemberExpr {
+        obj := eval(target.object, env)
+        if is_error(obj) { return obj }
+        member := target.member.value
+        current := eval_member_value(obj, member)
+        if is_error(current) { return current }
+        right := eval(node.value, env)
+        if is_error(right) { return right }
+        result := eval_infix_values(op, current, right)
+        if is_error(result) { return result }
+        return eval_member_assign(target, result, env)
+    }
+    return new_error("invalid compound assignment target")
+}
+
+fn eval_member_value(obj: object, member: string) -> object {
+    if obj is ZInstance {
+        val := obj.fields[member]
+        if val != nil {
+            return val
+        }
+        return new_error("no field '" + member + "' on instance")
+    }
+    return new_error("cannot access member on " + obj_type(obj))
+}
+
+fn eval_return(node: object, env: object) -> object {
+    if node.condition != nil {
+        cond := eval(node.condition, env)
+        if is_error(cond) { return cond }
+        if not is_truthy(cond) {
+            return Z_NULL
+        }
+    }
+    val := eval(node.value, env)
+    if is_error(val) { return val }
+    return ZReturnVal()..value=val
+}
+
+fn eval_break(node: object, env: object) -> object {
+    if node.condition != nil {
+        cond := eval(node.condition, env)
+        if is_error(cond) { return cond }
+        if not is_truthy(cond) {
+            return Z_NULL
+        }
+    }
+    return Z_BREAK
+}
+
+fn eval_continue(node: object, env: object) -> object {
+    if node.condition != nil {
+        cond := eval(node.condition, env)
+        if is_error(cond) { return cond }
+        if not is_truthy(cond) {
+            return Z_NULL
+        }
+    }
+    return Z_CONTINUE
+}
+
+# ============================================================
+# Control Flow
+# ============================================================
+
+fn eval_if(node: object, env: object) -> object {
+    condition := eval(node.condition, env)
+    if is_error(condition) { return condition }
+
+    if is_truthy(condition) {
+        return eval(node.consequence, env)
+    }
+    if node.alternative != nil {
+        return eval(node.alternative, env)
+    }
+    return Z_NULL
+}
+
+fn eval_for_in(node: object, env: object) -> object {
+    iterable := eval(node.iterable, env)
+    if is_error(iterable) { return iterable }
+
+    if iterable is ZList {
+        return eval_for_in_list(node, iterable, env)
+    }
+    if iterable is ZString {
+        return eval_for_in_string(node, iterable, env)
+    }
+    if iterable is ZRange {
+        return eval_for_in_range(node, iterable, env)
+    }
+    return new_error("cannot iterate over " + obj_type(iterable))
+}
+
+fn eval_for_in_list(node: object, list_obj: object, env: object) -> object {
+    mut result := Z_NULL
+    loop_env := new_enclosed_environment(env)
+    for el in list_obj.elements {
+        env_declare(loop_env, node.variable.value, el, false)
+        result = eval(node.body, loop_env)
+        if result is ZBreak { return Z_NULL }
+        if result is ZContinue { continue }
+        if result is ZReturnVal { return result }
+        if is_error(result) { return result }
+    }
+    return result
+}
+
+fn eval_for_in_string(node: object, str_obj: object, env: object) -> object {
+    mut result := Z_NULL
+    loop_env := new_enclosed_environment(env)
+    for ch in str_obj.value {
+        env_declare(loop_env, node.variable.value, new_string(ch), false)
+        result = eval(node.body, loop_env)
+        if result is ZBreak { return Z_NULL }
+        if result is ZContinue { continue }
+        if result is ZReturnVal { return result }
+        if is_error(result) { return result }
+    }
+    return result
+}
+
+fn eval_for_in_range(node: object, range_obj: object, env: object) -> object {
+    mut result := Z_NULL
+    loop_env := new_enclosed_environment(env)
+    mut end := range_obj.end
+    if range_obj.inclusive {
+        end += 1
+    }
+    mut i := range_obj.start
+    for i < end {
+        env_declare(loop_env, node.variable.value, new_integer(i), false)
+        result = eval(node.body, loop_env)
+        if result is ZBreak { return Z_NULL }
+        if result is ZContinue {
+            i += 1
+            continue
+        }
+        if result is ZReturnVal { return result }
+        if is_error(result) { return result }
+        i += 1
+    }
+    return result
+}
+
+fn eval_for_cond(node: object, env: object) -> object {
+    mut result := Z_NULL
+    for {
+        if node.condition != nil {
+            condition := eval(node.condition, env)
+            if is_error(condition) { return condition }
+            if not is_truthy(condition) {
+                break
+            }
+        }
+        loop_env := new_enclosed_environment(env)
+        result = eval(node.body, loop_env)
+        if result is ZBreak { return Z_NULL }
+        if result is ZContinue { continue }
+        if result is ZReturnVal { return result }
+        if is_error(result) { return result }
+    }
+    return result
+}
+
+fn eval_match(node: object, env: object) -> object {
+    value := eval(node.subject, env)
+    if is_error(value) { return value }
+    for arm in node.arms {
+        mut matched := false
+        for pattern in arm.patterns {
+            if match_pattern(pattern, value, env) {
+                matched = true
+                break
+            }
+        }
+        if matched {
+            if arm.guard != nil {
+                guard_result := eval(arm.guard, env)
+                if is_error(guard_result) { return guard_result }
+                if not is_truthy(guard_result) {
+                    continue
+                }
+            }
+            result := eval(arm.body, env)
+            # Unwrap return value at match level
+            if result is ZReturnVal {
+                return result
+            }
+            return result
+        }
+    }
+    return Z_NULL
+}
+
+fn match_pattern(pattern: object, value: object, env: object) -> bool {
+    # Wildcard: _ matches everything
+    if pattern is Identifier {
+        if pattern.value == "_" {
+            return true
+        }
+    }
+
+    # Integer literal
+    if pattern is IntegerLit {
+        if value is ZInteger {
+            return value.value == pattern.value
+        }
+        return false
+    }
+
+    # Float literal
+    if pattern is FloatLit {
+        if value is ZFloat {
+            return value.value == pattern.value
+        }
+        return false
+    }
+
+    # String literal
+    if pattern is StringLit {
+        if value is ZString {
+            return value.value == pattern.value
+        }
+        return false
+    }
+
+    # Bool literal
+    if pattern is BoolLit {
+        if value is ZBoolean {
+            return value.value == pattern.value
+        }
+        return false
+    }
+
+    # Nil literal
+    if pattern is NilLit {
+        return value is ZNull
+    }
+
+    # Member expression (enum variant: EnumType.VARIANT)
+    if pattern is MemberExpr {
+        pattern_val := eval(pattern, env)
+        if is_error(pattern_val) { return false }
+        if pattern_val is ZEnumValue and value is ZEnumValue {
+            return pattern_val.enum_name == value.enum_name and pattern_val.variant == value.variant
+        }
+        return objects_equal(pattern_val, value)
+    }
+
+    # Identifier (could be enum or variable reference)
+    if pattern is Identifier {
+        pattern_val := eval(pattern, env)
+        if is_error(pattern_val) { return false }
+        return objects_equal(pattern_val, value)
+    }
+
+    # Default: evaluate and compare
+    pattern_val := eval(pattern, env)
+    if is_error(pattern_val) { return false }
+    return objects_equal(pattern_val, value)
+}
+
 fn objects_equal(a: object, b: object) -> bool {
     if a is ZInteger and b is ZInteger { return a.value == b.value }
     if a is ZFloat and b is ZFloat { return a.value == b.value }
@@ -849,4 +1241,344 @@ fn objects_equal(a: object, b: object) -> bool {
         return a.enum_name == b.enum_name and a.variant == b.variant
     }
     return a == b
+}
+
+fn eval_assert(node: object, env: object) -> object {
+    condition := eval(node.condition, env)
+    if is_error(condition) { return condition }
+
+    if not is_truthy(condition) {
+        mut msg := "assertion failed"
+        if node.message != nil {
+            msg_obj := eval(node.message, env)
+            if msg_obj is ZString {
+                msg = msg_obj.value
+            }
+        }
+        return new_error(msg)
+    }
+    return Z_NULL
+}
+
+# ============================================================
+# Function Evaluation
+# ============================================================
+
+fn eval_function_lit(node: object, env: object) -> object {
+    return ZFunction()
+        ..params=node.parameters
+        ..body=node.body
+        ..env=env
+        ..name=node.name
+}
+
+fn eval_call(node: object, env: object) -> object {
+    func := eval(node.function, env)
+    if is_error(func) { return func }
+
+    # Evaluate positional arguments
+    mut args := []
+    mut named_args := {}
+    for arg in node.arguments {
+        if arg is NamedArgument {
+            val := eval(arg.value, env)
+            if is_error(val) { return val }
+            named_args[arg.name] = val
+        }
+        if not (arg is NamedArgument) {
+            val := eval(arg, env)
+            if is_error(val) { return val }
+            args = args.append(val)
+        }
+    }
+
+    return apply_function(func, args, named_args)
+}
+
+fn apply_function(func: object, args: list, named_args: map) -> object {
+    # Builtin function
+    if func is ZBuiltin {
+        return apply_builtin(func.name, args)
+    }
+
+    # User function
+    if func is ZFunction {
+        fn_env := new_enclosed_environment(func.env)
+        for i in 0..len(func.params) {
+            param := func.params[i]
+            param_name := param.name
+            # Check named args first
+            named_val := named_args[param_name]
+            if named_val != nil {
+                env_declare(fn_env, param_name, named_val, false)
+            }
+            if named_val == nil {
+                if i < len(args) {
+                    env_declare(fn_env, param_name, args[i], false)
+                }
+            }
+        }
+        result := eval(func.body, fn_env)
+        if result is ZReturnVal {
+            return result.value
+        }
+        return result
+    }
+
+    # Class instantiation
+    if func is ZClass {
+        return instantiate_class(func, args, named_args)
+    }
+
+    # Bound method call
+    if func is ZBoundMethod {
+        return apply_method(func, args, named_args)
+    }
+
+    return new_error("not a function: " + obj_type(func))
+}
+
+fn instantiate_class(class_def: object, args: list, named_args: map) -> object {
+    instance := ZInstance()..class_def=class_def..fields={}
+
+    # Initialize fields with defaults
+    for name in class_def.field_names {
+        field := class_def.fields[name]
+        if field.default_val != nil {
+            instance.fields[name] = field.default_val
+        }
+        if field.default_val == nil {
+            instance.fields[name] = Z_NULL
+        }
+    }
+
+    # Call init if it exists
+    if class_def.methods["init"] != nil {
+        init_method := class_def.methods["init"]
+        apply_method_on_instance(init_method, instance, args, named_args)
+    }
+
+    return instance
+}
+
+fn apply_method(bm: object, args: list, named_args: map) -> object {
+    if bm.instance == nil {
+        return apply_static_method(bm.method, args, named_args)
+    }
+    return apply_method_on_instance(bm.method, bm.instance, args, named_args)
+}
+
+fn apply_method_on_instance(method: object, instance: object, args: list, named_args: map) -> object {
+    method_env := new_enclosed_environment(method.env)
+    env_declare(method_env, "this", instance, false)
+
+    for i in 0..len(method.params) {
+        param_name := method.params[i]
+        named_val := named_args[param_name]
+        if named_val != nil {
+            env_declare(method_env, param_name, named_val, false)
+        }
+        if named_val == nil {
+            if i < len(args) {
+                env_declare(method_env, param_name, args[i], false)
+            }
+        }
+    }
+
+    result := eval(method.body, method_env)
+    if result is ZReturnVal {
+        return result.value
+    }
+    return result
+}
+
+fn apply_static_method(method: object, args: list, named_args: map) -> object {
+    method_env := new_enclosed_environment(method.env)
+    for i in 0..len(method.params) {
+        param_name := method.params[i]
+        named_val := named_args[param_name]
+        if named_val != nil {
+            env_declare(method_env, param_name, named_val, false)
+        }
+        if named_val == nil {
+            if i < len(args) {
+                env_declare(method_env, param_name, args[i], false)
+            }
+        }
+    }
+    result := eval(method.body, method_env)
+    if result is ZReturnVal {
+        return result.value
+    }
+    return result
+}
+
+# ============================================================
+# Collection Evaluation
+# ============================================================
+
+fn eval_list(node: object, env: object) -> object {
+    mut elements := []
+    for elem in node.elements {
+        val := eval(elem, env)
+        if is_error(val) { return val }
+        elements = elements.append(val)
+    }
+    return new_list(elements)
+}
+
+fn eval_map_lit(node: object, env: object) -> object {
+    mut pairs := []
+    for pair in node.pairs {
+        key := eval(pair.key, env)
+        if is_error(key) { return key }
+        value := eval(pair.value, env)
+        if is_error(value) { return value }
+        pairs = pairs.append([key, value])
+    }
+    return ZMap()..pairs=pairs
+}
+
+fn eval_index(node: object, env: object) -> object {
+    left := eval(node.left, env)
+    if is_error(left) { return left }
+    index := eval(node.index, env)
+    if is_error(index) { return index }
+
+    if left is ZList and index is ZInteger {
+        if index.value < 0 or index.value >= len(left.elements) {
+            return Z_NULL
+        }
+        return left.elements[index.value]
+    }
+    if left is ZMap {
+        for pair in left.pairs {
+            if objects_equal(pair[0], index) {
+                return pair[1]
+            }
+        }
+        return Z_NULL
+    }
+    if left is ZString and index is ZInteger {
+        if index.value < 0 or index.value >= len(left.value) {
+            return Z_NULL
+        }
+        return new_string(left.value[index.value])
+    }
+    return new_error("index operator not supported: " + obj_type(left))
+}
+
+fn eval_member(node: object, env: object) -> object {
+    obj := eval(node.object, env)
+    if is_error(obj) { return obj }
+    member := node.member.value
+    return eval_member_access(obj, member)
+}
+
+fn eval_member_access(obj: object, member: string) -> object {
+    # Enum variant access
+    if obj is ZEnum {
+        for v in obj.variants {
+            if v == member {
+                return ZEnumValue()..enum_name=obj.name..variant=member
+            }
+        }
+        return new_error("enum '" + obj.name + "' has no variant '" + member + "'")
+    }
+
+    # Module member access
+    if obj is ZModule {
+        val := env_get_value(obj.env, member)
+        if val != nil {
+            return val
+        }
+        return new_error("module '" + obj.name + "' has no member '" + member + "'")
+    }
+
+    # Instance field/method access
+    if obj is ZInstance {
+        field_val := obj.fields[member]
+        if field_val != nil {
+            return field_val
+        }
+        method_val := obj.class_def.methods[member]
+        if method_val != nil {
+            return ZBoundMethod()..instance=obj..method=method_val
+        }
+        return new_error("no member '" + member + "' on instance of " + obj.class_def.name)
+    }
+
+    # Class static method access
+    if obj is ZClass {
+        static_method := obj.static_methods[member]
+        if static_method != nil {
+            return ZBoundMethod()..instance=nil..method=static_method
+        }
+        return new_error("no static member '" + member + "' on class " + obj.name)
+    }
+
+    # Map member access (dot notation)
+    if obj is ZMap {
+        for pair in obj.pairs {
+            if pair[0] is ZString {
+                if pair[0].value == member {
+                    return pair[1]
+                }
+            }
+        }
+        return Z_NULL
+    }
+
+    # List built-in properties
+    if obj is ZList {
+        if member == "length" {
+            return new_integer(len(obj.elements))
+        }
+        # List methods
+        if member == "push" {
+            return ZBuiltin()..name="__list_push__"
+        }
+    }
+
+    # String built-in properties
+    if obj is ZString {
+        if member == "length" {
+            return new_integer(len(obj.value))
+        }
+    }
+
+    return new_error("no member '" + member + "' on type " + obj_type(obj))
+}
+
+fn eval_range(node: object, env: object) -> object {
+    start := eval(node.start, env)
+    if is_error(start) { return start }
+    end := eval(node.end, env)
+    if is_error(end) { return end }
+
+    if start is ZInteger and end is ZInteger {
+        return new_range(start.value, end.value, node.inclusive)
+    }
+    return new_error("range bounds must be integers")
+}
+
+fn eval_chained_assignment(node: object, env: object) -> object {
+    obj := eval(node.object, env)
+    if is_error(obj) { return obj }
+
+    if obj is ZInstance {
+        val := eval(node.value, env)
+        if is_error(val) { return val }
+        field_name := node.field
+        field_def := obj.class_def.fields[field_name]
+        if field_def != nil {
+            if not field_def.is_mut {
+                return new_error("cannot assign to immutable field: " + field_name)
+            }
+            obj.fields[field_name] = val
+            return obj
+        }
+        return new_error("unknown field: " + field_name)
+    }
+    return new_error("builder syntax (..) can only be used on class instances")
 }
