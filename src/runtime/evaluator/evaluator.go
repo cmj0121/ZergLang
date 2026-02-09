@@ -53,6 +53,16 @@ func Eval(node parser.Node, env *Environment) Object {
 	case *parser.BlockStatement:
 		return evalBlockStatement(node, env)
 	case *parser.ReturnStatement:
+		// Check postfix condition first
+		if node.Condition != nil {
+			cond := Eval(node.Condition, env)
+			if IsError(cond) {
+				return cond
+			}
+			if !isTruthy(cond) {
+				return NULL // condition not met, don't return
+			}
+		}
 		val := Eval(node.ReturnValue, env)
 		if IsError(val) {
 			return val
@@ -114,8 +124,28 @@ func Eval(node parser.Node, env *Environment) Object {
 	case *parser.ForConditionStatement:
 		return evalForConditionStatement(node, env)
 	case *parser.BreakStatement:
+		// Check postfix condition
+		if node.Condition != nil {
+			cond := Eval(node.Condition, env)
+			if IsError(cond) {
+				return cond
+			}
+			if !isTruthy(cond) {
+				return NULL // condition not met, don't break
+			}
+		}
 		return BREAK
 	case *parser.ContinueStatement:
+		// Check postfix condition
+		if node.Condition != nil {
+			cond := Eval(node.Condition, env)
+			if IsError(cond) {
+				return cond
+			}
+			if !isTruthy(cond) {
+				return NULL // condition not met, don't continue
+			}
+		}
 		return CONTINUE
 	case *parser.NopStatement:
 		return NULL
