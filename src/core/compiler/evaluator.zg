@@ -366,6 +366,33 @@ fn env_assign(env: object, name: string, val: object) -> object {
 # Builtins
 # ============================================================
 
+fn create_str_module() -> object {
+    mod_env := new_environment()
+    env_declare(mod_env, "substring", ZBuiltin()..name="str_substring", false)
+    env_declare(mod_env, "replace", ZBuiltin()..name="str_replace", false)
+    env_declare(mod_env, "split", ZBuiltin()..name="str_split", false)
+    env_declare(mod_env, "join", ZBuiltin()..name="str_join", false)
+    env_declare(mod_env, "trim", ZBuiltin()..name="str_trim", false)
+    env_declare(mod_env, "find", ZBuiltin()..name="str_find", false)
+    env_declare(mod_env, "starts_with", ZBuiltin()..name="str_starts_with", false)
+    env_declare(mod_env, "ends_with", ZBuiltin()..name="str_ends_with", false)
+    env_declare(mod_env, "upper", ZBuiltin()..name="str_upper", false)
+    env_declare(mod_env, "lower", ZBuiltin()..name="str_lower", false)
+    env_declare(mod_env, "contains", ZBuiltin()..name="str_contains", false)
+    return ZModule()..name="str"..env=mod_env
+}
+
+fn create_char_module() -> object {
+    mod_env := new_environment()
+    env_declare(mod_env, "ord", ZBuiltin()..name="char_ord", false)
+    env_declare(mod_env, "chr", ZBuiltin()..name="char_chr", false)
+    env_declare(mod_env, "is_digit", ZBuiltin()..name="char_is_digit", false)
+    env_declare(mod_env, "is_alpha", ZBuiltin()..name="char_is_alpha", false)
+    env_declare(mod_env, "is_space", ZBuiltin()..name="char_is_space", false)
+    env_declare(mod_env, "is_alnum", ZBuiltin()..name="char_is_alnum", false)
+    return ZModule()..name="char"..env=mod_env
+}
+
 fn new_environment_with_builtins() -> object {
     env := new_environment()
     env_declare(env, "print", ZBuiltin()..name="print", false)
@@ -376,6 +403,8 @@ fn new_environment_with_builtins() -> object {
     env_declare(env, "byte", ZBuiltin()..name="byte", false)
     env_declare(env, "Ok", ZBuiltin()..name="Ok", false)
     env_declare(env, "Err", ZBuiltin()..name="Err", false)
+    env_declare(env, "str", create_str_module(), false)
+    env_declare(env, "char", create_char_module(), false)
     return env
 }
 
@@ -457,6 +486,417 @@ fn apply_builtin(name: string, args: list) -> object {
         }
         return ZEnumValue()..enum_name="Result"..variant="Err"
     }
+
+    # --- str module builtins ---
+    if name == "str_substring" {
+        if len(args) < 3 {
+            return new_error("str.substring() takes 3 arguments (s, start, end)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.substring() first argument must be string")
+        }
+        if not (args[1] is ZInteger) {
+            return new_error("str.substring() second argument must be integer")
+        }
+        if not (args[2] is ZInteger) {
+            return new_error("str.substring() third argument must be integer")
+        }
+        s := args[0].value
+        mut start := args[1].value
+        mut end := args[2].value
+        if start < 0 { start = 0 }
+        if end > len(s) { end = len(s) }
+        if start >= end { return new_string("") }
+        mut result := ""
+        mut i := start
+        for i < end {
+            result += s[i]
+            i += 1
+        }
+        return new_string(result)
+    }
+    if name == "str_replace" {
+        if len(args) < 3 {
+            return new_error("str.replace() takes 3 arguments (s, old, new)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.replace() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.replace() second argument must be string")
+        }
+        if not (args[2] is ZString) {
+            return new_error("str.replace() third argument must be string")
+        }
+        s := args[0].value
+        old := args[1].value
+        new_s := args[2].value
+        if len(old) == 0 { return new_string(s) }
+        mut result := ""
+        mut i := 0
+        for i < len(s) {
+            # Check for match at position i
+            mut matched := true
+            if i + len(old) > len(s) {
+                matched = false
+            }
+            if matched {
+                mut j := 0
+                for j < len(old) {
+                    if s[i + j] != old[j] {
+                        matched = false
+                    }
+                    j += 1
+                }
+            }
+            if matched {
+                result += new_s
+                i += len(old)
+            }
+            if not matched {
+                result += s[i]
+                i += 1
+            }
+        }
+        return new_string(result)
+    }
+    if name == "str_split" {
+        if len(args) < 2 {
+            return new_error("str.split() takes 2 arguments (s, sep)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.split() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.split() second argument must be string")
+        }
+        s := args[0].value
+        sep := args[1].value
+        mut parts := []
+        if len(sep) == 0 {
+            # Split into individual characters
+            for i in 0..len(s) {
+                parts = parts.append(new_string(s[i]))
+            }
+            return new_list(parts)
+        }
+        mut current := ""
+        mut i := 0
+        for i < len(s) {
+            mut matched := true
+            if i + len(sep) > len(s) {
+                matched = false
+            }
+            if matched {
+                mut j := 0
+                for j < len(sep) {
+                    if s[i + j] != sep[j] {
+                        matched = false
+                    }
+                    j += 1
+                }
+            }
+            if matched {
+                parts = parts.append(new_string(current))
+                current = ""
+                i += len(sep)
+            }
+            if not matched {
+                current += s[i]
+                i += 1
+            }
+        }
+        parts = parts.append(new_string(current))
+        return new_list(parts)
+    }
+    if name == "str_join" {
+        if len(args) < 2 {
+            return new_error("str.join() takes 2 arguments (sep, list)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.join() first argument must be string")
+        }
+        if not (args[1] is ZList) {
+            return new_error("str.join() second argument must be list")
+        }
+        sep := args[0].value
+        mut result := ""
+        for i in 0..len(args[1].elements) {
+            if i > 0 { result += sep }
+            result += inspect(args[1].elements[i])
+        }
+        return new_string(result)
+    }
+    if name == "str_trim" {
+        if len(args) < 1 {
+            return new_error("str.trim() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.trim() argument must be string")
+        }
+        s := args[0].value
+        mut start := 0
+        for start < len(s) {
+            ch := byte(s[start])
+            if ch != 32 and ch != 9 and ch != 10 and ch != 13 {
+                break
+            }
+            start += 1
+        }
+        mut end := len(s)
+        for end > start {
+            ch := byte(s[end - 1])
+            if ch != 32 and ch != 9 and ch != 10 and ch != 13 {
+                break
+            }
+            end -= 1
+        }
+        mut result := ""
+        mut i := start
+        for i < end {
+            result += s[i]
+            i += 1
+        }
+        return new_string(result)
+    }
+    if name == "str_find" {
+        if len(args) < 2 {
+            return new_error("str.find() takes 2 arguments (s, substr)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.find() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.find() second argument must be string")
+        }
+        s := args[0].value
+        sub := args[1].value
+        if len(sub) == 0 { return new_integer(0) }
+        mut i := 0
+        for i <= len(s) - len(sub) {
+            mut matched := true
+            mut j := 0
+            for j < len(sub) {
+                if s[i + j] != sub[j] {
+                    matched = false
+                }
+                j += 1
+            }
+            if matched { return new_integer(i) }
+            i += 1
+        }
+        return new_integer(-1)
+    }
+    if name == "str_starts_with" {
+        if len(args) < 2 {
+            return new_error("str.starts_with() takes 2 arguments")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.starts_with() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.starts_with() second argument must be string")
+        }
+        s := args[0].value
+        prefix := args[1].value
+        if len(prefix) > len(s) { return Z_FALSE }
+        mut i := 0
+        for i < len(prefix) {
+            if s[i] != prefix[i] { return Z_FALSE }
+            i += 1
+        }
+        return Z_TRUE
+    }
+    if name == "str_ends_with" {
+        if len(args) < 2 {
+            return new_error("str.ends_with() takes 2 arguments")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.ends_with() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.ends_with() second argument must be string")
+        }
+        s := args[0].value
+        suffix := args[1].value
+        if len(suffix) > len(s) { return Z_FALSE }
+        offset := len(s) - len(suffix)
+        mut i := 0
+        for i < len(suffix) {
+            if s[offset + i] != suffix[i] { return Z_FALSE }
+            i += 1
+        }
+        return Z_TRUE
+    }
+    if name == "str_upper" {
+        if len(args) < 1 {
+            return new_error("str.upper() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.upper() argument must be string")
+        }
+        s := args[0].value
+        mut result := ""
+        for i in 0..len(s) {
+            ch := byte(s[i])
+            if ch >= 97 and ch <= 122 {
+                mut upper_ch := ""
+                unsafe { upper_ch = asm("char_chr", ch - 32) }
+                result += upper_ch
+            }
+            if not (ch >= 97 and ch <= 122) {
+                result += s[i]
+            }
+        }
+        return new_string(result)
+    }
+    if name == "str_lower" {
+        if len(args) < 1 {
+            return new_error("str.lower() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.lower() argument must be string")
+        }
+        s := args[0].value
+        mut result := ""
+        for i in 0..len(s) {
+            ch := byte(s[i])
+            if ch >= 65 and ch <= 90 {
+                mut lower_ch := ""
+                unsafe { lower_ch = asm("char_chr", ch + 32) }
+                result += lower_ch
+            }
+            if not (ch >= 65 and ch <= 90) {
+                result += s[i]
+            }
+        }
+        return new_string(result)
+    }
+    if name == "str_contains" {
+        if len(args) < 2 {
+            return new_error("str.contains() takes 2 arguments (s, substr)")
+        }
+        if not (args[0] is ZString) {
+            return new_error("str.contains() first argument must be string")
+        }
+        if not (args[1] is ZString) {
+            return new_error("str.contains() second argument must be string")
+        }
+        s := args[0].value
+        sub := args[1].value
+        if len(sub) == 0 { return Z_TRUE }
+        mut i := 0
+        for i <= len(s) - len(sub) {
+            mut matched := true
+            mut j := 0
+            for j < len(sub) {
+                if s[i + j] != sub[j] {
+                    matched = false
+                }
+                j += 1
+            }
+            if matched { return Z_TRUE }
+            i += 1
+        }
+        return Z_FALSE
+    }
+
+    # --- char module builtins ---
+    if name == "char_ord" {
+        if len(args) < 1 {
+            return new_error("char.ord() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("char.ord() argument must be string")
+        }
+        if len(args[0].value) != 1 {
+            return new_error("char.ord() requires a single character")
+        }
+        return new_integer(byte(args[0].value))
+    }
+    if name == "char_chr" {
+        if len(args) < 1 {
+            return new_error("char.chr() takes 1 argument")
+        }
+        if not (args[0] is ZInteger) {
+            return new_error("char.chr() argument must be integer")
+        }
+        mut ch := ""
+        unsafe { ch = asm("char_chr", args[0].value) }
+        return new_string(ch)
+    }
+    if name == "char_is_digit" {
+        if len(args) < 1 {
+            return new_error("char.is_digit() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("char.is_digit() argument must be string")
+        }
+        if len(args[0].value) != 1 {
+            return new_error("char.is_digit() requires a single character")
+        }
+        ch := byte(args[0].value)
+        return new_boolean(ch >= 48 and ch <= 57)
+    }
+    if name == "char_is_alpha" {
+        if len(args) < 1 {
+            return new_error("char.is_alpha() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("char.is_alpha() argument must be string")
+        }
+        if len(args[0].value) != 1 {
+            return new_error("char.is_alpha() requires a single character")
+        }
+        ch := byte(args[0].value)
+        mut is_a := false
+        if ch >= 65 {
+            if ch <= 90 { is_a = true }
+        }
+        if ch >= 97 {
+            if ch <= 122 { is_a = true }
+        }
+        if ch == 95 { is_a = true }
+        return new_boolean(is_a)
+    }
+    if name == "char_is_space" {
+        if len(args) < 1 {
+            return new_error("char.is_space() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("char.is_space() argument must be string")
+        }
+        if len(args[0].value) != 1 {
+            return new_error("char.is_space() requires a single character")
+        }
+        ch := byte(args[0].value)
+        return new_boolean(ch == 32 or ch == 9 or ch == 10 or ch == 13)
+    }
+    if name == "char_is_alnum" {
+        if len(args) < 1 {
+            return new_error("char.is_alnum() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("char.is_alnum() argument must be string")
+        }
+        if len(args[0].value) != 1 {
+            return new_error("char.is_alnum() requires a single character")
+        }
+        ch := byte(args[0].value)
+        mut is_an := false
+        if ch >= 48 {
+            if ch <= 57 { is_an = true }
+        }
+        if ch >= 65 {
+            if ch <= 90 { is_an = true }
+        }
+        if ch >= 97 {
+            if ch <= 122 { is_an = true }
+        }
+        if ch == 95 { is_an = true }
+        return new_boolean(is_an)
+    }
+
     return new_error("unknown builtin: " + name)
 }
 
