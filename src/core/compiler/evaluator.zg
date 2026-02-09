@@ -1362,6 +1362,10 @@ fn instantiate_class(class_def: object, args: list, named_args: map) -> object {
 }
 
 fn apply_method(bm: object, args: list, named_args: map) -> object {
+    # Bound builtin methods (list/map methods)
+    if bm.method is ZBuiltin {
+        return apply_bound_builtin(bm.instance, bm.method.name, args)
+    }
     if bm.instance == nil {
         return apply_static_method(bm.method, args, named_args)
     }
@@ -1411,6 +1415,184 @@ fn apply_static_method(method: object, args: list, named_args: map) -> object {
         return result.value
     }
     return result
+}
+
+# ============================================================
+# Bound Builtin Methods (List/Map)
+# ============================================================
+
+fn apply_bound_builtin(receiver: object, name: string, args: list) -> object {
+    # --- List methods ---
+    if name == "list_append" {
+        if len(args) != 1 {
+            return new_error("append() takes 1 argument, got " + string(len(args)))
+        }
+        return new_list(receiver.elements.append(args[0]))
+    }
+    if name == "list_pop" {
+        if len(receiver.elements) == 0 {
+            return new_error("pop from empty list")
+        }
+        return receiver.elements[len(receiver.elements) - 1]
+    }
+    if name == "list_join" {
+        mut sep := ""
+        if len(args) > 0 {
+            if args[0] is ZString {
+                sep = args[0].value
+            }
+        }
+        mut result := ""
+        for i in 0..len(receiver.elements) {
+            if i > 0 {
+                result += sep
+            }
+            result += inspect(receiver.elements[i])
+        }
+        return new_string(result)
+    }
+    if name == "list_slice" {
+        if len(args) < 2 {
+            return new_error("slice() takes 2 arguments, got " + string(len(args)))
+        }
+        if not (args[0] is ZInteger) {
+            return new_error("slice() start must be integer")
+        }
+        if not (args[1] is ZInteger) {
+            return new_error("slice() end must be integer")
+        }
+        mut start := args[0].value
+        mut end := args[1].value
+        if start < 0 { start = 0 }
+        if end > len(receiver.elements) { end = len(receiver.elements) }
+        mut elems := []
+        mut i := start
+        for i < end {
+            elems = elems.append(receiver.elements[i])
+            i += 1
+        }
+        return new_list(elems)
+    }
+    if name == "list_index" {
+        if len(args) != 1 {
+            return new_error("index() takes 1 argument, got " + string(len(args)))
+        }
+        target := args[0]
+        for i in 0..len(receiver.elements) {
+            if objects_equal(receiver.elements[i], target) {
+                return new_integer(i)
+            }
+        }
+        return new_integer(-1)
+    }
+    if name == "list_reverse" {
+        mut elems := []
+        mut i := len(receiver.elements) - 1
+        for i >= 0 {
+            elems = elems.append(receiver.elements[i])
+            i -= 1
+        }
+        return new_list(elems)
+    }
+    if name == "list_sort" {
+        # Simple insertion sort using inspect() for comparison
+        mut elems := []
+        for item in receiver.elements {
+            elems = elems.append(item)
+        }
+        mut i := 1
+        for i < len(elems) {
+            key := elems[i]
+            key_str := inspect(key)
+            mut j := i - 1
+            mut done := false
+            for j >= 0 {
+                if done {
+                    j -= 1
+                    continue
+                }
+                cmp_str := inspect(elems[j])
+                # Try numeric comparison if both are integers
+                mut should_swap := false
+                if key is ZInteger {
+                    if elems[j] is ZInteger {
+                        should_swap = key.value < elems[j].value
+                    }
+                }
+                if not (key is ZInteger) or not (elems[j] is ZInteger) {
+                    should_swap = key_str < cmp_str
+                }
+                if should_swap {
+                    elems[j + 1] = elems[j]
+                    j -= 1
+                }
+                if not should_swap {
+                    done = true
+                }
+            }
+            elems[j + 1] = key
+            i += 1
+        }
+        return new_list(elems)
+    }
+    if name == "list_filter" {
+        if len(args) != 1 {
+            return new_error("filter() takes 1 argument, got " + string(len(args)))
+        }
+        predicate := args[0]
+        mut elems := []
+        for item in receiver.elements {
+            result := apply_function(predicate, [item], {})
+            if is_error(result) { return result }
+            if is_truthy(result) {
+                elems = elems.append(item)
+            }
+        }
+        return new_list(elems)
+    }
+    if name == "list_map" {
+        if len(args) != 1 {
+            return new_error("map() takes 1 argument, got " + string(len(args)))
+        }
+        mapper := args[0]
+        mut elems := []
+        for item in receiver.elements {
+            result := apply_function(mapper, [item], {})
+            if is_error(result) { return result }
+            elems = elems.append(result)
+        }
+        return new_list(elems)
+    }
+
+    # --- Map methods ---
+    if name == "map_keys" {
+        mut keys := []
+        for pair in receiver.pairs {
+            keys = keys.append(pair[0])
+        }
+        return new_list(keys)
+    }
+    if name == "map_values" {
+        mut vals := []
+        for pair in receiver.pairs {
+            vals = vals.append(pair[1])
+        }
+        return new_list(vals)
+    }
+    if name == "map_contains" {
+        if len(args) != 1 {
+            return new_error("contains() takes 1 argument, got " + string(len(args)))
+        }
+        target := args[0]
+        for pair in receiver.pairs {
+            if objects_equal(pair[0], target) {
+                return Z_TRUE
+            }
+        }
+        return Z_FALSE
+    }
+
+    return new_error("unknown bound builtin: " + name)
 }
 
 # ============================================================
@@ -1519,6 +1701,16 @@ fn eval_member_access(obj: object, member: string) -> object {
 
     # Map member access (dot notation)
     if obj is ZMap {
+        # Builtin map methods
+        if member == "keys" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_keys"
+        }
+        if member == "values" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_values"
+        }
+        if member == "contains" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_contains"
+        }
         for pair in obj.pairs {
             if pair[0] is ZString {
                 if pair[0].value == member {
@@ -1529,14 +1721,40 @@ fn eval_member_access(obj: object, member: string) -> object {
         return Z_NULL
     }
 
-    # List built-in properties
+    # List built-in properties and methods
     if obj is ZList {
         if member == "length" {
             return new_integer(len(obj.elements))
         }
-        # List methods
+        if member == "append" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_append"
+        }
+        if member == "pop" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_pop"
+        }
+        if member == "join" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_join"
+        }
+        if member == "slice" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_slice"
+        }
+        if member == "index" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_index"
+        }
+        if member == "reverse" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_reverse"
+        }
+        if member == "sort" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_sort"
+        }
+        if member == "filter" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_filter"
+        }
+        if member == "map" {
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_map"
+        }
         if member == "push" {
-            return ZBuiltin()..name="__list_push__"
+            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_append"
         }
     }
 
