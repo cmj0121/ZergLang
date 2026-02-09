@@ -412,7 +412,7 @@ impl Lexer {
 # Returns true if ch is a letter (a-z, A-Z) or underscore.
 # Used to identify the start of identifiers.
 fn is_letter(ch: str) -> bool {
-    if ch == "" { return false }
+    return false if ch == ""
     code := char.ord(ch)
     return (code >= 97 and code <= 122) or (code >= 65 and code <= 90) or ch == "_"
 }
@@ -421,7 +421,7 @@ fn is_letter(ch: str) -> bool {
 # Returns true if ch is a digit (0-9).
 # Used for number literals and identifier continuation.
 fn is_digit(ch: str) -> bool {
-    if ch == "" { return false }
+    return false if ch == ""
     return char.is_digit(ch)
 }
 
