@@ -583,7 +583,7 @@ impl Parser {
         return ast.MemberExpr()..token=tok..object=left..member=member
     }
 
-    # parse_chained_assignment(left) - Parse ..field=value
+    # parse_chained_assignment(left) - Parse ..field=value[..field2=value2...]
     mut fn parse_chained_assignment(left: object) -> object {
         tok := this.cur_token
         if not this.cur_token_is(token.TokenType.IDENT) {
@@ -598,13 +598,24 @@ impl Parser {
         }
 
         this.next_token()
-        value := this.parse_expression(LOWEST)
+        value := this.parse_expression(RANGE_PREC)
 
-        return ast.ChainedAssignment()
+        mut expr := ast.ChainedAssignment()
             ..token=tok
             ..object=left
             ..field=field
             ..value=value
+
+        # Check for chaining: ..field2=value2
+        if this.peek_token_is(token.TokenType.DOTDOT) {
+            this.next_token()
+            this.next_token()
+            if this.cur_token_is(token.TokenType.IDENT) and this.peek_token_is(token.TokenType.ASSIGN) {
+                expr = this.parse_chained_assignment(expr)
+            }
+        }
+
+        return expr
     }
 
     # ============================================================

@@ -524,10 +524,10 @@ fn eval(node: object, env: object) -> object {
         return eval_assert(node, env)
     }
     if node is ImportStmt {
-        return new_error("not yet implemented: " + "ImportStmt")
+        return eval_import(node, env)
     }
     if node is WithStmt {
-        return new_error("not yet implemented: " + "WithStmt")
+        return eval_with(node, env)
     }
 
     # Expressions - Literals
@@ -593,30 +593,30 @@ fn eval(node: object, env: object) -> object {
 
     # Expressions - Advanced
     if node is IsExpr {
-        return new_error("not yet implemented: " + "IsExpr")
+        return eval_is(node, env)
     }
     if node is InterpolatedString {
-        return new_error("not yet implemented: " + "InterpolatedString")
+        return eval_interpolated_string(node, env)
     }
     if node is AsmExpr {
-        return new_error("not yet implemented: " + "AsmExpr")
+        return eval_asm(node, env)
     }
 
     # Declarations - OOP
     if node is ClassDecl {
-        return new_error("not yet implemented: " + "ClassDecl")
+        return eval_class_decl(node, env)
     }
     if node is ImplDecl {
-        return new_error("not yet implemented: " + "ImplDecl")
+        return eval_impl_decl(node, env)
     }
     if node is SpecDecl {
-        return new_error("not yet implemented: " + "SpecDecl")
+        return eval_spec_decl(node, env)
     }
     if node is EnumDecl {
-        return new_error("not yet implemented: " + "EnumDecl")
+        return eval_enum_decl(node, env)
     }
     if node is UnsafeBlock {
-        return new_error("not yet implemented: " + "UnsafeBlock")
+        return eval_unsafe(node, env)
     }
 
     return new_error("unknown node type")
@@ -1581,4 +1581,333 @@ fn eval_chained_assignment(node: object, env: object) -> object {
         return new_error("unknown field: " + field_name)
     }
     return new_error("builder syntax (..) can only be used on class instances")
+}
+
+# ============================================================
+# OOP Evaluation
+# ============================================================
+
+fn eval_class_decl(node: object, env: object) -> object {
+    class_def := ZClass()
+        ..name=node.name.value
+        ..fields={}
+        ..field_names=[]
+        ..methods={}
+        ..method_names=[]
+        ..static_methods={}
+        ..implements={}
+
+    for field in node.fields {
+        cf := ZClassField()
+            ..name=field.name
+            ..default_val=nil
+            ..is_pub=field.is_pub
+            ..is_mut=field.is_mut
+        class_def.fields[field.name] = cf
+        class_def.field_names = class_def.field_names.append(field.name)
+    }
+
+    env_declare(env, node.name.value, class_def, false)
+    return class_def
+}
+
+fn eval_impl_decl(node: object, env: object) -> object {
+    class_obj := env_get_value(env, node.type_name.value)
+    if class_obj == nil {
+        return new_error("class not found: " + node.type_name.value)
+    }
+    if not (class_obj is ZClass) {
+        return new_error(node.type_name.value + " is not a class")
+    }
+
+    # Check if this is an impl-for (spec implementation)
+    if node.spec_name != nil {
+        return eval_impl_for(node, class_obj, env)
+    }
+
+    for method in node.methods {
+        cm := ZClassMethod()
+            ..name=method.name
+            ..params=[]
+            ..body=method.body
+            ..is_pub=true
+            ..is_static=method.is_static
+            ..is_mut=method.is_mut
+            ..env=env
+
+        for param in method.parameters {
+            cm.params = cm.params.append(param.name)
+        }
+
+        if method.is_static {
+            class_obj.static_methods[method.name] = cm
+        }
+        if not method.is_static {
+            class_obj.methods[method.name] = cm
+            class_obj.method_names = class_obj.method_names.append(method.name)
+        }
+    }
+
+    return Z_NULL
+}
+
+fn eval_impl_for(node: object, class_obj: object, env: object) -> object {
+    spec_obj := env_get_value(env, node.spec_name.value)
+    if spec_obj == nil {
+        return new_error("spec not found: " + node.spec_name.value)
+    }
+    if not (spec_obj is ZSpec) {
+        return new_error(node.spec_name.value + " is not a spec")
+    }
+
+    for method in node.methods {
+        cm := ZClassMethod()
+            ..name=method.name
+            ..params=[]
+            ..body=method.body
+            ..is_pub=true
+            ..is_static=method.is_static
+            ..is_mut=method.is_mut
+            ..env=env
+
+        for param in method.parameters {
+            cm.params = cm.params.append(param.name)
+        }
+
+        if method.is_static {
+            class_obj.static_methods[method.name] = cm
+        }
+        if not method.is_static {
+            class_obj.methods[method.name] = cm
+            class_obj.method_names = class_obj.method_names.append(method.name)
+        }
+    }
+
+    # Verify all spec methods are implemented
+    for name in spec_obj.method_names {
+        if class_obj.methods[name] == nil {
+            return new_error("class " + class_obj.name + " does not implement method '" + name + "' from spec " + spec_obj.name)
+        }
+    }
+
+    class_obj.implements[spec_obj.name] = spec_obj
+    return Z_NULL
+}
+
+fn eval_spec_decl(node: object, env: object) -> object {
+    sp := ZSpec()..name=node.name.value..methods={}..method_names=[]
+
+    for method in node.methods {
+        sm := ZSpecMethod()
+            ..name=method.name
+            ..params=[]
+            ..is_pub=true
+            ..is_mut=method.is_mut
+
+        for param in method.parameters {
+            sm.params = sm.params.append(param.name)
+        }
+
+        sp.methods[method.name] = sm
+        sp.method_names = sp.method_names.append(method.name)
+    }
+
+    env_declare(env, node.name.value, sp, false)
+    return sp
+}
+
+fn eval_enum_decl(node: object, env: object) -> object {
+    mut variants := []
+    for v in node.variants {
+        variants = variants.append(v.name)
+    }
+    enum_obj := ZEnum()..name=node.name.value..variants=variants
+    env_declare(env, node.name.value, enum_obj, false)
+    return enum_obj
+}
+
+# ============================================================
+# Advanced Expression Evaluation
+# ============================================================
+
+fn eval_is(node: object, env: object) -> object {
+    left := eval(node.left, env)
+    if is_error(left) { return left }
+
+    type_name := node.type_name.value
+
+    # Built-in type checks
+    if type_name == "int" or type_name == "Integer" {
+        return new_boolean(left is ZInteger)
+    }
+    if type_name == "float" or type_name == "Float" {
+        return new_boolean(left is ZFloat)
+    }
+    if type_name == "string" or type_name == "String" {
+        return new_boolean(left is ZString)
+    }
+    if type_name == "bool" or type_name == "Boolean" {
+        return new_boolean(left is ZBoolean)
+    }
+    if type_name == "list" or type_name == "List" {
+        return new_boolean(left is ZList)
+    }
+    if type_name == "map" or type_name == "Map" {
+        return new_boolean(left is ZMap)
+    }
+    if type_name == "nil" or type_name == "Nil" {
+        return new_boolean(left is ZNull)
+    }
+    if type_name == "Ok" {
+        if left is ZEnumValue {
+            return new_boolean(left.enum_name == "Result" and left.variant == "Ok")
+        }
+        return Z_FALSE
+    }
+    if type_name == "Err" {
+        if left is ZEnumValue {
+            return new_boolean(left.enum_name == "Result" and left.variant == "Err")
+        }
+        return Z_FALSE
+    }
+
+    # Class instance check
+    if left is ZInstance {
+        return new_boolean(left.class_def.name == type_name)
+    }
+    # Enum type check
+    if left is ZEnumValue {
+        return new_boolean(left.enum_name == type_name)
+    }
+    return Z_FALSE
+}
+
+fn eval_interpolated_string(node: object, env: object) -> object {
+    mut result := ""
+    for part in node.parts {
+        if part.is_expr {
+            val := eval(part.expr, env)
+            if is_error(val) { return val }
+            result += inspect(val)
+        }
+        if not part.is_expr {
+            result += part.text
+        }
+    }
+    return new_string(result)
+}
+
+fn eval_asm(node: object, env: object) -> object {
+    # Delegate to bootstrap's asm mechanism
+    # The self-hosted evaluator runs on the bootstrap, so asm calls
+    # need to be forwarded to the bootstrap runtime
+    return new_error("asm not yet supported in self-hosted evaluator: " + node.instruction)
+}
+
+fn eval_unsafe(node: object, env: object) -> object {
+    unsafe_env := new_enclosed_environment(env)
+    env_declare(unsafe_env, "__unsafe__", Z_TRUE, false)
+    return eval(node.body, unsafe_env)
+}
+
+fn eval_with(node: object, env: object) -> object {
+    resource := eval(node.value, env)
+    if is_error(resource) { return resource }
+
+    inner_env := new_enclosed_environment(env)
+    env_declare(inner_env, node.variable.value, resource, false)
+    result := eval(node.body, inner_env)
+    return result
+}
+
+# ============================================================
+# Import / Module Loading
+# ============================================================
+
+fn eval_import(node: object, env: object) -> object {
+    path := node.path
+
+    # Check module cache
+    if module_cache[path] != nil {
+        # Extract module name from path
+        mod_name := extract_module_name(path)
+        env_declare(env, mod_name, module_cache[path], false)
+        return Z_NULL
+    }
+
+    # Read file
+    file_path := path + ".zg"
+    mut source := ""
+    unsafe {
+        source = asm("read_file", file_path)
+    }
+    if source == "" {
+        return new_error("could not read module: " + file_path)
+    }
+
+    # Lex and parse
+    l := lexer.new_lexer(source)
+    p := parser.new_parser(l)
+    program := p.parse_program()
+    if len(p.errors) > 0 {
+        return new_error("parse errors in module " + path + ": " + p.errors[0])
+    }
+
+    # Evaluate in new environment
+    mod_env := new_environment_with_builtins()
+    result := eval_program(program, mod_env)
+    if is_error(result) { return result }
+
+    # Create module
+    mod_name := extract_module_name(path)
+    mod := ZModule()..name=mod_name..env=mod_env
+    module_cache[path] = mod
+    env_declare(env, mod_name, mod, false)
+    return Z_NULL
+}
+
+fn extract_module_name(path: string) -> string {
+    # Extract last segment: "src/core/compiler/lexer" -> "lexer"
+    mut last_slash := -1
+    for i in 0..len(path) {
+        if path[i] == "/" {
+            last_slash = i
+        }
+    }
+    if last_slash >= 0 {
+        mut result := ""
+        mut j := last_slash + 1
+        for j < len(path) {
+            result += path[j]
+            j += 1
+        }
+        return result
+    }
+    return path
+}
+
+# ============================================================
+# Entry Point
+# ============================================================
+
+fn run(source: string) -> object {
+    l := lexer.new_lexer(source)
+    p := parser.new_parser(l)
+    program := p.parse_program()
+    if len(p.errors) > 0 {
+        return new_error("parse errors: " + p.errors[0])
+    }
+    env := new_environment_with_builtins()
+    return eval_program(program, env)
+}
+
+fn run_file(file_path: string) -> object {
+    mut source := ""
+    unsafe {
+        source = asm("read_file", file_path)
+    }
+    if source == "" {
+        return new_error("could not read file: " + file_path)
+    }
+    return run(source)
 }
