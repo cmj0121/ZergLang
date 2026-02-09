@@ -1,0 +1,533 @@
+# ast.zg - Abstract Syntax Tree node definitions for Zerg parser
+#
+# This module provides the AST node types used by the self-hosted Zerg parser.
+# Each node represents a syntactic construct in the Zerg language.
+#
+# Usage:
+#   import "src/core/compiler/ast"
+#
+#   node := ast.Identifier()..token=tok..value="x"
+#   program := ast.Program()..statements=[]
+#
+# Types:
+#   NodeKind - Enum of all AST node types
+#   Program, Identifier, IntegerLit, FloatLit, StringLit, BoolLit, NilLit
+#   PrefixExpr, InfixExpr, CallExpr, IndexExpr, MemberExpr, GroupExpr
+#   FunctionLit, ListLit, MapLit, RangeExpr, ChainedAssignment
+#   BlockStmt, ExprStmt, DeclareStmt, AssignStmt, CompoundAssignStmt
+#   ReturnStmt, BreakStmt, ContinueStmt, NopStmt
+#   IfStmt, ForInStmt, ForCondStmt, MatchStmt, MatchArm
+#   ClassDecl, ImplDecl, SpecDecl, EnumDecl
+#   FieldDecl, MethodDecl, MethodSignature, Parameter
+#   ImportStmt, WithStmt, AssertStmt, UnsafeBlock, AsmExpr
+#   IsExpr, InterpolatedString
+
+import "src/core/compiler/token"
+
+# NodeKind - Enumeration of all AST node types
+enum NodeKind {
+    # Expressions
+    Identifier
+    IntegerLit
+    FloatLit
+    StringLit
+    BoolLit
+    NilLit
+    PrefixExpr
+    InfixExpr
+    CallExpr
+    IndexExpr
+    MemberExpr
+    GroupExpr
+    FunctionLit
+    ListLit
+    MapLit
+    RangeExpr
+    ChainedAssignment
+    IsExpr
+    InterpolatedString
+    AsmExpr
+
+    # Statements
+    Program
+    BlockStmt
+    ExprStmt
+    DeclareStmt
+    AssignStmt
+    CompoundAssignStmt
+    ReturnStmt
+    BreakStmt
+    ContinueStmt
+    NopStmt
+    IfStmt
+    ForInStmt
+    ForCondStmt
+    MatchStmt
+
+    # Declarations
+    ClassDecl
+    ImplDecl
+    SpecDecl
+    EnumDecl
+    FieldDecl
+    MethodDecl
+    MethodSignature
+    ImportStmt
+    WithStmt
+    AssertStmt
+    UnsafeBlock
+}
+
+# ============================================================
+# Program and Block
+# ============================================================
+
+# Program - The root node of the AST, contains all top-level statements
+class Program {
+    pub mut statements: list
+}
+
+# BlockStmt - A block of statements enclosed in braces
+class BlockStmt {
+    pub mut token: object
+    pub mut statements: list
+}
+
+# ============================================================
+# Expressions - Literals
+# ============================================================
+
+# Identifier - A variable or type name
+class Identifier {
+    pub mut token: object
+    pub mut value: string
+}
+
+# IntegerLit - An integer literal (e.g., 42, 1_000_000)
+class IntegerLit {
+    pub mut token: object
+    pub mut value: int
+}
+
+# FloatLit - A floating-point literal (e.g., 3.14)
+class FloatLit {
+    pub mut token: object
+    pub mut value: float
+}
+
+# StringLit - A string literal (e.g., "hello")
+class StringLit {
+    pub mut token: object
+    pub mut value: string
+}
+
+# BoolLit - A boolean literal (true or false)
+class BoolLit {
+    pub mut token: object
+    pub mut value: bool
+}
+
+# NilLit - The nil literal
+class NilLit {
+    pub mut token: object
+}
+
+# ============================================================
+# Expressions - Operators and Compound Expressions
+# ============================================================
+
+# PrefixExpr - A prefix expression (e.g., -x, not x)
+class PrefixExpr {
+    pub mut token: object
+    pub mut operator: string
+    pub mut right: object
+}
+
+# InfixExpr - A binary expression (e.g., a + b, x and y)
+class InfixExpr {
+    pub mut token: object
+    pub mut left: object
+    pub mut operator: string
+    pub mut right: object
+}
+
+# GroupExpr - A parenthesized expression (e.g., (a + b))
+class GroupExpr {
+    pub mut token: object
+    pub mut expression: object
+}
+
+# RangeExpr - A range expression (e.g., 0..10, 0..=10)
+class RangeExpr {
+    pub mut token: object
+    pub mut start: object
+    pub mut end: object
+    pub mut inclusive: bool
+}
+
+# IsExpr - Type checking expression (e.g., x is int)
+class IsExpr {
+    pub mut token: object
+    pub mut left: object
+    pub mut type_name: Identifier
+}
+
+# ============================================================
+# Expressions - Access and Call
+# ============================================================
+
+# CallExpr - A function/method call (e.g., foo(a, b), obj.method())
+class CallExpr {
+    pub mut token: object
+    pub mut function: object
+    pub mut arguments: list
+}
+
+# NamedArgument - A named argument in a call (e.g., x=1 in foo(x=1))
+class NamedArgument {
+    pub mut token: object
+    pub mut name: string
+    pub mut value: object
+}
+
+# IndexExpr - An index access (e.g., arr[0], map["key"])
+class IndexExpr {
+    pub mut token: object
+    pub mut left: object
+    pub mut index: object
+}
+
+# MemberExpr - A member access (e.g., obj.field, Type.Variant)
+class MemberExpr {
+    pub mut token: object
+    pub mut object: object
+    pub mut member: Identifier
+}
+
+# ChainedAssignment - Builder pattern (e.g., Point()..x=1..y=2)
+class ChainedAssignment {
+    pub mut token: object
+    pub mut object: object
+    pub mut field: string
+    pub mut value: object
+}
+
+# ============================================================
+# Expressions - Literals (Complex)
+# ============================================================
+
+# ListLit - A list literal (e.g., [1, 2, 3])
+class ListLit {
+    pub mut token: object
+    pub mut elements: list
+}
+
+# MapLit - A map literal (e.g., {"a": 1, "b": 2})
+class MapLit {
+    pub mut token: object
+    pub mut pairs: list
+}
+
+# MapPair - A key-value pair in a map literal
+class MapPair {
+    pub mut key: object
+    pub mut value: object
+}
+
+# FunctionLit - A function literal (e.g., fn(a, b) { return a + b })
+class FunctionLit {
+    pub mut token: object
+    pub mut name: string
+    pub mut parameters: list
+    pub mut return_type: object
+    pub mut body: BlockStmt
+    pub mut is_mut: bool
+}
+
+# Parameter - A function parameter
+class Parameter {
+    pub mut token: object
+    pub mut name: string
+    pub mut type_annotation: object
+    pub mut is_mut: bool
+}
+
+# InterpolatedString - A string with interpolation (e.g., "hello {name}")
+class InterpolatedString {
+    pub mut token: object
+    pub mut parts: list
+}
+
+# StringPart - A part of an interpolated string (text or expression)
+class StringPart {
+    pub mut is_expr: bool
+    pub mut text: string
+    pub mut expr: object
+}
+
+# AsmExpr - Inline assembly (e.g., asm("sys_os"))
+class AsmExpr {
+    pub mut token: object
+    pub mut instruction: string
+}
+
+# ============================================================
+# Statements - Expression and Declaration
+# ============================================================
+
+# ExprStmt - An expression used as a statement
+class ExprStmt {
+    pub mut token: object
+    pub mut expression: object
+}
+
+# DeclareStmt - A variable declaration (e.g., x := 1, mut y := 2)
+class DeclareStmt {
+    pub mut token: object
+    pub mut name: Identifier
+    pub mut value: object
+    pub mut is_mut: bool
+}
+
+# AssignStmt - An assignment (e.g., x = 1)
+class AssignStmt {
+    pub mut token: object
+    pub mut target: object
+    pub mut value: object
+}
+
+# CompoundAssignStmt - Compound assignment (e.g., x += 1)
+class CompoundAssignStmt {
+    pub mut token: object
+    pub mut target: object
+    pub mut operator: string
+    pub mut value: object
+}
+
+# ============================================================
+# Statements - Control Flow (Simple)
+# ============================================================
+
+# ReturnStmt - A return statement (e.g., return x, return x if cond)
+class ReturnStmt {
+    pub mut token: object
+    pub mut value: object
+    pub mut condition: object
+}
+
+# BreakStmt - A break statement (e.g., break, break if cond)
+class BreakStmt {
+    pub mut token: object
+    pub mut condition: object
+}
+
+# ContinueStmt - A continue statement (e.g., continue, continue if cond)
+class ContinueStmt {
+    pub mut token: object
+    pub mut condition: object
+}
+
+# NopStmt - A no-operation statement
+class NopStmt {
+    pub mut token: object
+}
+
+# ============================================================
+# Statements - Control Flow (Complex)
+# ============================================================
+
+# IfStmt - An if statement (e.g., if cond { ... } else { ... })
+class IfStmt {
+    pub mut token: object
+    pub mut condition: object
+    pub mut consequence: BlockStmt
+    pub mut alternative: object
+}
+
+# ForInStmt - A for-in loop (e.g., for x in items { ... })
+class ForInStmt {
+    pub mut token: object
+    pub mut variable: Identifier
+    pub mut iterable: object
+    pub mut body: BlockStmt
+}
+
+# ForCondStmt - A for-condition loop (e.g., for x < 10 { ... }, for { ... })
+class ForCondStmt {
+    pub mut token: object
+    pub mut condition: object
+    pub mut body: BlockStmt
+}
+
+# MatchStmt - A match statement
+class MatchStmt {
+    pub mut token: object
+    pub mut subject: object
+    pub mut arms: list
+}
+
+# MatchArm - A single arm in a match statement
+class MatchArm {
+    pub mut token: object
+    pub mut patterns: list
+    pub mut guard: object
+    pub mut body: BlockStmt
+}
+
+# ============================================================
+# Declarations - OOP
+# ============================================================
+
+# ClassDecl - A class declaration
+class ClassDecl {
+    pub mut token: object
+    pub mut name: Identifier
+    pub mut fields: list
+    pub mut embedded: list
+}
+
+# FieldDecl - A field in a class
+class FieldDecl {
+    pub mut token: object
+    pub mut name: string
+    pub mut type_annotation: object
+    pub mut is_pub: bool
+    pub mut is_mut: bool
+}
+
+# ImplDecl - An impl block
+class ImplDecl {
+    pub mut token: object
+    pub mut type_name: Identifier
+    pub mut spec_name: object
+    pub mut methods: list
+}
+
+# MethodDecl - A method in an impl block
+class MethodDecl {
+    pub mut token: object
+    pub mut name: string
+    pub mut parameters: list
+    pub mut return_type: object
+    pub mut body: BlockStmt
+    pub mut is_mut: bool
+    pub mut is_static: bool
+}
+
+# SpecDecl - A spec (interface) declaration
+class SpecDecl {
+    pub mut token: object
+    pub mut name: Identifier
+    pub mut methods: list
+}
+
+# MethodSignature - A method signature in a spec
+class MethodSignature {
+    pub mut token: object
+    pub mut name: string
+    pub mut parameters: list
+    pub mut return_type: object
+    pub mut is_mut: bool
+}
+
+# EnumDecl - An enum declaration
+class EnumDecl {
+    pub mut token: object
+    pub mut name: Identifier
+    pub mut variants: list
+}
+
+# EnumVariant - A variant in an enum
+class EnumVariant {
+    pub mut token: object
+    pub mut name: string
+}
+
+# ============================================================
+# Declarations - Other
+# ============================================================
+
+# ImportStmt - An import statement (e.g., import "path/to/module")
+class ImportStmt {
+    pub mut token: object
+    pub mut path: string
+    pub mut alias: string
+}
+
+# WithStmt - A with statement (e.g., with resource { ... })
+class WithStmt {
+    pub mut token: object
+    pub mut variable: Identifier
+    pub mut value: object
+    pub mut body: BlockStmt
+}
+
+# AssertStmt - An assert statement (e.g., assert cond, "message")
+class AssertStmt {
+    pub mut token: object
+    pub mut condition: object
+    pub mut message: object
+}
+
+# UnsafeBlock - An unsafe block
+class UnsafeBlock {
+    pub mut token: object
+    pub mut body: BlockStmt
+}
+
+# ============================================================
+# Helper Functions
+# ============================================================
+
+# node_kind_name(kind) -> string
+# Returns the string name of a NodeKind for debugging
+fn node_kind_name(kind: NodeKind) -> string {
+    match kind {
+        NodeKind.Identifier => { return "Identifier" }
+        NodeKind.IntegerLit => { return "IntegerLit" }
+        NodeKind.FloatLit => { return "FloatLit" }
+        NodeKind.StringLit => { return "StringLit" }
+        NodeKind.BoolLit => { return "BoolLit" }
+        NodeKind.NilLit => { return "NilLit" }
+        NodeKind.PrefixExpr => { return "PrefixExpr" }
+        NodeKind.InfixExpr => { return "InfixExpr" }
+        NodeKind.CallExpr => { return "CallExpr" }
+        NodeKind.IndexExpr => { return "IndexExpr" }
+        NodeKind.MemberExpr => { return "MemberExpr" }
+        NodeKind.GroupExpr => { return "GroupExpr" }
+        NodeKind.FunctionLit => { return "FunctionLit" }
+        NodeKind.ListLit => { return "ListLit" }
+        NodeKind.MapLit => { return "MapLit" }
+        NodeKind.RangeExpr => { return "RangeExpr" }
+        NodeKind.ChainedAssignment => { return "ChainedAssignment" }
+        NodeKind.IsExpr => { return "IsExpr" }
+        NodeKind.InterpolatedString => { return "InterpolatedString" }
+        NodeKind.AsmExpr => { return "AsmExpr" }
+        NodeKind.Program => { return "Program" }
+        NodeKind.BlockStmt => { return "BlockStmt" }
+        NodeKind.ExprStmt => { return "ExprStmt" }
+        NodeKind.DeclareStmt => { return "DeclareStmt" }
+        NodeKind.AssignStmt => { return "AssignStmt" }
+        NodeKind.CompoundAssignStmt => { return "CompoundAssignStmt" }
+        NodeKind.ReturnStmt => { return "ReturnStmt" }
+        NodeKind.BreakStmt => { return "BreakStmt" }
+        NodeKind.ContinueStmt => { return "ContinueStmt" }
+        NodeKind.NopStmt => { return "NopStmt" }
+        NodeKind.IfStmt => { return "IfStmt" }
+        NodeKind.ForInStmt => { return "ForInStmt" }
+        NodeKind.ForCondStmt => { return "ForCondStmt" }
+        NodeKind.MatchStmt => { return "MatchStmt" }
+        NodeKind.ClassDecl => { return "ClassDecl" }
+        NodeKind.ImplDecl => { return "ImplDecl" }
+        NodeKind.SpecDecl => { return "SpecDecl" }
+        NodeKind.EnumDecl => { return "EnumDecl" }
+        NodeKind.FieldDecl => { return "FieldDecl" }
+        NodeKind.MethodDecl => { return "MethodDecl" }
+        NodeKind.MethodSignature => { return "MethodSignature" }
+        NodeKind.ImportStmt => { return "ImportStmt" }
+        NodeKind.WithStmt => { return "WithStmt" }
+        NodeKind.AssertStmt => { return "AssertStmt" }
+        NodeKind.UnsafeBlock => { return "UnsafeBlock" }
+        _ => { return "Unknown" }
+    }
+}

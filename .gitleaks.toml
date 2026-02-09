@@ -1,0 +1,20 @@
+# Gitleaks configuration for Zerg language project
+# https://github.com/gitleaks/gitleaks
+
+[extend]
+useDefault = true
+
+# Allowlist for Zerg builder pattern syntax (..field=value)
+# These are not secrets, just Zerg's object initialization syntax
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+
+[rules.allowlist]
+paths = [
+    '''\.zg$''',
+]
+regexes = [
+    '''\.\.token=''',
+    '''\.\.tok=''',
+]

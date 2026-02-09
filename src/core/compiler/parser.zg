@@ -1,0 +1,1522 @@
+# parser.zg - Pratt parser for Zerg
+#
+# This module provides the parser for the self-hosted Zerg compiler.
+# It uses the Pratt parsing algorithm (top-down operator precedence)
+# to parse expressions with correct precedence and associativity.
+#
+# Usage:
+#   import "src/core/compiler/parser"
+#   import "src/core/compiler/lexer"
+#
+#   l := lexer.new_lexer("1 + 2 * 3")
+#   p := parser.new_parser(l)
+#   program := p.parse_program()
+#
+# Types:
+#   Parser - The parser class with state and parsing methods
+#
+# Functions:
+#   new_parser(lexer) -> Parser   Create a new parser for the given lexer
+
+import "src/core/compiler/token"
+import "src/core/compiler/lexer"
+import "src/core/compiler/ast"
+
+# Precedence levels (higher = binds tighter)
+LOWEST      := 1
+RANGE_PREC  := 2    # .. ..=
+OR_PREC     := 3    # or
+AND_PREC    := 4    # and
+IS_PREC     := 5    # is
+EQUALS      := 6    # == !=
+LESSGREATER := 7    # < > <= >=
+SUM         := 8    # + -
+PRODUCT     := 9    # * / %
+POWER_PREC  := 10   # **
+PREFIX      := 11   # -x, not x
+CALL        := 12   # fn()
+INDEX       := 13   # arr[0], obj.field, ..chain
+
+# Precedence lookup for token types
+fn get_precedence(tok_type: object) -> int {
+    match tok_type {
+        token.TokenType.DOTDOT => { return RANGE_PREC }
+        token.TokenType.DOTDOTEQ => { return RANGE_PREC }
+        token.TokenType.OR => { return OR_PREC }
+        token.TokenType.AND => { return AND_PREC }
+        token.TokenType.IS => { return IS_PREC }
+        token.TokenType.EQ => { return EQUALS }
+        token.TokenType.NOT_EQ => { return EQUALS }
+        token.TokenType.LT => { return LESSGREATER }
+        token.TokenType.GT => { return LESSGREATER }
+        token.TokenType.LT_EQ => { return LESSGREATER }
+        token.TokenType.GT_EQ => { return LESSGREATER }
+        token.TokenType.PLUS => { return SUM }
+        token.TokenType.MINUS => { return SUM }
+        token.TokenType.ASTERISK => { return PRODUCT }
+        token.TokenType.SLASH => { return PRODUCT }
+        token.TokenType.PERCENT => { return PRODUCT }
+        token.TokenType.POWER => { return POWER_PREC }
+        token.TokenType.LPAREN => { return CALL }
+        token.TokenType.LBRACKET => { return INDEX }
+        token.TokenType.DOT => { return INDEX }
+        _ => { return LOWEST }
+    }
+}
+
+# Parser - Parses tokens into an AST
+#
+# The parser uses a two-token lookahead (cur_token and peek_token)
+# and maintains a list of errors encountered during parsing.
+class Parser {
+    pub mut lex: object
+    pub mut cur_token: object
+    pub mut peek_token: object
+    pub mut errors: list
+}
+
+# new_parser(l) -> Parser
+# Creates a new Parser for the given Lexer
+fn new_parser(l: object) -> Parser {
+    p := Parser()..lex=l..errors=[]
+    p.cur_token = l.next_token()
+    p.peek_token = l.next_token()
+    return p
+}
+
+impl Parser {
+    # ============================================================
+    # Token Navigation
+    # ============================================================
+
+    # next_token() - Advance to the next token
+    mut fn next_token() {
+        this.cur_token = this.peek_token
+        this.peek_token = this.lex.next_token()
+    }
+
+    # cur_token_is(t) - Check if current token is of type t
+    fn cur_token_is(t: object) -> bool {
+        return this.cur_token.type == t
+    }
+
+    # peek_token_is(t) - Check if peek token is of type t
+    fn peek_token_is(t: object) -> bool {
+        return this.peek_token.type == t
+    }
+
+    # expect_peek(t) - Expect peek to be t and advance if so
+    mut fn expect_peek(t: object) -> bool {
+        if this.peek_token_is(t) {
+            this.next_token()
+            return true
+        }
+        this.peek_error(t)
+        return false
+    }
+
+    # cur_precedence() - Get precedence of current token
+    fn cur_precedence() -> int {
+        return get_precedence(this.cur_token.type)
+    }
+
+    # peek_precedence() - Get precedence of peek token
+    fn peek_precedence() -> int {
+        return get_precedence(this.peek_token.type)
+    }
+
+    # ============================================================
+    # Error Handling
+    # ============================================================
+
+    # peek_error(t) - Add an error for unexpected peek token
+    mut fn peek_error(t: object) {
+        msg := "expected " + token.token_type_name(t) + ", got " + token.token_type_name(this.peek_token.type)
+        this.errors = this.errors.append(msg)
+    }
+
+    # add_error(msg) - Add a custom error message
+    mut fn add_error(msg: string) {
+        this.errors = this.errors.append(msg)
+    }
+
+    # no_prefix_parse_error(t) - Add error for missing prefix parser
+    mut fn no_prefix_parse_error(t: object) {
+        msg := "no prefix parse function for " + token.token_type_name(t)
+        this.errors = this.errors.append(msg)
+    }
+
+    # ============================================================
+    # Main Parsing Entry Points
+    # ============================================================
+
+    # parse_program() - Parse a complete program
+    mut fn parse_program() -> object {
+        program := ast.Program()..statements=[]
+
+        for not this.cur_token_is(token.TokenType.EOF) {
+            stmt := this.parse_statement()
+            if stmt != nil {
+                program.statements = program.statements.append(stmt)
+            }
+            this.next_token()
+        }
+
+        return program
+    }
+
+    # parse_statement() - Parse a single statement
+    mut fn parse_statement() -> object {
+        match this.cur_token.type {
+            token.TokenType.IMPORT => { return this.parse_import_statement() }
+            token.TokenType.RETURN => { return this.parse_return_statement() }
+            token.TokenType.BREAK => { return this.parse_break_statement() }
+            token.TokenType.CONTINUE => { return this.parse_continue_statement() }
+            token.TokenType.NOP => { return this.parse_nop_statement() }
+            token.TokenType.IF => { return this.parse_if_statement() }
+            token.TokenType.FOR => { return this.parse_for_statement() }
+            token.TokenType.MATCH => { return this.parse_match_statement() }
+            token.TokenType.CLASS => { return this.parse_class_declaration() }
+            token.TokenType.IMPL => { return this.parse_impl_declaration() }
+            token.TokenType.SPEC => { return this.parse_spec_declaration() }
+            token.TokenType.ENUM => { return this.parse_enum_declaration() }
+            token.TokenType.FN => { return this.parse_function_statement() }
+            token.TokenType.ASSERT => { return this.parse_assert_statement() }
+            token.TokenType.UNSAFE => { return this.parse_unsafe_block() }
+            token.TokenType.WITH => { return this.parse_with_statement() }
+            token.TokenType.MUT => { return this.parse_maybe_declaration() }
+            token.TokenType.IDENT => { return this.parse_maybe_declaration() }
+            _ => { return this.parse_expression_statement() }
+        }
+    }
+
+    # ============================================================
+    # Expression Parsing (Pratt Parser Core)
+    # ============================================================
+
+    # parse_expression(precedence) - Parse an expression with given precedence
+    mut fn parse_expression(precedence: int) -> object {
+        # Parse prefix expression
+        mut left := this.parse_prefix()
+        if left == nil {
+            return nil
+        }
+
+        # Parse infix expressions while precedence allows
+        for not this.peek_token_is(token.TokenType.EOF) and precedence < this.peek_precedence() {
+            # Check for infix operator
+            if not this.is_infix_token(this.peek_token.type) {
+                return left
+            }
+            this.next_token()
+            left = this.parse_infix(left)
+        }
+
+        return left
+    }
+
+    # is_infix_token(t) - Check if token type can be an infix operator
+    fn is_infix_token(t: object) -> bool {
+        match t {
+            token.TokenType.PLUS => { return true }
+            token.TokenType.MINUS => { return true }
+            token.TokenType.ASTERISK => { return true }
+            token.TokenType.SLASH => { return true }
+            token.TokenType.PERCENT => { return true }
+            token.TokenType.POWER => { return true }
+            token.TokenType.EQ => { return true }
+            token.TokenType.NOT_EQ => { return true }
+            token.TokenType.LT => { return true }
+            token.TokenType.GT => { return true }
+            token.TokenType.LT_EQ => { return true }
+            token.TokenType.GT_EQ => { return true }
+            token.TokenType.AND => { return true }
+            token.TokenType.OR => { return true }
+            token.TokenType.IS => { return true }
+            token.TokenType.DOTDOT => { return true }
+            token.TokenType.DOTDOTEQ => { return true }
+            token.TokenType.LPAREN => { return true }
+            token.TokenType.LBRACKET => { return true }
+            token.TokenType.DOT => { return true }
+            _ => { return false }
+        }
+    }
+
+    # parse_prefix() - Parse a prefix expression
+    mut fn parse_prefix() -> object {
+        match this.cur_token.type {
+            token.TokenType.IDENT => { return this.parse_identifier() }
+            token.TokenType.INT => { return this.parse_integer_literal() }
+            token.TokenType.FLOAT => { return this.parse_float_literal() }
+            token.TokenType.STRING => { return this.parse_string_literal() }
+            token.TokenType.INTERP_START => { return this.parse_interpolated_string() }
+            token.TokenType.TRUE => { return this.parse_boolean_literal() }
+            token.TokenType.FALSE => { return this.parse_boolean_literal() }
+            token.TokenType.NIL => { return this.parse_nil_literal() }
+            token.TokenType.MINUS => { return this.parse_prefix_expression() }
+            token.TokenType.NOT => { return this.parse_prefix_expression() }
+            token.TokenType.LPAREN => { return this.parse_grouped_expression() }
+            token.TokenType.LBRACKET => { return this.parse_list_literal() }
+            token.TokenType.LBRACE => { return this.parse_map_or_block() }
+            token.TokenType.FN => { return this.parse_function_literal() }
+            token.TokenType.THIS => { return this.parse_this_expression() }
+            token.TokenType.SELF => { return this.parse_self_expression() }
+            token.TokenType.UNDERSCORE => { return this.parse_underscore() }
+            _ => {
+                this.no_prefix_parse_error(this.cur_token.type)
+                return nil
+            }
+        }
+    }
+
+    # parse_infix(left) - Parse an infix expression with left operand
+    mut fn parse_infix(left: object) -> object {
+        match this.cur_token.type {
+            token.TokenType.PLUS => { return this.parse_infix_expression(left) }
+            token.TokenType.MINUS => { return this.parse_infix_expression(left) }
+            token.TokenType.ASTERISK => { return this.parse_infix_expression(left) }
+            token.TokenType.SLASH => { return this.parse_infix_expression(left) }
+            token.TokenType.PERCENT => { return this.parse_infix_expression(left) }
+            token.TokenType.POWER => { return this.parse_power_expression(left) }
+            token.TokenType.EQ => { return this.parse_infix_expression(left) }
+            token.TokenType.NOT_EQ => { return this.parse_infix_expression(left) }
+            token.TokenType.LT => { return this.parse_infix_expression(left) }
+            token.TokenType.GT => { return this.parse_infix_expression(left) }
+            token.TokenType.LT_EQ => { return this.parse_infix_expression(left) }
+            token.TokenType.GT_EQ => { return this.parse_infix_expression(left) }
+            token.TokenType.AND => { return this.parse_infix_expression(left) }
+            token.TokenType.OR => { return this.parse_infix_expression(left) }
+            token.TokenType.IS => { return this.parse_is_expression(left) }
+            token.TokenType.DOTDOT => { return this.parse_range_expression(left) }
+            token.TokenType.DOTDOTEQ => { return this.parse_range_expression(left) }
+            token.TokenType.LPAREN => { return this.parse_call_expression(left) }
+            token.TokenType.LBRACKET => { return this.parse_index_expression(left) }
+            token.TokenType.DOT => { return this.parse_member_or_chain(left) }
+            _ => { return left }
+        }
+    }
+
+    # ============================================================
+    # Literal Parsing
+    # ============================================================
+
+    # parse_identifier() - Parse an identifier
+    mut fn parse_identifier() -> object {
+        return ast.Identifier()..token=this.cur_token..value=this.cur_token.literal
+    }
+
+    # parse_integer_literal() - Parse an integer literal
+    mut fn parse_integer_literal() -> object {
+        tok := this.cur_token
+        # Remove underscores from the literal for parsing
+        lit := str.replace(tok.literal, "_", "")
+        value := int(lit)
+        return ast.IntegerLit()..token=tok..value=value
+    }
+
+    # parse_float_literal() - Parse a float literal
+    mut fn parse_float_literal() -> object {
+        tok := this.cur_token
+        lit := str.replace(tok.literal, "_", "")
+        value := float(lit)
+        return ast.FloatLit()..token=tok..value=value
+    }
+
+    # parse_string_literal() - Parse a string literal
+    mut fn parse_string_literal() -> object {
+        return ast.StringLit()..token=this.cur_token..value=this.cur_token.literal
+    }
+
+    # parse_boolean_literal() - Parse a boolean literal
+    mut fn parse_boolean_literal() -> object {
+        tok := this.cur_token
+        value := this.cur_token_is(token.TokenType.TRUE)
+        return ast.BoolLit()..token=tok..value=value
+    }
+
+    # parse_nil_literal() - Parse a nil literal
+    mut fn parse_nil_literal() -> object {
+        return ast.NilLit()..token=this.cur_token
+    }
+
+    # parse_this_expression() - Parse 'this' keyword
+    mut fn parse_this_expression() -> object {
+        return ast.Identifier()..token=this.cur_token..value="this"
+    }
+
+    # parse_self_expression() - Parse 'Self' keyword
+    mut fn parse_self_expression() -> object {
+        return ast.Identifier()..token=this.cur_token..value="Self"
+    }
+
+    # parse_underscore() - Parse '_' (wildcard)
+    mut fn parse_underscore() -> object {
+        return ast.Identifier()..token=this.cur_token..value="_"
+    }
+
+    # parse_interpolated_string() - Parse an interpolated string
+    mut fn parse_interpolated_string() -> object {
+        start_tok := this.cur_token
+        mut parts := []
+
+        # Add the initial string part if non-empty
+        if this.cur_token.literal != "" {
+            part := ast.StringPart()..is_expr=false..text=this.cur_token.literal..expr=nil
+            parts = parts.append(part)
+        }
+
+        # Parse expressions and string parts
+        for {
+            this.next_token()
+
+            # Parse the expression inside the interpolation
+            expr := this.parse_expression(LOWEST)
+            if expr != nil {
+                part := ast.StringPart()..is_expr=true..text=""..expr=expr
+                parts = parts.append(part)
+            }
+
+            # Move to INTERP_MID or INTERP_END
+            this.next_token()
+
+            if this.cur_token_is(token.TokenType.INTERP_END) {
+                if this.cur_token.literal != "" {
+                    part := ast.StringPart()..is_expr=false..text=this.cur_token.literal..expr=nil
+                    parts = parts.append(part)
+                }
+                break
+            }
+
+            if this.cur_token_is(token.TokenType.INTERP_MID) {
+                if this.cur_token.literal != "" {
+                    part := ast.StringPart()..is_expr=false..text=this.cur_token.literal..expr=nil
+                    parts = parts.append(part)
+                }
+                # Continue to next expression
+            } else {
+                break
+            }
+        }
+
+        return ast.InterpolatedString()..token=start_tok..parts=parts
+    }
+
+    # ============================================================
+    # Operator Parsing
+    # ============================================================
+
+    # parse_prefix_expression() - Parse a prefix operator expression (-, not)
+    mut fn parse_prefix_expression() -> object {
+        tok := this.cur_token
+        operator := this.cur_token.literal
+        this.next_token()
+        right := this.parse_expression(PREFIX)
+        return ast.PrefixExpr()..token=tok..operator=operator..right=right
+    }
+
+    # parse_infix_expression(left) - Parse a binary operator expression
+    mut fn parse_infix_expression(left: object) -> object {
+        tok := this.cur_token
+        operator := this.cur_token.literal
+        precedence := this.cur_precedence()
+        this.next_token()
+        right := this.parse_expression(precedence)
+        return ast.InfixExpr()
+            ..token=tok
+            ..left=left
+            ..operator=operator
+            ..right=right
+    }
+
+    # parse_power_expression(left) - Parse ** (right-associative)
+    mut fn parse_power_expression(left: object) -> object {
+        tok := this.cur_token
+        operator := this.cur_token.literal
+        this.next_token()
+        # Right-associative: use precedence - 1
+        right := this.parse_expression(POWER_PREC - 1)
+        return ast.InfixExpr()
+            ..token=tok
+            ..left=left
+            ..operator=operator
+            ..right=right
+    }
+
+    # parse_range_expression(left) - Parse .. or ..= (or builder pattern ..field=value)
+    mut fn parse_range_expression(left: object) -> object {
+        tok := this.cur_token
+
+        # Check for builder pattern: ..field=value
+        # Only DOTDOT can be builder pattern, not DOTDOTEQ
+        if this.cur_token_is(token.TokenType.DOTDOT) {
+            this.next_token()  # move past ..
+
+            # Check if this is builder pattern: IDENT followed by ASSIGN
+            if this.cur_token_is(token.TokenType.IDENT) and this.peek_token_is(token.TokenType.ASSIGN) {
+                return this.parse_chained_assignment(left)
+            }
+
+            # Otherwise it's a range expression - parse the end value
+            right := this.parse_expression(RANGE_PREC)
+            return ast.RangeExpr()
+                ..token=tok
+                ..start=left
+                ..end=right
+                ..inclusive=false
+        }
+
+        # Handle ..= (inclusive range)
+        inclusive := this.cur_token_is(token.TokenType.DOTDOTEQ)
+        this.next_token()
+        right := this.parse_expression(RANGE_PREC)
+        return ast.RangeExpr()
+            ..token=tok
+            ..start=left
+            ..end=right
+            ..inclusive=inclusive
+    }
+
+    # parse_is_expression(left) - Parse 'is' type check
+    mut fn parse_is_expression(left: object) -> object {
+        tok := this.cur_token
+        this.next_token()
+        type_name := this.parse_identifier()
+        return ast.IsExpr()..token=tok..left=left..type_name=type_name
+    }
+
+    # parse_grouped_expression() - Parse a parenthesized expression
+    mut fn parse_grouped_expression() -> object {
+        tok := this.cur_token
+        this.next_token()
+        expr := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.RPAREN) {
+            return nil
+        }
+
+        return ast.GroupExpr()..token=tok..expression=expr
+    }
+
+    # ============================================================
+    # Access and Call Expressions
+    # ============================================================
+
+    # parse_call_expression(function) - Parse a function call
+    mut fn parse_call_expression(function: object) -> object {
+        tok := this.cur_token
+        args := this.parse_call_arguments()
+        return ast.CallExpr()..token=tok..function=function..arguments=args
+    }
+
+    # parse_call_arguments() - Parse function call arguments
+    mut fn parse_call_arguments() -> list {
+        mut args := []
+
+        if this.peek_token_is(token.TokenType.RPAREN) {
+            this.next_token()
+            return args
+        }
+
+        this.next_token()
+        args = args.append(this.parse_call_argument())
+
+        for this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            args = args.append(this.parse_call_argument())
+        }
+
+        if not this.expect_peek(token.TokenType.RPAREN) {
+            return []
+        }
+
+        return args
+    }
+
+    # parse_call_argument() - Parse a single argument (possibly named)
+    mut fn parse_call_argument() -> object {
+        # Check for named argument: name=value
+        if this.cur_token_is(token.TokenType.IDENT) and this.peek_token_is(token.TokenType.ASSIGN) {
+            name := this.cur_token.literal
+            tok := this.cur_token
+            this.next_token()  # consume name
+            this.next_token()  # consume =
+            value := this.parse_expression(LOWEST)
+            return ast.NamedArgument()..token=tok..name=name..value=value
+        }
+        return this.parse_expression(LOWEST)
+    }
+
+    # parse_index_expression(left) - Parse an index access [...]
+    mut fn parse_index_expression(left: object) -> object {
+        tok := this.cur_token
+        this.next_token()
+        index := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.RBRACKET) {
+            return nil
+        }
+
+        return ast.IndexExpr()..token=tok..left=left..index=index
+    }
+
+    # parse_member_or_chain(left) - Parse member access or chained assignment
+    mut fn parse_member_or_chain(left: object) -> object {
+        tok := this.cur_token
+
+        # Check for chained assignment: ..field=value
+        if this.peek_token_is(token.TokenType.DOT) {
+            this.next_token()  # consume first .
+            this.next_token()  # consume second .
+            return this.parse_chained_assignment(left)
+        }
+
+        # Regular member access
+        this.next_token()
+        if not this.cur_token_is(token.TokenType.IDENT) {
+            this.add_error("expected identifier after .")
+            return nil
+        }
+
+        member := this.parse_identifier()
+        return ast.MemberExpr()..token=tok..object=left..member=member
+    }
+
+    # parse_chained_assignment(left) - Parse ..field=value
+    mut fn parse_chained_assignment(left: object) -> object {
+        tok := this.cur_token
+        if not this.cur_token_is(token.TokenType.IDENT) {
+            this.add_error("expected identifier in chained assignment")
+            return nil
+        }
+
+        field := this.cur_token.literal
+
+        if not this.expect_peek(token.TokenType.ASSIGN) {
+            return nil
+        }
+
+        this.next_token()
+        value := this.parse_expression(LOWEST)
+
+        return ast.ChainedAssignment()
+            ..token=tok
+            ..object=left
+            ..field=field
+            ..value=value
+    }
+
+    # ============================================================
+    # Collection Literals
+    # ============================================================
+
+    # parse_list_literal() - Parse a list literal [...]
+    mut fn parse_list_literal() -> object {
+        tok := this.cur_token
+        elements := this.parse_expression_list(token.TokenType.RBRACKET)
+        return ast.ListLit()..token=tok..elements=elements
+    }
+
+    # parse_expression_list(end) - Parse comma-separated expressions until end token
+    mut fn parse_expression_list(end: object) -> list {
+        mut elements := []
+
+        if this.peek_token_is(end) {
+            this.next_token()
+            return elements
+        }
+
+        this.next_token()
+        elements = elements.append(this.parse_expression(LOWEST))
+
+        for this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            elements = elements.append(this.parse_expression(LOWEST))
+        }
+
+        if not this.expect_peek(end) {
+            return []
+        }
+
+        return elements
+    }
+
+    # parse_map_or_block() - Parse either a map literal or a block statement
+    mut fn parse_map_or_block() -> object {
+        tok := this.cur_token
+
+        # Empty map: {}
+        if this.peek_token_is(token.TokenType.RBRACE) {
+            this.next_token()
+            return ast.MapLit()..token=tok..pairs=[]
+        }
+
+        # Check if it's a map by looking for key:value pattern
+        # A map starts with: { expr : or { string :
+        this.next_token()
+
+        # If we see a colon after the first expression, it's a map
+        # Save the current state
+        first_expr := this.parse_expression(LOWEST)
+
+        if this.peek_token_is(token.TokenType.COLON) {
+            # It's a map - continue parsing
+            return this.continue_parse_map(tok, first_expr)
+        }
+
+        # It's a block - but we've already consumed the first expression
+        # This shouldn't happen in expression context, treat as error
+        this.add_error("unexpected block in expression context")
+        return nil
+    }
+
+    # continue_parse_map(tok, first_key) - Continue parsing a map after first key
+    mut fn continue_parse_map(tok: object, first_key: object) -> object {
+        mut pairs := []
+
+        # Parse first pair
+        this.next_token()  # consume :
+        this.next_token()
+        first_value := this.parse_expression(LOWEST)
+        pair := ast.MapPair()..key=first_key..value=first_value
+        pairs = pairs.append(pair)
+
+        # Parse remaining pairs
+        for this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            key := this.parse_expression(LOWEST)
+            if not this.expect_peek(token.TokenType.COLON) {
+                return nil
+            }
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            pair := ast.MapPair()..key=key..value=value
+            pairs = pairs.append(pair)
+        }
+
+        if not this.expect_peek(token.TokenType.RBRACE) {
+            return nil
+        }
+
+        return ast.MapLit()..token=tok..pairs=pairs
+    }
+
+    # ============================================================
+    # Function Parsing
+    # ============================================================
+
+    # parse_function_literal() - Parse fn(...) { ... }
+    mut fn parse_function_literal() -> object {
+        tok := this.cur_token
+        mut name := ""
+        mut is_mut := false
+
+        # Check for method modifier: mut fn
+        if this.peek_token_is(token.TokenType.MUT) {
+            # This shouldn't happen in expression context
+            nop
+        }
+
+        # Check for function name
+        if this.peek_token_is(token.TokenType.IDENT) {
+            this.next_token()
+            name = this.cur_token.literal
+        }
+
+        if not this.expect_peek(token.TokenType.LPAREN) {
+            return nil
+        }
+
+        params := this.parse_function_parameters()
+
+        # Optional return type
+        mut return_type := nil
+        if this.peek_token_is(token.TokenType.ARROW) {
+            this.next_token()
+            this.next_token()
+            return_type = this.parse_type_annotation()
+        }
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+
+        return ast.FunctionLit()
+            ..token=tok
+            ..name=name
+            ..parameters=params
+            ..return_type=return_type
+            ..body=body
+            ..is_mut=is_mut
+    }
+
+    # parse_function_parameters() - Parse function parameter list
+    mut fn parse_function_parameters() -> list {
+        mut params := []
+
+        if this.peek_token_is(token.TokenType.RPAREN) {
+            this.next_token()
+            return params
+        }
+
+        this.next_token()
+        params = params.append(this.parse_parameter())
+
+        for this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            params = params.append(this.parse_parameter())
+        }
+
+        if not this.expect_peek(token.TokenType.RPAREN) {
+            return []
+        }
+
+        return params
+    }
+
+    # parse_parameter() - Parse a single function parameter
+    mut fn parse_parameter() -> object {
+        tok := this.cur_token
+        mut is_mut := false
+
+        if this.cur_token_is(token.TokenType.MUT) {
+            is_mut = true
+            this.next_token()
+        }
+
+        name := this.cur_token.literal
+
+        mut type_annotation := nil
+        if this.peek_token_is(token.TokenType.COLON) {
+            this.next_token()
+            this.next_token()
+            type_annotation = this.parse_type_annotation()
+        }
+
+        return ast.Parameter()..token=tok..name=name..type_annotation=type_annotation..is_mut=is_mut
+    }
+
+    # parse_type_annotation() - Parse a type annotation
+    mut fn parse_type_annotation() -> object {
+        return this.parse_identifier()
+    }
+
+    # parse_function_statement() - Parse a top-level function definition
+    mut fn parse_function_statement() -> object {
+        return this.parse_function_literal()
+    }
+
+    # ============================================================
+    # Statement Parsing
+    # ============================================================
+
+    # parse_block_statement() - Parse a block { ... }
+    mut fn parse_block_statement() -> object {
+        tok := this.cur_token
+        mut statements := []
+
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            stmt := this.parse_statement()
+            if stmt != nil {
+                statements = statements.append(stmt)
+            }
+            this.next_token()
+        }
+
+        return ast.BlockStmt()..token=tok..statements=statements
+    }
+
+    # parse_expression_statement() - Parse an expression as a statement
+    mut fn parse_expression_statement() -> object {
+        tok := this.cur_token
+        expr := this.parse_expression(LOWEST)
+        return ast.ExprStmt()..token=tok..expression=expr
+    }
+
+    # parse_maybe_declaration() - Parse potential declaration or assignment
+    mut fn parse_maybe_declaration() -> object {
+        mut is_mut := false
+        start_tok := this.cur_token
+
+        # Check for 'mut' modifier
+        if this.cur_token_is(token.TokenType.MUT) {
+            is_mut = true
+            this.next_token()
+        }
+
+        if not this.cur_token_is(token.TokenType.IDENT) {
+            return this.parse_expression_statement()
+        }
+
+        name := this.parse_identifier()
+
+        # Check for declaration (:=)
+        if this.peek_token_is(token.TokenType.DECLARE) {
+            this.next_token()
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+
+            # Check for postfix conditional
+            mut condition := nil
+            if this.peek_token_is(token.TokenType.IF) {
+                this.next_token()
+                this.next_token()
+                condition = this.parse_expression(LOWEST)
+            }
+
+            stmt := ast.DeclareStmt()..token=start_tok..name=name..value=value..is_mut=is_mut
+            return stmt
+        }
+
+        # Check for assignment (=)
+        if this.peek_token_is(token.TokenType.ASSIGN) {
+            this.next_token()
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.AssignStmt()..token=start_tok..target=name..value=value
+        }
+
+        # Check for compound assignment (+=, -=, etc.)
+        if this.is_compound_assign(this.peek_token.type) {
+            this.next_token()
+            op := this.cur_token.literal
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.CompoundAssignStmt()
+                ..token=start_tok
+                ..target=name
+                ..operator=op
+                ..value=value
+        }
+
+        # Not a declaration, parse as expression
+        # We've already parsed the identifier, now continue with infix parsing
+        mut expr := name
+
+        # Continue parsing the expression (handles calls, member access, etc.)
+        for not this.peek_token_is(token.TokenType.EOF) and LOWEST < this.peek_precedence() {
+            if not this.is_infix_token(this.peek_token.type) {
+                break
+            }
+            this.next_token()
+            expr = this.parse_infix(expr)
+        }
+
+        # Check for assignment after parsing the full left-hand side
+        if this.peek_token_is(token.TokenType.ASSIGN) {
+            this.next_token()
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.AssignStmt()..token=start_tok..target=expr..value=value
+        }
+
+        # Check for compound assignment
+        if this.is_compound_assign(this.peek_token.type) {
+            this.next_token()
+            op := this.cur_token.literal
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.CompoundAssignStmt()
+                ..token=start_tok
+                ..target=expr
+                ..operator=op
+                ..value=value
+        }
+
+        # Just an expression statement
+        return ast.ExprStmt()..token=start_tok..expression=expr
+    }
+
+    # is_compound_assign(t) - Check if token is a compound assignment operator
+    fn is_compound_assign(t: object) -> bool {
+        match t {
+            token.TokenType.PLUS_ASSIGN => { return true }
+            token.TokenType.MINUS_ASSIGN => { return true }
+            token.TokenType.ASTERISK_ASSIGN => { return true }
+            token.TokenType.SLASH_ASSIGN => { return true }
+            token.TokenType.PERCENT_ASSIGN => { return true }
+            _ => { return false }
+        }
+    }
+
+    # ============================================================
+    # Control Flow Statements
+    # ============================================================
+
+    # parse_return_statement() - Parse return [expr] [if cond]
+    mut fn parse_return_statement() -> object {
+        tok := this.cur_token
+        mut value := nil
+        mut condition := nil
+
+        # Check if there's a return value
+        if not this.peek_token_is(token.TokenType.RBRACE) and not this.peek_token_is(token.TokenType.EOF) {
+            this.next_token()
+
+            # Check for 'if' immediately (return if cond)
+            if this.cur_token_is(token.TokenType.IF) {
+                this.next_token()
+                condition = this.parse_expression(LOWEST)
+            } else {
+                value = this.parse_expression(LOWEST)
+
+                # Check for postfix conditional
+                if this.peek_token_is(token.TokenType.IF) {
+                    this.next_token()
+                    this.next_token()
+                    condition = this.parse_expression(LOWEST)
+                }
+            }
+        }
+
+        return ast.ReturnStmt()..token=tok..value=value..condition=condition
+    }
+
+    # parse_break_statement() - Parse break [if cond]
+    mut fn parse_break_statement() -> object {
+        tok := this.cur_token
+        mut condition := nil
+
+        if this.peek_token_is(token.TokenType.IF) {
+            this.next_token()
+            this.next_token()
+            condition = this.parse_expression(LOWEST)
+        }
+
+        return ast.BreakStmt()..token=tok..condition=condition
+    }
+
+    # parse_continue_statement() - Parse continue [if cond]
+    mut fn parse_continue_statement() -> object {
+        tok := this.cur_token
+        mut condition := nil
+
+        if this.peek_token_is(token.TokenType.IF) {
+            this.next_token()
+            this.next_token()
+            condition = this.parse_expression(LOWEST)
+        }
+
+        return ast.ContinueStmt()..token=tok..condition=condition
+    }
+
+    # parse_nop_statement() - Parse nop
+    mut fn parse_nop_statement() -> object {
+        return ast.NopStmt()..token=this.cur_token
+    }
+
+    # parse_if_statement() - Parse if condition { ... } [else { ... }]
+    mut fn parse_if_statement() -> object {
+        tok := this.cur_token
+        this.next_token()
+
+        condition := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        consequence := this.parse_block_statement()
+
+        mut alternative := nil
+        if this.peek_token_is(token.TokenType.ELSE) {
+            this.next_token()
+
+            # Check for else if
+            if this.peek_token_is(token.TokenType.IF) {
+                this.next_token()
+                alternative = this.parse_if_statement()
+            } else {
+                if not this.expect_peek(token.TokenType.LBRACE) {
+                    return nil
+                }
+                alternative = this.parse_block_statement()
+            }
+        }
+
+        return ast.IfStmt()
+            ..token=tok
+            ..condition=condition
+            ..consequence=consequence
+            ..alternative=alternative
+    }
+
+    # parse_for_statement() - Parse for loop (for-in or for-condition)
+    mut fn parse_for_statement() -> object {
+        tok := this.cur_token
+        this.next_token()
+
+        # Check for infinite loop: for { ... }
+        if this.cur_token_is(token.TokenType.LBRACE) {
+            body := this.parse_block_statement()
+            return ast.ForCondStmt()..token=tok..condition=nil..body=body
+        }
+
+        # Parse the first expression/identifier
+        if this.cur_token_is(token.TokenType.IDENT) {
+            ident := this.parse_identifier()
+
+            # Check for for-in: for x in iterable { ... }
+            if this.peek_token_is(token.TokenType.IN) {
+                this.next_token()
+                this.next_token()
+                iterable := this.parse_expression(LOWEST)
+
+                if not this.expect_peek(token.TokenType.LBRACE) {
+                    return nil
+                }
+
+                body := this.parse_block_statement()
+                return ast.ForInStmt()
+                    ..token=tok
+                    ..variable=ident
+                    ..iterable=iterable
+                    ..body=body
+            }
+
+            # It's a for-condition starting with identifier
+            # Continue parsing as expression
+            mut condition := ident
+
+            # Continue parsing if there are more operators
+            for this.peek_precedence() > LOWEST {
+                this.next_token()
+                condition = this.parse_infix(condition)
+            }
+
+            if not this.expect_peek(token.TokenType.LBRACE) {
+                return nil
+            }
+
+            body := this.parse_block_statement()
+            return ast.ForCondStmt()..token=tok..condition=condition..body=body
+        }
+
+        # It's a for-condition with an expression
+        condition := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+        return ast.ForCondStmt()..token=tok..condition=condition..body=body
+    }
+
+    # parse_match_statement() - Parse match statement
+    mut fn parse_match_statement() -> object {
+        tok := this.cur_token
+        this.next_token()
+
+        subject := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        mut arms := []
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            arm := this.parse_match_arm()
+            if arm != nil {
+                arms = arms.append(arm)
+            }
+            this.next_token()
+        }
+
+        return ast.MatchStmt()..token=tok..subject=subject..arms=arms
+    }
+
+    # parse_match_arm() - Parse a single match arm
+    mut fn parse_match_arm() -> object {
+        tok := this.cur_token
+        mut patterns := []
+
+        # Parse patterns (can be multiple with |)
+        patterns = patterns.append(this.parse_expression(LOWEST))
+
+        for this.peek_token_is(token.TokenType.PIPE) {
+            this.next_token()
+            this.next_token()
+            patterns = patterns.append(this.parse_expression(LOWEST))
+        }
+
+        # Optional guard: if condition
+        mut guard := nil
+        if this.peek_token_is(token.TokenType.IF) {
+            this.next_token()
+            this.next_token()
+            guard = this.parse_expression(LOWEST)
+        }
+
+        if not this.expect_peek(token.TokenType.FAT_ARROW) {
+            return nil
+        }
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+
+        return ast.MatchArm()
+            ..token=tok
+            ..patterns=patterns
+            ..guard=guard
+            ..body=body
+    }
+
+    # ============================================================
+    # OOP Declarations
+    # ============================================================
+
+    # parse_class_declaration() - Parse class definition
+    mut fn parse_class_declaration() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.parse_identifier()
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        mut fields := []
+        mut embedded := []
+
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            # Check for embedded type (just an identifier on its own)
+            if this.cur_token_is(token.TokenType.IDENT) and not this.peek_token_is(token.TokenType.COLON) {
+                emb := this.parse_identifier()
+                embedded = embedded.append(emb)
+                this.next_token()
+                continue
+            }
+
+            field := this.parse_field_declaration()
+            if field != nil {
+                fields = fields.append(field)
+            }
+            this.next_token()
+        }
+
+        return ast.ClassDecl()
+            ..token=tok
+            ..name=name
+            ..fields=fields
+            ..embedded=embedded
+    }
+
+    # parse_field_declaration() - Parse a field in a class
+    mut fn parse_field_declaration() -> object {
+        tok := this.cur_token
+        mut is_pub := false
+        mut is_mut := false
+
+        if this.cur_token_is(token.TokenType.PUB) {
+            is_pub = true
+            this.next_token()
+        }
+
+        if this.cur_token_is(token.TokenType.MUT) {
+            is_mut = true
+            this.next_token()
+        }
+
+        if not this.cur_token_is(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.cur_token.literal
+
+        if not this.expect_peek(token.TokenType.COLON) {
+            return nil
+        }
+
+        this.next_token()
+        type_annotation := this.parse_type_annotation()
+
+        return ast.FieldDecl()..token=tok..name=name..type_annotation=type_annotation..is_pub=is_pub..is_mut=is_mut
+    }
+
+    # parse_impl_declaration() - Parse impl block
+    mut fn parse_impl_declaration() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        type_name := this.parse_identifier()
+
+        # Check for spec implementation: impl Spec for Type
+        mut spec_name := nil
+        # Note: Zerg doesn't use "for" for spec impl, skip this for now
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        mut methods := []
+
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            method := this.parse_method_declaration()
+            if method != nil {
+                methods = methods.append(method)
+            }
+            this.next_token()
+        }
+
+        return ast.ImplDecl()..token=tok..type_name=type_name..spec_name=spec_name..methods=methods
+    }
+
+    # parse_method_declaration() - Parse a method in an impl block
+    mut fn parse_method_declaration() -> object {
+        tok := this.cur_token
+        mut is_mut := false
+        mut is_static := false
+
+        if this.cur_token_is(token.TokenType.STATIC) {
+            is_static = true
+            this.next_token()
+        }
+
+        if this.cur_token_is(token.TokenType.MUT) {
+            is_mut = true
+            this.next_token()
+        }
+
+        if not this.cur_token_is(token.TokenType.FN) {
+            return nil
+        }
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.cur_token.literal
+
+        if not this.expect_peek(token.TokenType.LPAREN) {
+            return nil
+        }
+
+        params := this.parse_function_parameters()
+
+        mut return_type := nil
+        if this.peek_token_is(token.TokenType.ARROW) {
+            this.next_token()
+            this.next_token()
+            return_type = this.parse_type_annotation()
+        }
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+
+        return ast.MethodDecl()
+            ..token=tok
+            ..name=name
+            ..parameters=params
+            ..return_type=return_type
+            ..body=body
+            ..is_mut=is_mut
+            ..is_static=is_static
+    }
+
+    # parse_spec_declaration() - Parse spec (interface) declaration
+    mut fn parse_spec_declaration() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.parse_identifier()
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        mut methods := []
+
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            sig := this.parse_method_signature()
+            if sig != nil {
+                methods = methods.append(sig)
+            }
+            this.next_token()
+        }
+
+        return ast.SpecDecl()..token=tok..name=name..methods=methods
+    }
+
+    # parse_method_signature() - Parse method signature in spec
+    mut fn parse_method_signature() -> object {
+        tok := this.cur_token
+        mut is_mut := false
+
+        if this.cur_token_is(token.TokenType.MUT) {
+            is_mut = true
+            this.next_token()
+        }
+
+        if not this.cur_token_is(token.TokenType.FN) {
+            return nil
+        }
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.cur_token.literal
+
+        if not this.expect_peek(token.TokenType.LPAREN) {
+            return nil
+        }
+
+        params := this.parse_function_parameters()
+
+        mut return_type := nil
+        if this.peek_token_is(token.TokenType.ARROW) {
+            this.next_token()
+            this.next_token()
+            return_type = this.parse_type_annotation()
+        }
+
+        return ast.MethodSignature()..token=tok..name=name..parameters=params..return_type=return_type..is_mut=is_mut
+    }
+
+    # parse_enum_declaration() - Parse enum declaration
+    mut fn parse_enum_declaration() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        name := this.parse_identifier()
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        mut variants := []
+
+        this.next_token()
+
+        for not this.cur_token_is(token.TokenType.RBRACE) and not this.cur_token_is(token.TokenType.EOF) {
+            if this.cur_token_is(token.TokenType.IDENT) {
+                variant := ast.EnumVariant()..token=this.cur_token..name=this.cur_token.literal
+                variants = variants.append(variant)
+            }
+            this.next_token()
+        }
+
+        return ast.EnumDecl()..token=tok..name=name..variants=variants
+    }
+
+    # ============================================================
+    # Other Statements
+    # ============================================================
+
+    # parse_import_statement() - Parse import "path" [as alias]
+    mut fn parse_import_statement() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.STRING) {
+            return nil
+        }
+
+        path := this.cur_token.literal
+        mut alias := ""
+
+        if this.peek_token_is(token.TokenType.AS) {
+            this.next_token()
+            if not this.expect_peek(token.TokenType.IDENT) {
+                return nil
+            }
+            alias = this.cur_token.literal
+        }
+
+        return ast.ImportStmt()..token=tok..path=path..alias=alias
+    }
+
+    # parse_assert_statement() - Parse assert cond, "message"
+    mut fn parse_assert_statement() -> object {
+        tok := this.cur_token
+        this.next_token()
+
+        condition := this.parse_expression(LOWEST)
+
+        mut message := nil
+        if this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            message = this.parse_expression(LOWEST)
+        }
+
+        return ast.AssertStmt()..token=tok..condition=condition..message=message
+    }
+
+    # parse_unsafe_block() - Parse unsafe { ... }
+    mut fn parse_unsafe_block() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+
+        return ast.UnsafeBlock()..token=tok..body=body
+    }
+
+    # parse_with_statement() - Parse with var := expr { ... }
+    mut fn parse_with_statement() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.IDENT) {
+            return nil
+        }
+
+        variable := this.parse_identifier()
+
+        if not this.expect_peek(token.TokenType.DECLARE) {
+            return nil
+        }
+
+        this.next_token()
+        value := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.LBRACE) {
+            return nil
+        }
+
+        body := this.parse_block_statement()
+
+        return ast.WithStmt()
+            ..token=tok
+            ..variable=variable
+            ..value=value
+            ..body=body
+    }
+}

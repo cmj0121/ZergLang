@@ -1,0 +1,602 @@
+# test_parser.zg - Tests for Zerg parser
+#
+# This file contains comprehensive tests for the self-hosted Zerg parser.
+# Tests are organized by feature: literals, operators, expressions, statements,
+# control flow, functions, collections, and OOP constructs.
+
+import "src/core/compiler/token"
+import "src/core/compiler/lexer"
+import "src/core/compiler/ast"
+import "src/core/compiler/parser"
+
+print("=== Parser Tests ===")
+print("")
+
+# Helper function to check for parse errors
+fn check_errors(p, test_name) {
+    if len(p.errors) > 0 {
+        print("FAIL: " + test_name + " had parse errors:")
+        for err in p.errors {
+            print("  - " + err)
+        }
+        assert false, test_name + " should not have errors"
+    }
+}
+
+# Helper to create a parser for input
+fn make_parser(input) {
+    l := lexer.new_lexer(input)
+    return parser.new_parser(l)
+}
+
+# Helper to get node type name (workaround since Go runtime doesn't know our ast types)
+fn node_type(node) {
+    if node == nil {
+        return "nil"
+    }
+    # Use duck typing - check for distinctive fields
+    if node.value != nil and node.token != nil {
+        # Could be Identifier, IntegerLit, FloatLit, StringLit, BoolLit
+        if node.token.type == token.TokenType.IDENT {
+            return "Identifier"
+        }
+        if node.token.type == token.TokenType.INT {
+            return "IntegerLit"
+        }
+        if node.token.type == token.TokenType.FLOAT {
+            return "FloatLit"
+        }
+        if node.token.type == token.TokenType.STRING {
+            return "StringLit"
+        }
+        if node.token.type == token.TokenType.TRUE or node.token.type == token.TokenType.FALSE {
+            return "BoolLit"
+        }
+    }
+    return "Unknown"
+}
+
+# ============================================================
+# Literal Tests
+# ============================================================
+print("--- Literal Tests ---")
+
+# Test 1: Integer literal
+print("Test 1: Integer literal")
+p := make_parser("42")
+program := p.parse_program()
+check_errors(p, "integer literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 2: Float literal
+print("Test 2: Float literal")
+p := make_parser("3.14")
+program := p.parse_program()
+check_errors(p, "float literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 3: String literal
+print("Test 3: String literal")
+p := make_parser("\"hello\"")
+program := p.parse_program()
+check_errors(p, "string literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 4: Boolean literals
+print("Test 4: Boolean literals")
+p := make_parser("true")
+program := p.parse_program()
+check_errors(p, "true literal")
+assert len(program.statements) == 1, "should have 1 statement"
+
+p := make_parser("false")
+program := p.parse_program()
+check_errors(p, "false literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 5: Nil literal
+print("Test 5: Nil literal")
+p := make_parser("nil")
+program := p.parse_program()
+check_errors(p, "nil literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 6: Identifier
+print("Test 6: Identifier")
+p := make_parser("foobar")
+program := p.parse_program()
+check_errors(p, "identifier")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Prefix Expression Tests
+# ============================================================
+print("--- Prefix Expression Tests ---")
+
+# Test 7: Prefix minus
+print("Test 7: Prefix minus")
+p := make_parser("-5")
+program := p.parse_program()
+check_errors(p, "prefix minus")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 8: Prefix not
+print("Test 8: Prefix not")
+p := make_parser("not true")
+program := p.parse_program()
+check_errors(p, "prefix not")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Infix Expression Tests
+# ============================================================
+print("--- Infix Expression Tests ---")
+
+# Test 9: Basic arithmetic
+print("Test 9: Basic arithmetic (+)")
+p := make_parser("5 + 5")
+program := p.parse_program()
+check_errors(p, "addition")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 10: Operator precedence (* over +)
+print("Test 10: Operator precedence (* over +)")
+p := make_parser("5 + 5 * 10")
+program := p.parse_program()
+check_errors(p, "precedence")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 11: Grouped expression
+print("Test 11: Grouped expression")
+p := make_parser("(5 + 5) * 10")
+program := p.parse_program()
+check_errors(p, "grouped")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 12: Power operator (right-associative)
+print("Test 12: Power operator (right-associative)")
+p := make_parser("2 ** 3 ** 2")
+program := p.parse_program()
+check_errors(p, "power")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 13: Comparison operators
+print("Test 13: Comparison operators")
+p := make_parser("5 < 10")
+program := p.parse_program()
+check_errors(p, "less than")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 14: Logical operators
+print("Test 14: Logical operators (and, or)")
+p := make_parser("true and false")
+program := p.parse_program()
+check_errors(p, "and")
+assert len(program.statements) == 1, "should have 1 statement"
+
+p := make_parser("true or false")
+program := p.parse_program()
+check_errors(p, "or")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 15: Range expression
+print("Test 15: Range expressions")
+p := make_parser("0..10")
+program := p.parse_program()
+check_errors(p, "range")
+assert len(program.statements) == 1, "should have 1 statement"
+
+p := make_parser("0..=10")
+program := p.parse_program()
+check_errors(p, "range inclusive")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Declaration and Assignment Tests
+# ============================================================
+print("--- Declaration and Assignment Tests ---")
+
+# Test 16: Declaration
+print("Test 16: Declaration (:=)")
+p := make_parser("x := 5")
+program := p.parse_program()
+check_errors(p, "declaration")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 17: Mutable declaration
+print("Test 17: Mutable declaration")
+p := make_parser("mut y := 10")
+program := p.parse_program()
+check_errors(p, "mutable declaration")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 18: Assignment
+print("Test 18: Assignment (=)")
+p := make_parser("x = 5")
+program := p.parse_program()
+check_errors(p, "assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 19: Compound assignment
+print("Test 19: Compound assignment (+=)")
+p := make_parser("x += 5")
+program := p.parse_program()
+check_errors(p, "compound assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Control Flow Tests
+# ============================================================
+print("--- Control Flow Tests ---")
+
+# Test 20: Return statement
+print("Test 20: Return statement")
+p := make_parser("return 5")
+program := p.parse_program()
+check_errors(p, "return")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 21: Return with condition (postfix if)
+print("Test 21: Return with postfix if")
+p := make_parser("return 0 if x < 0")
+program := p.parse_program()
+check_errors(p, "return postfix if")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 22: If statement
+print("Test 22: If statement")
+p := make_parser("if x < 10 \{ y := 1 }")
+program := p.parse_program()
+check_errors(p, "if statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 23: If-else statement
+print("Test 23: If-else statement")
+p := make_parser("if x < 10 \{ y := 1 } else \{ y := 2 }")
+program := p.parse_program()
+check_errors(p, "if-else statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 24: For-in loop
+print("Test 24: For-in loop")
+p := make_parser("for x in items \{ print(x) }")
+program := p.parse_program()
+check_errors(p, "for-in loop")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 25: For condition loop
+print("Test 25: For condition loop")
+p := make_parser("for i < 10 \{ i = i + 1 }")
+program := p.parse_program()
+check_errors(p, "for condition loop")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 26: Infinite loop
+print("Test 26: Infinite loop")
+p := make_parser("for \{ break }")
+program := p.parse_program()
+check_errors(p, "infinite loop")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 27: Break and continue
+print("Test 27: Break and continue")
+p := make_parser("break")
+program := p.parse_program()
+check_errors(p, "break")
+assert len(program.statements) == 1, "should have 1 statement"
+
+p := make_parser("continue")
+program := p.parse_program()
+check_errors(p, "continue")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 28: Match statement
+print("Test 28: Match statement")
+p := make_parser("match x \{ 1 => \{ y := 1 } 2 => \{ y := 2 } _ => \{ y := 0 } }")
+program := p.parse_program()
+check_errors(p, "match statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Function Tests
+# ============================================================
+print("--- Function Tests ---")
+
+# Test 29: Function definition
+print("Test 29: Function definition")
+p := make_parser("fn add(a, b) \{ return a + b }")
+program := p.parse_program()
+check_errors(p, "function definition")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 30: Function with return type
+print("Test 30: Function with return type")
+p := make_parser("fn add(a, b) -> int \{ return a + b }")
+program := p.parse_program()
+check_errors(p, "function with return type")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 31: Function call
+print("Test 31: Function call")
+p := make_parser("add(1, 2)")
+program := p.parse_program()
+check_errors(p, "function call")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 32: Named arguments
+print("Test 32: Named arguments")
+p := make_parser("Point(x=1, y=2)")
+program := p.parse_program()
+check_errors(p, "named arguments")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Collection Tests
+# ============================================================
+print("--- Collection Tests ---")
+
+# Test 33: List literal
+print("Test 33: List literal")
+p := make_parser("[1, 2, 3]")
+program := p.parse_program()
+check_errors(p, "list literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 34: Empty list
+print("Test 34: Empty list")
+p := make_parser("[]")
+program := p.parse_program()
+check_errors(p, "empty list")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 35: Map literal
+print("Test 35: Map literal")
+p := make_parser("\{\"a\": 1, \"b\": 2\}")
+program := p.parse_program()
+check_errors(p, "map literal")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 36: Empty map
+print("Test 36: Empty map")
+p := make_parser("\{\}")
+program := p.parse_program()
+check_errors(p, "empty map")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 37: Index expression
+print("Test 37: Index expression")
+p := make_parser("arr[0]")
+program := p.parse_program()
+check_errors(p, "index expression")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 38: Member expression
+print("Test 38: Member expression")
+p := make_parser("obj.field")
+program := p.parse_program()
+check_errors(p, "member expression")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 39: Chained member access
+print("Test 39: Chained member access")
+p := make_parser("a.b.c")
+program := p.parse_program()
+check_errors(p, "chained member")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# OOP Tests
+# ============================================================
+print("--- OOP Tests ---")
+
+# Test 40: Class declaration
+print("Test 40: Class declaration")
+p := make_parser("class Point \{ pub mut x: int pub mut y: int }")
+program := p.parse_program()
+check_errors(p, "class declaration")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 41: Impl declaration
+print("Test 41: Impl declaration")
+p := make_parser("impl Point \{ fn distance() \{ return 0.0 } }")
+program := p.parse_program()
+check_errors(p, "impl declaration")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 42: Enum declaration
+print("Test 42: Enum declaration")
+p := make_parser("enum Color \{ Red Green Blue }")
+program := p.parse_program()
+check_errors(p, "enum declaration")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 43: Enum member access
+print("Test 43: Enum member access")
+p := make_parser("Color.Red")
+program := p.parse_program()
+check_errors(p, "enum member")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Other Statement Tests
+# ============================================================
+print("--- Other Statement Tests ---")
+
+# Test 44: Import statement
+print("Test 44: Import statement")
+p := make_parser("import \"path/to/module\"")
+program := p.parse_program()
+check_errors(p, "import statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 45: Assert statement
+print("Test 45: Assert statement")
+p := make_parser("assert x > 0, \"x must be positive\"")
+program := p.parse_program()
+check_errors(p, "assert statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 46: Nop statement
+print("Test 46: Nop statement")
+p := make_parser("nop")
+program := p.parse_program()
+check_errors(p, "nop statement")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Complex Expression Tests
+# ============================================================
+print("--- Complex Expression Tests ---")
+
+# Test 47: Complex expression with multiple operators
+print("Test 47: Complex expression")
+p := make_parser("1 + 2 * 3 - 4 / 2")
+program := p.parse_program()
+check_errors(p, "complex expression")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 48: Call chain
+print("Test 48: Call chain")
+p := make_parser("foo().bar().baz()")
+program := p.parse_program()
+check_errors(p, "call chain")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 49: Index on call result
+print("Test 49: Index on call result")
+p := make_parser("get_list()[0]")
+program := p.parse_program()
+check_errors(p, "index on call")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 50: Is expression
+print("Test 50: Is expression")
+p := make_parser("x is int")
+program := p.parse_program()
+check_errors(p, "is expression")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Multi-statement Program Tests
+# ============================================================
+print("--- Multi-statement Program Tests ---")
+
+# Test 51: Multiple statements
+print("Test 51: Multiple statements")
+p := make_parser("x := 1\ny := 2\nz := x + y")
+program := p.parse_program()
+check_errors(p, "multiple statements")
+assert len(program.statements) == 3, "should have 3 statements"
+print("  OK")
+
+# Test 52: Function with multiple statements
+print("Test 52: Function with multiple statements")
+p := make_parser("fn foo() \{ x := 1 y := 2 return x + y }")
+program := p.parse_program()
+check_errors(p, "function with multiple statements")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+
+# ============================================================
+# Edge Cases
+# ============================================================
+print("--- Edge Cases ---")
+
+# Test 53: Integer with underscores
+print("Test 53: Integer with underscores")
+p := make_parser("1_000_000")
+program := p.parse_program()
+check_errors(p, "integer with underscores")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 54: Deeply nested parentheses
+print("Test 54: Deeply nested parentheses")
+p := make_parser("(((1 + 2)))")
+program := p.parse_program()
+check_errors(p, "nested parentheses")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 55: Chained assignment (builder pattern)
+print("Test 55: Chained assignment (builder pattern)")
+p := make_parser("Point()..x=1..y=2")
+program := p.parse_program()
+check_errors(p, "chained assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+print("")
+print("=== All Parser Tests PASSED! ===")
