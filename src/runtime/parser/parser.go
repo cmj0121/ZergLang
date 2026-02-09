@@ -173,9 +173,9 @@ func (p *Parser) parseStatement() Statement {
 	case lexer.FOR:
 		return p.parseForStatement()
 	case lexer.BREAK:
-		return &BreakStatement{Token: p.curToken}
+		return p.parseBreakStatement()
 	case lexer.CONTINUE:
-		return &ContinueStatement{Token: p.curToken}
+		return p.parseContinueStatement()
 	case lexer.NOP:
 		return &NopStatement{Token: p.curToken}
 	case lexer.CLASS:
@@ -486,8 +486,43 @@ func (p *Parser) parseReturnStatement() *ReturnStatement {
 
 	p.nextToken()
 
-	if p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+	if p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF && p.curToken.Type != lexer.IF {
 		stmt.ReturnValue = p.parseExpression(LOWEST)
+	}
+
+	// Check for postfix conditional: return x if condition
+	if p.curToken.Type == lexer.IF || p.peekToken.Type == lexer.IF {
+		if p.peekToken.Type == lexer.IF {
+			p.nextToken() // move to 'if'
+		}
+		p.nextToken() // move past 'if' to condition
+		stmt.Condition = p.parseExpression(LOWEST)
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseBreakStatement() *BreakStatement {
+	stmt := &BreakStatement{Token: p.curToken}
+
+	// Check for postfix conditional: break if condition
+	if p.peekToken.Type == lexer.IF {
+		p.nextToken() // move to 'if'
+		p.nextToken() // move past 'if' to condition
+		stmt.Condition = p.parseExpression(LOWEST)
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseContinueStatement() *ContinueStatement {
+	stmt := &ContinueStatement{Token: p.curToken}
+
+	// Check for postfix conditional: continue if condition
+	if p.peekToken.Type == lexer.IF {
+		p.nextToken() // move to 'if'
+		p.nextToken() // move past 'if' to condition
+		stmt.Condition = p.parseExpression(LOWEST)
 	}
 
 	return stmt
