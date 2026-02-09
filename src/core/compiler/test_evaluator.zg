@@ -1,0 +1,274 @@
+# test_evaluator.zg - Comprehensive tests for the self-hosted Zerg evaluator
+#
+# Run: ./bin/zerg-bootstrap src/core/compiler/test_evaluator.zg
+
+import "src/core/compiler/lexer"
+import "src/core/compiler/parser"
+import "src/core/compiler/evaluator"
+
+# ============================================================
+# Test Helpers
+# ============================================================
+
+mut test_count := 0
+mut pass_count := 0
+
+fn eval_input(input: string) -> object {
+    l := lexer.new_lexer(input)
+    p := parser.new_parser(l)
+    program := p.parse_program()
+    if len(p.errors) > 0 {
+        return evaluator.new_error("parse error: " + p.errors[0])
+    }
+    env := evaluator.new_environment_with_builtins()
+    return evaluator.eval(program, env)
+}
+
+fn check(name: string, result: object, expected: string) {
+    test_count += 1
+    actual := evaluator.inspect(result)
+    if actual == expected {
+        pass_count += 1
+        print("  PASS " + string(test_count) + ": " + name)
+    }
+    if actual != expected {
+        print("  FAIL " + string(test_count) + ": " + name)
+        print("    expected: " + expected)
+        print("    got:      " + actual)
+    }
+}
+
+fn check_type(name: string, result: object, expected_type: string) {
+    test_count += 1
+    actual := evaluator.obj_type(result)
+    if actual == expected_type {
+        pass_count += 1
+        print("  PASS " + string(test_count) + ": " + name)
+    }
+    if actual != expected_type {
+        print("  FAIL " + string(test_count) + ": " + name)
+        print("    expected type: " + expected_type)
+        print("    got type:      " + actual)
+        print("    value:         " + evaluator.inspect(result))
+    }
+}
+
+# ============================================================
+# Test 1: Integer Literals
+# ============================================================
+print("=== Integer Literals ===")
+check("integer 42", eval_input("42"), "42")
+check("integer 0", eval_input("0"), "0")
+check("negative integer", eval_input("-5"), "-5")
+
+# ============================================================
+# Test 2: Float Literals
+# ============================================================
+print("=== Float Literals ===")
+check("float 3.14", eval_input("3.14"), "3.14")
+
+# ============================================================
+# Test 3: String Literals
+# ============================================================
+print("=== String Literals ===")
+check("string hello", eval_input("\"hello\""), "hello")
+check("empty string", eval_input("\"\""), "")
+
+# ============================================================
+# Test 4: Boolean Literals
+# ============================================================
+print("=== Boolean Literals ===")
+check("true", eval_input("true"), "true")
+check("false", eval_input("false"), "false")
+
+# ============================================================
+# Test 5: Nil Literal
+# ============================================================
+print("=== Nil Literal ===")
+check("nil", eval_input("nil"), "nil")
+
+# ============================================================
+# Test 6: Arithmetic Expressions
+# ============================================================
+print("=== Arithmetic ===")
+check("addition", eval_input("1 + 2"), "3")
+check("subtraction", eval_input("10 - 3"), "7")
+check("multiplication", eval_input("3 * 4"), "12")
+check("division", eval_input("10 / 3"), "3")
+check("modulo", eval_input("10 % 3"), "1")
+check("power", eval_input("2 ** 3"), "8")
+check("precedence", eval_input("1 + 2 * 3"), "7")
+check("parentheses", eval_input("(1 + 2) * 3"), "9")
+
+# ============================================================
+# Test 7: Comparison Expressions
+# ============================================================
+print("=== Comparisons ===")
+check("less than", eval_input("1 < 2"), "true")
+check("greater than", eval_input("2 > 1"), "true")
+check("equal", eval_input("1 == 1"), "true")
+check("not equal", eval_input("1 != 2"), "true")
+check("less equal", eval_input("1 <= 1"), "true")
+check("greater equal", eval_input("2 >= 2"), "true")
+
+# ============================================================
+# Test 8: Logical Expressions
+# ============================================================
+print("=== Logical ===")
+check("and true", eval_input("true and true"), "true")
+check("and false", eval_input("true and false"), "false")
+check("or true", eval_input("false or true"), "true")
+check("or false", eval_input("false or false"), "false")
+check("not true", eval_input("not true"), "false")
+check("not false", eval_input("not false"), "true")
+
+# ============================================================
+# Test 9: String Operations
+# ============================================================
+print("=== String Operations ===")
+check("string concat", eval_input("\"hello\" + \" \" + \"world\""), "hello world")
+check("string equal", eval_input("\"abc\" == \"abc\""), "true")
+check("string not equal", eval_input("\"abc\" != \"xyz\""), "true")
+
+# ============================================================
+# Test 10: Variable Declaration and Assignment
+# ============================================================
+print("=== Variables ===")
+check("declare", eval_input("x := 42\nx"), "42")
+check("mut declare", eval_input("mut x := 1\nx = 2\nx"), "2")
+check("compound assign", eval_input("mut x := 10\nx += 5\nx"), "15")
+
+# ============================================================
+# Test 11: If/Else
+# ============================================================
+print("=== If/Else ===")
+check("if true", eval_input("if true \{ 42 \}"), "42")
+check("if false", eval_input("if false \{ 42 \}"), "nil")
+check("if else true", eval_input("if true \{ 1 \} else \{ 2 \}"), "1")
+check("if else false", eval_input("if false \{ 1 \} else \{ 2 \}"), "2")
+check("if comparison", eval_input("x := 5\nif x > 3 \{ \"big\" \} else \{ \"small\" \}"), "big")
+
+# ============================================================
+# Test 12: Functions
+# ============================================================
+print("=== Functions ===")
+check("function literal", eval_input("add := fn(a, b) \{ return a + b \}\nadd(1, 2)"), "3")
+check("closure", eval_input("make_adder := fn(x) \{ return fn(y) \{ return x + y \} \}\nadd5 := make_adder(5)\nadd5(3)"), "8")
+check("recursive", eval_input("factorial := fn(n) \{\nif n <= 1 \{ return 1 \}\nreturn n * factorial(n - 1)\n\}\nfactorial(5)"), "120")
+
+# ============================================================
+# Test 13: For Loops
+# ============================================================
+print("=== For Loops ===")
+check("for in range", eval_input("mut sum := 0\nfor i in 0..5 \{ sum += i \}\nsum"), "10")
+check("for in list", eval_input("mut sum := 0\nfor x in [1, 2, 3] \{ sum += x \}\nsum"), "6")
+check("for condition", eval_input("mut x := 0\nfor x < 5 \{ x += 1 \}\nx"), "5")
+check("break", eval_input("mut x := 0\nfor \{ x += 1\nbreak if x == 3 \}\nx"), "3")
+
+# ============================================================
+# Test 14: Lists
+# ============================================================
+print("=== Lists ===")
+check("list literal", eval_input("[1, 2, 3]"), "[1, 2, 3]")
+check("list index", eval_input("[10, 20, 30][1]"), "20")
+check("list length", eval_input("len([1, 2, 3])"), "3")
+
+# ============================================================
+# Test 15: Maps
+# ============================================================
+print("=== Maps ===")
+check_type("map literal", eval_input("\{\"a\": 1\}"), "MAP")
+check("map index", eval_input("m := \{\"x\": 42\}\nm[\"x\"]"), "42")
+
+# ============================================================
+# Test 16: Match
+# ============================================================
+print("=== Match ===")
+check("match integer", eval_input("x := 2\nmatch x \{\n1 => \{ \"one\" \}\n2 => \{ \"two\" \}\n_ => \{ \"other\" \}\n\}"), "two")
+check("match wildcard", eval_input("x := 99\nmatch x \{\n1 => \{ \"one\" \}\n_ => \{ \"other\" \}\n\}"), "other")
+
+# ============================================================
+# Test 17: Return Statement
+# ============================================================
+print("=== Return ===")
+check("return value", eval_input("f := fn() \{ return 42 \}\nf()"), "42")
+check("postfix return", eval_input("f := fn(x) \{\nreturn 0 if x < 0\nreturn x\n\}\nf(-5)"), "0")
+
+# ============================================================
+# Test 18: Classes
+# ============================================================
+print("=== Classes ===")
+check("class instantiation", eval_input("class Point \{\npub mut x: int\npub mut y: int\n\}\np := Point()\np"), "<Point instance>")
+check("builder pattern", eval_input("class Point \{\npub mut x: int\npub mut y: int\n\}\np := Point()..x=1..y=2\np.x"), "1")
+check("method call", eval_input("class Counter \{\npub mut count: int\n\}\nimpl Counter \{\nmut fn inc() \{ this.count += 1 \}\nfn get() -> int \{ return this.count \}\n\}\nc := Counter()..count=0\nc.inc()\nc.get()"), "1")
+
+# ============================================================
+# Test 19: Enum
+# ============================================================
+print("=== Enum ===")
+check("enum value", eval_input("enum Color \{ Red\nGreen\nBlue \}\nColor.Red"), "Color.Red")
+check("enum match", eval_input("enum Color \{ Red\nGreen\nBlue \}\nc := Color.Green\nmatch c \{\nColor.Red => \{ \"red\" \}\nColor.Green => \{ \"green\" \}\n_ => \{ \"other\" \}\n\}"), "green")
+
+# ============================================================
+# Test 20: Builtins
+# ============================================================
+print("=== Builtins ===")
+check("len string", eval_input("len(\"hello\")"), "5")
+check("len list", eval_input("len([1, 2, 3])"), "3")
+check("string conversion", eval_input("string(42)"), "42")
+check("int conversion", eval_input("int(3.14)"), "3")
+
+# ============================================================
+# Test 21: Prefix Operators
+# ============================================================
+print("=== Prefix ===")
+check("negate int", eval_input("-42"), "-42")
+check("not bool", eval_input("not true"), "false")
+check("not nil", eval_input("not nil"), "true")
+
+# ============================================================
+# Test 22: Assert
+# ============================================================
+print("=== Assert ===")
+check("assert pass", eval_input("assert true, \"should pass\""), "nil")
+check_type("assert fail", eval_input("assert false, \"should fail\""), "ERROR")
+
+# ============================================================
+# Test 23: Spec Declaration
+# ============================================================
+print("=== Spec ===")
+check_type("spec decl", eval_input("spec Printable \{\nfn to_string() -> string\n\}"), "SPEC")
+
+# ============================================================
+# Test 24: Is Expression
+# ============================================================
+print("=== Is Expression ===")
+check("is int", eval_input("42 is int"), "true")
+check("is string", eval_input("\"hello\" is string"), "true")
+check("is not", eval_input("42 is string"), "false")
+
+# ============================================================
+# Test 25: String Member Access
+# ============================================================
+print("=== String/List Members ===")
+check("string length", eval_input("\"hello\".length"), "5")
+check("list length", eval_input("[1,2,3].length"), "3")
+
+# ============================================================
+# Test 26: Mixed Float/Int
+# ============================================================
+print("=== Float/Int Mixed ===")
+check("int + float", eval_input("1 + 2.5"), "3.5")
+check("float comparison", eval_input("1.5 > 1.0"), "true")
+
+# ============================================================
+# Summary
+# ============================================================
+print("")
+print("=== Results: " + string(pass_count) + "/" + string(test_count) + " passed ===")
+if pass_count == test_count {
+    print("All tests passed!")
+}
+if pass_count != test_count {
+    print("Some tests FAILED!")
+}
