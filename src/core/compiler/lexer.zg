@@ -1,7 +1,52 @@
 # lexer.zg - Lexer for Zerg
+#
+# This module provides the lexer (tokenizer) for the self-hosted Zerg compiler.
+# The lexer converts source code text into a stream of tokens that can be
+# consumed by the parser.
+#
+# The lexer handles:
+#   - Operators: +, -, *, /, %, **, ==, !=, <, >, <=, >=, :=, ->, =>, etc.
+#   - Compound assignment: +=, -=, *=, /=, %=
+#   - Delimiters: (, ), \{, \}, [, ], ,, :, ., &, |
+#   - Range operators: .., ..=
+#   - Literals: integers, floats (with _ separators), strings
+#   - String interpolation: "hello \{name}" produces INTERP_START, expr, INTERP_END
+#   - Identifiers and keywords (30+ reserved words)
+#   - Comments: # single-line comments
+#   - Whitespace skipping with line/column tracking
+#
+# Usage:
+#   import "src/core/compiler/lexer"
+#
+#   tokens := lexer.tokenize("x := 1 + 2")
+#   for tok in tokens {
+#       print(tok.literal)
+#   }
+#
+# Types:
+#   Lexer - Class that holds lexer state and provides tokenization methods
+#
+# Functions:
+#   new_lexer(input) -> Lexer    Create a new lexer for the given source
+#   tokenize(input) -> list      Convenience function to tokenize source to list
 
 import "src/core/compiler/token"
 
+# Lexer - Performs lexical analysis on Zerg source code.
+#
+# The lexer maintains state as it scans through the input, tracking the
+# current position, character, line number, and column for error reporting.
+# It also tracks interpolation state for handling string interpolations.
+#
+# Fields:
+#   input        - The source code string being tokenized
+#   pos          - Current position in input (points to current char)
+#   read_pos     - Next reading position (after current char)
+#   ch           - Current character being examined (empty string = EOF)
+#   line         - Current line number (1-based)
+#   column       - Current column number (1-based)
+#   in_interp    - True when inside a string interpolation expression
+#   interp_depth - Brace nesting depth within interpolation
 class Lexer {
     pub mut input: string
     pub mut pos: int
@@ -13,6 +58,20 @@ class Lexer {
     pub mut interp_depth: int
 }
 
+# new_lexer(input) -> Lexer
+#
+# Creates a new Lexer initialized with the given source code.
+# The lexer is positioned at the first character, ready to produce tokens.
+#
+# Args:
+#   input - The source code string to tokenize
+#
+# Returns:
+#   A new Lexer instance ready for tokenization
+#
+# Example:
+#   l := new_lexer("x := 42")
+#   tok := l.next_token()  # returns IDENT token for "x"
 fn new_lexer(input: str) -> Lexer {
     l := Lexer()
     l.input = input
@@ -28,6 +87,9 @@ fn new_lexer(input: str) -> Lexer {
 }
 
 impl Lexer {
+    # read_char() - Advances the lexer by one character.
+    # Updates position, line, and column tracking.
+    # Sets ch to empty string when EOF is reached.
     mut fn read_char() {
         if this.read_pos >= len(this.input) {
             this.ch = ""
@@ -45,6 +107,9 @@ impl Lexer {
         }
     }
 
+    # peek_char() -> string
+    # Returns the next character without advancing the lexer.
+    # Returns empty string if at EOF.
     fn peek_char() -> string {
         if this.read_pos >= len(this.input) {
             return ""
@@ -52,6 +117,9 @@ impl Lexer {
         return this.input[this.read_pos]
     }
 
+    # skip_whitespace_and_comments()
+    # Skips over whitespace (space, tab, newline, carriage return) and
+    # single-line comments (# to end of line). Called before reading each token.
     mut fn skip_whitespace_and_comments() {
         for {
             # Skip whitespace
@@ -69,6 +137,9 @@ impl Lexer {
         }
     }
 
+    # read_identifier() -> string
+    # Reads an identifier (letter followed by letters/digits).
+    # Returns the identifier string.
     mut fn read_identifier() -> string {
         start := this.pos
         for is_letter(this.ch) or is_digit(this.ch) {
@@ -77,6 +148,9 @@ impl Lexer {
         return str.substring(this.input, start, this.pos)
     }
 
+    # read_number() -> Token
+    # Reads an integer or float literal. Supports underscore separators.
+    # Returns INT token for integers, FLOAT token for decimals.
     mut fn read_number() {
         start := this.pos
         line := this.line
@@ -101,6 +175,10 @@ impl Lexer {
         return token.make_token(tok_type, lit, line, col)
     }
 
+    # handle_escape() -> string
+    # Processes an escape sequence in a string literal.
+    # Handles: \n, \t, \r, \\, \", \{, \}
+    # Returns the unescaped character(s).
     mut fn handle_escape() -> string {
         this.read_char()
         ch := this.ch
@@ -116,6 +194,9 @@ impl Lexer {
         }
     }
 
+    # read_string() -> Token
+    # Reads a string literal, handling escape sequences and interpolation.
+    # Returns STRING for regular strings, INTERP_START if interpolation found.
     mut fn read_string() {
         line := this.line
         col := this.column
@@ -144,6 +225,9 @@ impl Lexer {
         }
     }
 
+    # read_string_continue() -> Token
+    # Continues reading a string after an interpolation expression.
+    # Returns INTERP_MID if another interpolation found, INTERP_END at string end.
     mut fn read_string_continue() {
         line := this.line
         col := this.column
@@ -171,6 +255,10 @@ impl Lexer {
         }
     }
 
+    # next_token() -> Token
+    # Returns the next token from the input.
+    # This is the main method called repeatedly to tokenize source code.
+    # Handles all token types: operators, literals, keywords, etc.
     mut fn next_token() {
         this.skip_whitespace_and_comments()
 
@@ -328,17 +416,37 @@ impl Lexer {
     }
 }
 
+# is_letter(ch) -> bool
+# Returns true if ch is a letter (a-z, A-Z) or underscore.
+# Used to identify the start of identifiers.
 fn is_letter(ch: str) -> bool {
     if ch == "" { return false }
     code := char.ord(ch)
     return (code >= 97 and code <= 122) or (code >= 65 and code <= 90) or ch == "_"
 }
 
+# is_digit(ch) -> bool
+# Returns true if ch is a digit (0-9).
+# Used for number literals and identifier continuation.
 fn is_digit(ch: str) -> bool {
     if ch == "" { return false }
     return char.is_digit(ch)
 }
 
+# tokenize(input) -> list[Token]
+#
+# Convenience function that tokenizes the entire input and returns a list
+# of all tokens including the final EOF token.
+#
+# Args:
+#   input - The source code string to tokenize
+#
+# Returns:
+#   A list of Token objects representing the tokenized input
+#
+# Example:
+#   tokens := tokenize("1 + 2")
+#   # tokens = [INT("1"), PLUS("+"), INT("2"), EOF("")]
 fn tokenize(input: str) -> list {
     l := new_lexer(input)
     mut tokens := []

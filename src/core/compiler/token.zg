@@ -1,5 +1,32 @@
-# token.zg - Token types for Zerg lexer
+# token.zg - Token types and Token class for Zerg lexer
+#
+# This module provides the fundamental types for lexical analysis in the
+# self-hosted Zerg compiler. It defines all token types recognized by the
+# language and provides utilities for token creation and keyword lookup.
+#
+# Usage:
+#   import "src/core/compiler/token"
+#
+#   tok := token.make_token(token.TokenType.INT, "42", 1, 5)
+#   print(token.token_type_name(tok.type))  # prints "INT"
+#
+# Types:
+#   TokenType  - Enum of all token types (operators, keywords, literals, etc.)
+#   Token      - Class representing a single token with type, literal, position
+#
+# Functions:
+#   make_token(type, literal, line, col) -> Token
+#   lookup_ident(ident) -> TokenType
+#   token_type_name(type) -> string
 
+# TokenType - Enumeration of all token types recognized by the Zerg lexer.
+#
+# Categories:
+#   - Special: ILLEGAL (invalid token), EOF (end of file)
+#   - Literals: IDENT, INT, FLOAT, STRING, INTERP_* (interpolation)
+#   - Operators: arithmetic, comparison, assignment
+#   - Delimiters: parentheses, braces, brackets, punctuation
+#   - Keywords: control flow, declarations, modifiers
 enum TokenType {
     # Special
     ILLEGAL
@@ -92,6 +119,17 @@ enum TokenType {
     WITH
 }
 
+# Token - Represents a single lexical token.
+#
+# A token is the smallest unit of meaning in source code, produced by the
+# lexer during tokenization. Each token carries its type, the original text
+# (literal), and its position in the source file for error reporting.
+#
+# Fields:
+#   type    - The TokenType indicating what kind of token this is
+#   literal - The original text from the source code
+#   line    - 1-based line number where the token appears
+#   column  - 1-based column number where the token starts
 class Token {
     pub mut type: TokenType
     pub mut literal: string
@@ -99,6 +137,22 @@ class Token {
     pub mut column: int
 }
 
+# make_token(type, literal, line, col) -> Token
+#
+# Creates a new Token with the specified type, literal text, and position.
+# This is the primary constructor for creating tokens during lexical analysis.
+#
+# Args:
+#   t    - The TokenType for this token
+#   lit  - The literal text from the source
+#   line - The 1-based line number
+#   col  - The 1-based column number
+#
+# Returns:
+#   A new Token instance with the given values
+#
+# Example:
+#   tok := make_token(TokenType.INT, "42", 1, 5)
 fn make_token(t: TokenType, lit: str, line: int, col: int) -> Token {
     tok := Token()
     tok.type = t
@@ -108,6 +162,22 @@ fn make_token(t: TokenType, lit: str, line: int, col: int) -> Token {
     return tok
 }
 
+# lookup_ident(ident) -> TokenType
+#
+# Determines if an identifier is a keyword or a regular identifier.
+# This function is called by the lexer after reading an identifier to
+# check if it matches any of Zerg's reserved keywords.
+#
+# Args:
+#   ident - The identifier string to look up
+#
+# Returns:
+#   The corresponding keyword TokenType if ident is a keyword,
+#   otherwise TokenType.IDENT for regular identifiers
+#
+# Example:
+#   lookup_ident("fn")     # returns TokenType.FN
+#   lookup_ident("myVar")  # returns TokenType.IDENT
 fn lookup_ident(ident: str) -> TokenType {
     if ident == "true" { return TokenType.TRUE }
     if ident == "false" { return TokenType.FALSE }
@@ -145,6 +215,21 @@ fn lookup_ident(ident: str) -> TokenType {
     return TokenType.IDENT
 }
 
+# token_type_name(type) -> string
+#
+# Returns the string name of a TokenType for debugging and error messages.
+# Useful for printing tokens in a human-readable format.
+#
+# Args:
+#   t - The TokenType to get the name for
+#
+# Returns:
+#   A string representation of the token type (e.g., "INT", "PLUS", "FN")
+#   Returns "UNKNOWN" for unrecognized types
+#
+# Example:
+#   token_type_name(TokenType.PLUS)  # returns "PLUS"
+#   token_type_name(TokenType.FN)    # returns "FN"
 fn token_type_name(t: TokenType) -> string {
     match t {
         TokenType.ILLEGAL => { return "ILLEGAL" }
