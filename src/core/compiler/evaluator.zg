@@ -1,0 +1,852 @@
+# evaluator.zg - Tree-walking evaluator for the self-hosted Zerg compiler
+#
+# This module evaluates AST nodes produced by the self-hosted parser.
+# It mirrors the Go bootstrap evaluator but is written entirely in Zerg.
+#
+# Usage:
+#   import "src/core/compiler/evaluator"
+#
+#   result := evaluator.eval(program, evaluator.new_environment_with_builtins())
+
+import "src/core/compiler/ast"
+import "src/core/compiler/lexer"
+import "src/core/compiler/parser"
+import "src/core/compiler/token"
+
+# ============================================================
+# Runtime Object Types
+# ============================================================
+
+class ZInteger {
+    pub mut value: int
+}
+
+class ZFloat {
+    pub mut value: float
+}
+
+class ZString {
+    pub mut value: string
+}
+
+class ZBoolean {
+    pub mut value: bool
+}
+
+class ZNull {}
+
+class ZList {
+    pub mut elements: list
+}
+
+class ZMap {
+    pub mut pairs: list
+}
+
+class ZFunction {
+    pub mut params: list
+    pub mut body: object
+    pub mut env: object
+    pub mut name: string
+}
+
+class ZReturnVal {
+    pub mut value: object
+}
+
+class ZBreak {}
+
+class ZContinue {}
+
+class ZError {
+    pub mut message: string
+}
+
+class ZClass {
+    pub mut name: string
+    pub mut fields: map
+    pub mut field_names: list
+    pub mut methods: map
+    pub mut method_names: list
+    pub mut static_methods: map
+    pub mut implements: map
+}
+
+class ZClassField {
+    pub mut name: string
+    pub mut default_val: object
+    pub mut is_pub: bool
+    pub mut is_mut: bool
+}
+
+class ZClassMethod {
+    pub mut name: string
+    pub mut params: list
+    pub mut body: object
+    pub mut is_pub: bool
+    pub mut is_static: bool
+    pub mut is_mut: bool
+    pub mut env: object
+}
+
+class ZInstance {
+    pub mut class_def: object
+    pub mut fields: map
+}
+
+class ZBoundMethod {
+    pub mut instance: object
+    pub mut method: object
+}
+
+class ZBuiltin {
+    pub mut name: string
+}
+
+class ZModule {
+    pub mut name: string
+    pub mut env: object
+}
+
+class ZEnum {
+    pub mut name: string
+    pub mut variants: list
+}
+
+class ZEnumValue {
+    pub mut enum_name: string
+    pub mut variant: string
+}
+
+class ZRange {
+    pub mut start: int
+    pub mut end: int
+    pub mut inclusive: bool
+}
+
+class ZSpec {
+    pub mut name: string
+    pub mut methods: map
+    pub mut method_names: list
+}
+
+class ZSpecMethod {
+    pub mut name: string
+    pub mut params: list
+    pub mut is_pub: bool
+    pub mut is_mut: bool
+}
+
+# ============================================================
+# Singletons
+# ============================================================
+
+Z_NULL := ZNull()
+Z_TRUE := ZBoolean()..value=true
+Z_FALSE := ZBoolean()..value=false
+Z_BREAK := ZBreak()
+Z_CONTINUE := ZContinue()
+
+# ============================================================
+# Object Constructors
+# ============================================================
+
+fn new_integer(v: int) -> object {
+    return ZInteger()..value=v
+}
+
+fn new_float(v: float) -> object {
+    return ZFloat()..value=v
+}
+
+fn new_string(v: string) -> object {
+    return ZString()..value=v
+}
+
+fn new_boolean(v: bool) -> object {
+    if v {
+        return Z_TRUE
+    }
+    return Z_FALSE
+}
+
+fn new_error(msg: string) -> object {
+    return ZError()..message=msg
+}
+
+fn new_list(elements: list) -> object {
+    return ZList()..elements=elements
+}
+
+fn new_range(s: int, e: int, inclusive: bool) -> object {
+    return ZRange()
+        ..start=s
+        ..end=e
+        ..inclusive=inclusive
+}
+
+# ============================================================
+# Object Helpers
+# ============================================================
+
+fn is_error(obj: object) -> bool {
+    if obj is ZError {
+        return true
+    }
+    return false
+}
+
+fn is_truthy(obj: object) -> bool {
+    if obj is ZNull {
+        return false
+    }
+    if obj is ZBoolean {
+        return obj.value
+    }
+    return true
+}
+
+fn is_signal(obj: object) -> bool {
+    if obj is ZReturnVal {
+        return true
+    }
+    if obj is ZBreak {
+        return true
+    }
+    if obj is ZContinue {
+        return true
+    }
+    if obj is ZError {
+        return true
+    }
+    return false
+}
+
+fn obj_type(obj: object) -> string {
+    if obj is ZInteger { return "INTEGER" }
+    if obj is ZFloat { return "FLOAT" }
+    if obj is ZString { return "STRING" }
+    if obj is ZBoolean { return "BOOLEAN" }
+    if obj is ZNull { return "NULL" }
+    if obj is ZList { return "LIST" }
+    if obj is ZMap { return "MAP" }
+    if obj is ZFunction { return "FUNCTION" }
+    if obj is ZReturnVal { return "RETURN_VALUE" }
+    if obj is ZBreak { return "BREAK" }
+    if obj is ZContinue { return "CONTINUE" }
+    if obj is ZError { return "ERROR" }
+    if obj is ZClass { return "CLASS" }
+    if obj is ZInstance { return "INSTANCE" }
+    if obj is ZBoundMethod { return "BOUND_METHOD" }
+    if obj is ZBuiltin { return "BUILTIN" }
+    if obj is ZModule { return "MODULE" }
+    if obj is ZEnum { return "ENUM_TYPE" }
+    if obj is ZEnumValue { return "ENUM_VALUE" }
+    if obj is ZRange { return "RANGE" }
+    if obj is ZSpec { return "SPEC" }
+    return "UNKNOWN"
+}
+
+fn inspect(obj: object) -> string {
+    if obj is ZInteger { return string(obj.value) }
+    if obj is ZFloat { return string(obj.value) }
+    if obj is ZString { return obj.value }
+    if obj is ZBoolean {
+        if obj.value {
+            return "true"
+        }
+        return "false"
+    }
+    if obj is ZNull { return "nil" }
+    if obj is ZList {
+        mut result := "["
+        for i in 0..len(obj.elements) {
+            if i > 0 {
+                result += ", "
+            }
+            result += inspect(obj.elements[i])
+        }
+        result += "]"
+        return result
+    }
+    if obj is ZMap {
+        mut result := "\{"
+        mut first := true
+        for pair in obj.pairs {
+            if not first {
+                result += ", "
+            }
+            result += inspect(pair[0]) + ": " + inspect(pair[1])
+            first = false
+        }
+        result += "\}"
+        return result
+    }
+    if obj is ZFunction { return "fn(...) \{...\}" }
+    if obj is ZError { return "error: " + obj.message }
+    if obj is ZClass { return "<class " + obj.name + ">" }
+    if obj is ZInstance { return "<" + obj.class_def.name + " instance>" }
+    if obj is ZBoundMethod { return "<method " + obj.method.name + ">" }
+    if obj is ZBuiltin { return "<builtin " + obj.name + ">" }
+    if obj is ZModule { return "<module " + obj.name + ">" }
+    if obj is ZEnum { return "<enum " + obj.name + ">" }
+    if obj is ZEnumValue { return obj.enum_name + "." + obj.variant }
+    if obj is ZRange {
+        if obj.inclusive {
+            return string(obj.start) + "..=" + string(obj.end)
+        }
+        return string(obj.start) + ".." + string(obj.end)
+    }
+    if obj is ZSpec { return "<spec " + obj.name + ">" }
+    return "<unknown>"
+}
+
+# ============================================================
+# Environment
+# ============================================================
+
+class Binding {
+    pub mut value: object
+    pub mut is_mut: bool
+}
+
+class Environment {
+    pub mut store: map
+    pub mut outer: object
+}
+
+fn new_environment() -> object {
+    return Environment()..store={}..outer=nil
+}
+
+fn new_enclosed_environment(outer: object) -> object {
+    return Environment()..store={}..outer=outer
+}
+
+fn env_get(env: object, name: string) -> object {
+    val := env.store[name]
+    if val != nil {
+        return val
+    }
+    if env.outer != nil {
+        return env_get(env.outer, name)
+    }
+    return nil
+}
+
+fn env_get_value(env: object, name: string) -> object {
+    binding := env_get(env, name)
+    if binding == nil {
+        return nil
+    }
+    return binding.value
+}
+
+fn env_declare(env: object, name: string, val: object, is_mut: bool) -> object {
+    env.store[name] = Binding()..value=val..is_mut=is_mut
+    return val
+}
+
+fn env_assign(env: object, name: string, val: object) -> object {
+    binding := env.store[name]
+    if binding != nil {
+        if not binding.is_mut {
+            return new_error("cannot assign to immutable variable: " + name)
+        }
+        binding.value = val
+        return val
+    }
+    if env.outer != nil {
+        return env_assign(env.outer, name, val)
+    }
+    return new_error("identifier not found: " + name)
+}
+
+# ============================================================
+# Builtins
+# ============================================================
+
+fn new_environment_with_builtins() -> object {
+    env := new_environment()
+    env_declare(env, "print", ZBuiltin()..name="print", false)
+    env_declare(env, "len", ZBuiltin()..name="len", false)
+    env_declare(env, "string", ZBuiltin()..name="string", false)
+    env_declare(env, "int", ZBuiltin()..name="int", false)
+    env_declare(env, "float", ZBuiltin()..name="float", false)
+    env_declare(env, "byte", ZBuiltin()..name="byte", false)
+    env_declare(env, "Ok", ZBuiltin()..name="Ok", false)
+    env_declare(env, "Err", ZBuiltin()..name="Err", false)
+    return env
+}
+
+fn apply_builtin(name: string, args: list) -> object {
+    if name == "print" {
+        mut output := ""
+        for i in 0..len(args) {
+            if i > 0 {
+                output += " "
+            }
+            output += inspect(args[i])
+        }
+        print(output)
+        return Z_NULL
+    }
+    if name == "len" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to len: got " + string(len(args)) + ", want 1")
+        }
+        arg := args[0]
+        if arg is ZString { return new_integer(len(arg.value)) }
+        if arg is ZList { return new_integer(len(arg.elements)) }
+        if arg is ZMap { return new_integer(len(arg.pairs)) }
+        return new_error("argument to len not supported: " + obj_type(arg))
+    }
+    if name == "string" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to string: got " + string(len(args)) + ", want 1")
+        }
+        return new_string(inspect(args[0]))
+    }
+    if name == "int" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to int: got " + string(len(args)) + ", want 1")
+        }
+        arg := args[0]
+        if arg is ZInteger { return arg }
+        if arg is ZFloat { return new_integer(int(arg.value)) }
+        if arg is ZString { return new_integer(int(arg.value)) }
+        if arg is ZBoolean {
+            if arg.value { return new_integer(1) }
+            return new_integer(0)
+        }
+        return new_error("cannot convert " + obj_type(arg) + " to int")
+    }
+    if name == "float" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to float: got " + string(len(args)) + ", want 1")
+        }
+        arg := args[0]
+        if arg is ZFloat { return arg }
+        if arg is ZInteger { return new_float(float(arg.value)) }
+        if arg is ZString { return new_float(float(arg.value)) }
+        return new_error("cannot convert " + obj_type(arg) + " to float")
+    }
+    if name == "byte" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to byte: got " + string(len(args)) + ", want 1")
+        }
+        arg := args[0]
+        if arg is ZInteger { return new_integer(arg.value) }
+        if arg is ZString {
+            if len(arg.value) == 1 {
+                return new_integer(byte(arg.value))
+            }
+            return new_error("byte() requires a single-character string")
+        }
+        return new_error("cannot convert " + obj_type(arg) + " to byte")
+    }
+    if name == "Ok" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to Ok: got " + string(len(args)) + ", want 1")
+        }
+        return ZEnumValue()..enum_name="Result"..variant="Ok"
+    }
+    if name == "Err" {
+        if len(args) != 1 {
+            return new_error("wrong number of arguments to Err: got " + string(len(args)) + ", want 1")
+        }
+        return ZEnumValue()..enum_name="Result"..variant="Err"
+    }
+    return new_error("unknown builtin: " + name)
+}
+
+# ============================================================
+# Module Cache
+# ============================================================
+
+mut module_cache := {}
+
+# ============================================================
+# Main Eval Dispatch
+# ============================================================
+
+fn eval(node: object, env: object) -> object {
+    if node == nil {
+        return Z_NULL
+    }
+
+    # Program
+    if node is Program {
+        return eval_program(node, env)
+    }
+
+    # Statements
+    if node is ExprStmt {
+        return eval(node.expression, env)
+    }
+    if node is BlockStmt {
+        return eval_block(node, env)
+    }
+    if node is DeclareStmt {
+        return new_error("not yet implemented: " + "DeclareStmt")
+    }
+    if node is AssignStmt {
+        return new_error("not yet implemented: " + "AssignStmt")
+    }
+    if node is CompoundAssignStmt {
+        return new_error("not yet implemented: " + "CompoundAssignStmt")
+    }
+    if node is ReturnStmt {
+        return new_error("not yet implemented: " + "ReturnStmt")
+    }
+    if node is BreakStmt {
+        return new_error("not yet implemented: " + "BreakStmt")
+    }
+    if node is ContinueStmt {
+        return new_error("not yet implemented: " + "ContinueStmt")
+    }
+    if node is NopStmt {
+        return Z_NULL
+    }
+    if node is IfStmt {
+        return new_error("not yet implemented: " + "IfStmt")
+    }
+    if node is ForInStmt {
+        return new_error("not yet implemented: " + "ForInStmt")
+    }
+    if node is ForCondStmt {
+        return new_error("not yet implemented: " + "ForCondStmt")
+    }
+    if node is MatchStmt {
+        return new_error("not yet implemented: " + "MatchStmt")
+    }
+    if node is AssertStmt {
+        return new_error("not yet implemented: " + "AssertStmt")
+    }
+    if node is ImportStmt {
+        return new_error("not yet implemented: " + "ImportStmt")
+    }
+    if node is WithStmt {
+        return new_error("not yet implemented: " + "WithStmt")
+    }
+
+    # Expressions - Literals
+    if node is IntegerLit {
+        return new_integer(node.value)
+    }
+    if node is FloatLit {
+        return new_float(node.value)
+    }
+    if node is StringLit {
+        return new_string(node.value)
+    }
+    if node is BoolLit {
+        return new_boolean(node.value)
+    }
+    if node is NilLit {
+        return Z_NULL
+    }
+
+    # Expressions - Operators
+    if node is PrefixExpr {
+        return eval_prefix(node, env)
+    }
+    if node is InfixExpr {
+        return eval_infix(node, env)
+    }
+    if node is GroupExpr {
+        return eval(node.expression, env)
+    }
+
+    # Expressions - Identifiers and Access
+    if node is Identifier {
+        return eval_identifier(node, env)
+    }
+    if node is MemberExpr {
+        return new_error("not yet implemented: " + "MemberExpr")
+    }
+    if node is IndexExpr {
+        return new_error("not yet implemented: " + "IndexExpr")
+    }
+    if node is CallExpr {
+        return new_error("not yet implemented: " + "CallExpr")
+    }
+
+    # Expressions - Collections
+    if node is ListLit {
+        return new_error("not yet implemented: " + "ListLit")
+    }
+    if node is MapLit {
+        return new_error("not yet implemented: " + "MapLit")
+    }
+    if node is RangeExpr {
+        return new_error("not yet implemented: " + "RangeExpr")
+    }
+    if node is ChainedAssignment {
+        return new_error("not yet implemented: " + "ChainedAssignment")
+    }
+
+    # Expressions - Functions
+    if node is FunctionLit {
+        return new_error("not yet implemented: " + "FunctionLit")
+    }
+
+    # Expressions - Advanced
+    if node is IsExpr {
+        return new_error("not yet implemented: " + "IsExpr")
+    }
+    if node is InterpolatedString {
+        return new_error("not yet implemented: " + "InterpolatedString")
+    }
+    if node is AsmExpr {
+        return new_error("not yet implemented: " + "AsmExpr")
+    }
+
+    # Declarations - OOP
+    if node is ClassDecl {
+        return new_error("not yet implemented: " + "ClassDecl")
+    }
+    if node is ImplDecl {
+        return new_error("not yet implemented: " + "ImplDecl")
+    }
+    if node is SpecDecl {
+        return new_error("not yet implemented: " + "SpecDecl")
+    }
+    if node is EnumDecl {
+        return new_error("not yet implemented: " + "EnumDecl")
+    }
+    if node is UnsafeBlock {
+        return new_error("not yet implemented: " + "UnsafeBlock")
+    }
+
+    return new_error("unknown node type")
+}
+
+# ============================================================
+# Program and Block Evaluation
+# ============================================================
+
+fn eval_program(program: object, env: object) -> object {
+    mut result := Z_NULL
+    for stmt in program.statements {
+        result = eval(stmt, env)
+        if result is ZReturnVal {
+            return result.value
+        }
+        if is_error(result) {
+            return result
+        }
+    }
+    return result
+}
+
+fn eval_block(block: object, env: object) -> object {
+    mut result := Z_NULL
+    for stmt in block.statements {
+        result = eval(stmt, env)
+        if result != nil {
+            if result is ZReturnVal { return result }
+            if result is ZBreak { return result }
+            if result is ZContinue { return result }
+            if result is ZError { return result }
+        }
+    }
+    return result
+}
+
+# ============================================================
+# Expression Evaluation
+# ============================================================
+
+fn eval_identifier(node: object, env: object) -> object {
+    val := env_get_value(env, node.value)
+    if val != nil {
+        return val
+    }
+    return new_error("identifier not found: " + node.value)
+}
+
+fn eval_prefix(node: object, env: object) -> object {
+    right := eval(node.right, env)
+    if is_error(right) { return right }
+
+    if node.operator == "-" {
+        if right is ZInteger {
+            return new_integer(-right.value)
+        }
+        if right is ZFloat {
+            return new_float(-right.value)
+        }
+        return new_error("unknown operator: -" + obj_type(right))
+    }
+    if node.operator == "not" {
+        return new_boolean(not is_truthy(right))
+    }
+    return new_error("unknown prefix operator: " + node.operator)
+}
+
+fn eval_infix(node: object, env: object) -> object {
+    left := eval(node.left, env)
+    if is_error(left) { return left }
+    right := eval(node.right, env)
+    if is_error(right) { return right }
+    return eval_infix_values(node.operator, left, right)
+}
+
+fn eval_infix_values(op: string, left: object, right: object) -> object {
+    lt := obj_type(left)
+    rt := obj_type(right)
+
+    # Integer operations
+    if lt == "INTEGER" and rt == "INTEGER" {
+        return eval_integer_infix(op, left.value, right.value)
+    }
+
+    # Float operations
+    if lt == "FLOAT" and rt == "FLOAT" {
+        return eval_float_infix(op, left.value, right.value)
+    }
+
+    # Mixed int/float promotion
+    if lt == "FLOAT" and rt == "INTEGER" {
+        return eval_float_infix(op, left.value, float(right.value))
+    }
+    if lt == "INTEGER" and rt == "FLOAT" {
+        return eval_float_infix(op, float(left.value), right.value)
+    }
+
+    # String operations
+    if lt == "STRING" and rt == "STRING" {
+        return eval_string_infix(op, left.value, right.value)
+    }
+
+    # Enum comparison
+    if lt == "ENUM_VALUE" and rt == "ENUM_VALUE" {
+        if op == "==" {
+            return new_boolean(left.enum_name == right.enum_name and left.variant == right.variant)
+        }
+        if op == "!=" {
+            return new_boolean(left.enum_name != right.enum_name or left.variant != right.variant)
+        }
+        return new_error("unknown operator: " + lt + " " + op + " " + rt)
+    }
+
+    # List operations
+    if lt == "LIST" and rt == "LIST" {
+        if op == "+" {
+            return new_list(list_concat(left.elements, right.elements))
+        }
+        if op == "==" {
+            return new_boolean(objects_equal(left, right))
+        }
+        if op == "!=" {
+            return new_boolean(not objects_equal(left, right))
+        }
+        return new_error("unknown operator: " + lt + " " + op + " " + rt)
+    }
+
+    # Boolean/null equality
+    if op == "==" {
+        return new_boolean(left == right)
+    }
+    if op == "!=" {
+        return new_boolean(left != right)
+    }
+
+    # Logical operators
+    if op == "and" {
+        if is_truthy(left) { return right }
+        return left
+    }
+    if op == "or" {
+        if is_truthy(left) { return left }
+        return right
+    }
+
+    if lt != rt {
+        return new_error("type mismatch: " + lt + " " + op + " " + rt)
+    }
+    return new_error("unknown operator: " + lt + " " + op + " " + rt)
+}
+
+fn eval_integer_infix(op: string, left: int, right: int) -> object {
+    if op == "+" { return new_integer(left + right) }
+    if op == "-" { return new_integer(left - right) }
+    if op == "*" { return new_integer(left * right) }
+    if op == "/" {
+        if right == 0 { return new_error("division by zero") }
+        return new_integer(left / right)
+    }
+    if op == "%" {
+        if right == 0 { return new_error("division by zero") }
+        return new_integer(left % right)
+    }
+    if op == "**" { return new_integer(int_pow(left, right)) }
+    if op == "<" { return new_boolean(left < right) }
+    if op == ">" { return new_boolean(left > right) }
+    if op == "<=" { return new_boolean(left <= right) }
+    if op == ">=" { return new_boolean(left >= right) }
+    if op == "==" { return new_boolean(left == right) }
+    if op == "!=" { return new_boolean(left != right) }
+    return new_error("unknown operator: INTEGER " + op + " INTEGER")
+}
+
+fn int_pow(base: int, exp: int) -> int {
+    if exp < 0 { return 0 }
+    mut result := 1
+    mut b := base
+    mut e := exp
+    for e > 0 {
+        if e % 2 == 1 {
+            result *= b
+        }
+        b *= b
+        e /= 2
+    }
+    return result
+}
+
+# list_concat - Concatenate two native lists (Go bootstrap has no list + list)
+fn list_concat(a: list, b: list) -> list {
+    mut result := a
+    for item in b {
+        result = result.append(item)
+    }
+    return result
+}
+
+fn eval_float_infix(op: string, left: float, right: float) -> object {
+    if op == "+" { return new_float(left + right) }
+    if op == "-" { return new_float(left - right) }
+    if op == "*" { return new_float(left * right) }
+    if op == "/" {
+        if right == 0.0 { return new_error("division by zero") }
+        return new_float(left / right)
+    }
+    if op == "<" { return new_boolean(left < right) }
+    if op == ">" { return new_boolean(left > right) }
+    if op == "<=" { return new_boolean(left <= right) }
+    if op == ">=" { return new_boolean(left >= right) }
+    if op == "==" { return new_boolean(left == right) }
+    if op == "!=" { return new_boolean(left != right) }
+    return new_error("unknown operator: FLOAT " + op + " FLOAT")
+}
+
+fn eval_string_infix(op: string, left: string, right: string) -> object {
+    if op == "+" { return new_string(left + right) }
+    if op == "==" { return new_boolean(left == right) }
+    if op == "!=" { return new_boolean(left != right) }
+    return new_error("unknown operator: STRING " + op + " STRING")
+}
+
+fn objects_equal(a: object, b: object) -> bool {
+    if a is ZInteger and b is ZInteger { return a.value == b.value }
+    if a is ZFloat and b is ZFloat { return a.value == b.value }
+    if a is ZString and b is ZString { return a.value == b.value }
+    if a is ZBoolean and b is ZBoolean { return a.value == b.value }
+    if a is ZNull and b is ZNull { return true }
+    if a is ZEnumValue and b is ZEnumValue {
+        return a.enum_name == b.enum_name and a.variant == b.variant
+    }
+    return a == b
+}
