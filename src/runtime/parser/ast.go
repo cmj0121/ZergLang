@@ -209,6 +209,7 @@ func (ca *ChainedAssignment) TokenLiteral() string { return ca.Token.Literal }
 type ReturnStatement struct {
 	Token       lexer.Token // the 'return' token
 	ReturnValue Expression
+	Condition   Expression // optional: for postfix "return x if cond"
 }
 
 func (rs *ReturnStatement) statementNode()       {}
@@ -248,7 +249,8 @@ func (fcs *ForConditionStatement) TokenLiteral() string { return fcs.Token.Liter
 
 // BreakStatement represents a break statement.
 type BreakStatement struct {
-	Token lexer.Token
+	Token     lexer.Token
+	Condition Expression // optional: for postfix "break if cond"
 }
 
 func (bs *BreakStatement) statementNode()       {}
@@ -256,7 +258,8 @@ func (bs *BreakStatement) TokenLiteral() string { return bs.Token.Literal }
 
 // ContinueStatement represents a continue statement.
 type ContinueStatement struct {
-	Token lexer.Token
+	Token     lexer.Token
+	Condition Expression // optional: for postfix "continue if cond"
 }
 
 func (cs *ContinueStatement) statementNode()       {}
