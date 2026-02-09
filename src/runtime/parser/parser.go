@@ -646,34 +646,70 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 
 func (p *Parser) parseCallExpression(function Expression) Expression {
 	exp := &CallExpression{Token: p.curToken, Function: function}
-	exp.Arguments = p.parseCallArguments()
+	exp.Arguments, exp.NamedArgs = p.parseCallArguments()
 	return exp
 }
 
-func (p *Parser) parseCallArguments() []Expression {
+func (p *Parser) parseCallArguments() ([]Expression, []*NamedArgument) {
 	args := []Expression{}
+	namedArgs := []*NamedArgument{}
+	seenNamed := false
 
 	if p.peekToken.Type == lexer.RPAREN {
 		p.nextToken()
-		return args
+		return args, namedArgs
 	}
 
 	p.nextToken()
-	args = append(args, p.parseExpression(LOWEST))
+
+	// Check if this is a named argument: IDENT = expr
+	if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.ASSIGN {
+		seenNamed = true
+		name := p.curToken.Literal
+		p.nextToken() // consume =
+		p.nextToken() // move to value
+		value := p.parseExpression(LOWEST)
+		namedArgs = append(namedArgs, &NamedArgument{
+			Token: p.curToken,
+			Name:  name,
+			Value: value,
+		})
+	} else {
+		args = append(args, p.parseExpression(LOWEST))
+	}
 
 	for p.peekToken.Type == lexer.COMMA {
 		p.nextToken()
 		p.nextToken()
-		args = append(args, p.parseExpression(LOWEST))
+
+		// Check if this is a named argument
+		if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.ASSIGN {
+			seenNamed = true
+			name := p.curToken.Literal
+			p.nextToken() // consume =
+			p.nextToken() // move to value
+			value := p.parseExpression(LOWEST)
+			namedArgs = append(namedArgs, &NamedArgument{
+				Token: p.curToken,
+				Name:  name,
+				Value: value,
+			})
+		} else {
+			if seenNamed {
+				p.errors = append(p.errors, "positional argument cannot follow named argument")
+				return nil, nil
+			}
+			args = append(args, p.parseExpression(LOWEST))
+		}
 	}
 
 	if p.peekToken.Type != lexer.RPAREN {
 		p.errors = append(p.errors, "expected ) after arguments")
-		return nil
+		return nil, nil
 	}
 	p.nextToken()
 
-	return args
+	return args, namedArgs
 }
 
 func (p *Parser) parseIfStatement() *IfStatement {
@@ -1426,6 +1462,26 @@ func (p *Parser) parseIsExpression(left Expression) Expression {
 }
 
 func (p *Parser) parseRangeExpression(left Expression) Expression {
+	// Check if this is a builder pattern: expr..field=value
+	// Builder pattern only works with DOTDOT (not DOTDOTEQ)
+	if p.curToken.Type == lexer.DOTDOT {
+		// Look ahead: if next is IDENT and after that is ASSIGN, it's a builder
+		p.nextToken() // move past ..
+		if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.ASSIGN {
+			return p.parseChainedAssignment(left)
+		}
+		// Not a builder, parse as range expression
+		// curToken is now at the expression after ..
+		expr := &RangeExpression{
+			Token:     p.curToken,
+			Start:     left,
+			Inclusive: false,
+		}
+		expr.End = p.parseExpression(RANGE_PREC)
+		return expr
+	}
+
+	// DOTDOTEQ case - always a range
 	expr := &RangeExpression{
 		Token:     p.curToken,
 		Start:     left,
@@ -1434,6 +1490,38 @@ func (p *Parser) parseRangeExpression(left Expression) Expression {
 
 	p.nextToken()
 	expr.End = p.parseExpression(RANGE_PREC)
+
+	return expr
+}
+
+func (p *Parser) parseChainedAssignment(left Expression) Expression {
+	// curToken is at IDENT (field name), peekToken is ASSIGN
+	name := p.curToken.Literal
+	token := p.curToken
+
+	p.nextToken() // consume IDENT, now at =
+	p.nextToken() // consume =, now at value expression
+
+	value := p.parseExpression(LOWEST)
+
+	expr := &ChainedAssignment{
+		Token: token,
+		Left:  left,
+		Name:  name,
+		Value: value,
+	}
+
+	// Check for chained assignments: ..field=value..field2=value2
+	if p.peekToken.Type == lexer.DOTDOT {
+		p.nextToken() // consume current, now at ..
+		p.nextToken() // move past .., now at next IDENT
+		if p.curToken.Type == lexer.IDENT && p.peekToken.Type == lexer.ASSIGN {
+			return p.parseChainedAssignment(expr)
+		}
+		// Not followed by another assignment, error
+		p.errors = append(p.errors, "expected field=value after ..")
+		return nil
+	}
 
 	return expr
 }
