@@ -172,15 +172,38 @@ type FunctionLiteral struct {
 func (fl *FunctionLiteral) expressionNode()      {}
 func (fl *FunctionLiteral) TokenLiteral() string { return fl.Token.Literal }
 
-// CallExpression represents a function call: fn(args)
+// CallExpression represents a function call: fn(args) or fn(name=value)
 type CallExpression struct {
-	Token     lexer.Token // the '(' token
-	Function  Expression  // Identifier or FunctionLiteral
-	Arguments []Expression
+	Token     lexer.Token      // the '(' token
+	Function  Expression       // Identifier or FunctionLiteral
+	Arguments []Expression     // positional arguments
+	NamedArgs []*NamedArgument // named arguments (optional)
 }
 
 func (ce *CallExpression) expressionNode()      {}
 func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
+
+// NamedArgument represents a named argument in a function call: name=value
+type NamedArgument struct {
+	Token lexer.Token // the '=' token
+	Name  string      // parameter name
+	Value Expression  // argument value
+}
+
+func (na *NamedArgument) expressionNode()      {}
+func (na *NamedArgument) TokenLiteral() string { return na.Token.Literal }
+
+// ChainedAssignment represents builder pattern: expr..field=value
+// Returns the modified object for chaining: Lexer()..input=x..pos=0
+type ChainedAssignment struct {
+	Token  lexer.Token // the '..' token
+	Left   Expression  // the object being modified
+	Name   string      // field name to assign
+	Value  Expression  // value to assign
+}
+
+func (ca *ChainedAssignment) expressionNode()      {}
+func (ca *ChainedAssignment) TokenLiteral() string { return ca.Token.Literal }
 
 // ReturnStatement represents a return statement.
 type ReturnStatement struct {
