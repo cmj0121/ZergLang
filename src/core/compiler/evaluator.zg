@@ -1713,11 +1713,16 @@ fn eval_assert(node: object, env: object) -> object {
 # ============================================================
 
 fn eval_function_lit(node: object, env: object) -> object {
-    return ZFunction()
+    func := ZFunction()
         ..params=node.parameters
         ..body=node.body
         ..env=env
         ..name=node.name
+    # Named functions are auto-declared in the environment (like Go bootstrap's DeclarationStatement)
+    if node.name != "" {
+        env_declare(env, node.name, func, false)
+    }
+    return func
 }
 
 fn eval_call(node: object, env: object) -> object {
