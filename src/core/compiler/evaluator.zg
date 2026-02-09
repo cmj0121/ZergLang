@@ -185,6 +185,14 @@ fn new_range(s: int, e: int, inclusive: bool) -> object {
         ..inclusive=inclusive
 }
 
+# char_byte - Convert a single-character string to its byte value
+# Go bootstrap byte() only works on integers, so we use asm("char_ord")
+fn char_byte(s: string) -> int {
+    mut result := 0
+    unsafe { result = asm("char_ord", s) }
+    return result
+}
+
 # ============================================================
 # Object Helpers
 # ============================================================
@@ -468,7 +476,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if arg is ZInteger { return new_integer(arg.value) }
         if arg is ZString {
             if len(arg.value) == 1 {
-                return new_integer(byte(arg.value))
+                return new_integer(char_byte(arg.value))
             }
             return new_error("byte() requires a single-character string")
         }
@@ -637,7 +645,7 @@ fn apply_builtin(name: string, args: list) -> object {
         s := args[0].value
         mut start := 0
         for start < len(s) {
-            ch := byte(s[start])
+            ch := char_byte(s[start])
             if ch != 32 and ch != 9 and ch != 10 and ch != 13 {
                 break
             }
@@ -645,7 +653,7 @@ fn apply_builtin(name: string, args: list) -> object {
         }
         mut end := len(s)
         for end > start {
-            ch := byte(s[end - 1])
+            ch := char_byte(s[end - 1])
             if ch != 32 and ch != 9 and ch != 10 and ch != 13 {
                 break
             }
@@ -738,7 +746,7 @@ fn apply_builtin(name: string, args: list) -> object {
         s := args[0].value
         mut result := ""
         for i in 0..len(s) {
-            ch := byte(s[i])
+            ch := char_byte(s[i])
             if ch >= 97 and ch <= 122 {
                 mut upper_ch := ""
                 unsafe { upper_ch = asm("char_chr", ch - 32) }
@@ -760,7 +768,7 @@ fn apply_builtin(name: string, args: list) -> object {
         s := args[0].value
         mut result := ""
         for i in 0..len(s) {
-            ch := byte(s[i])
+            ch := char_byte(s[i])
             if ch >= 65 and ch <= 90 {
                 mut lower_ch := ""
                 unsafe { lower_ch = asm("char_chr", ch + 32) }
@@ -812,7 +820,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args[0].value) != 1 {
             return new_error("char.ord() requires a single character")
         }
-        return new_integer(byte(args[0].value))
+        return new_integer(char_byte(args[0].value))
     }
     if name == "char_chr" {
         if len(args) < 1 {
@@ -835,7 +843,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args[0].value) != 1 {
             return new_error("char.is_digit() requires a single character")
         }
-        ch := byte(args[0].value)
+        ch := char_byte(args[0].value)
         return new_boolean(ch >= 48 and ch <= 57)
     }
     if name == "char_is_alpha" {
@@ -848,7 +856,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args[0].value) != 1 {
             return new_error("char.is_alpha() requires a single character")
         }
-        ch := byte(args[0].value)
+        ch := char_byte(args[0].value)
         mut is_a := false
         if ch >= 65 {
             if ch <= 90 { is_a = true }
@@ -869,7 +877,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args[0].value) != 1 {
             return new_error("char.is_space() requires a single character")
         }
-        ch := byte(args[0].value)
+        ch := char_byte(args[0].value)
         return new_boolean(ch == 32 or ch == 9 or ch == 10 or ch == 13)
     }
     if name == "char_is_alnum" {
@@ -882,7 +890,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args[0].value) != 1 {
             return new_error("char.is_alnum() requires a single character")
         }
-        ch := byte(args[0].value)
+        ch := char_byte(args[0].value)
         mut is_an := false
         if ch >= 48 {
             if ch <= 57 { is_an = true }
@@ -1935,42 +1943,33 @@ fn apply_bound_builtin(receiver: object, name: string, args: list) -> object {
         return new_list(elems)
     }
     if name == "list_sort" {
-        # Simple insertion sort using inspect() for comparison
+        # Simple bubble sort
         mut elems := []
         for item in receiver.elements {
             elems = elems.append(item)
         }
-        mut i := 1
-        for i < len(elems) {
-            key := elems[i]
-            key_str := inspect(key)
-            mut j := i - 1
-            mut done := false
-            for j >= 0 {
-                if done {
-                    j -= 1
-                    continue
-                }
-                cmp_str := inspect(elems[j])
-                # Try numeric comparison if both are integers
-                mut should_swap := false
-                if key is ZInteger {
-                    if elems[j] is ZInteger {
-                        should_swap = key.value < elems[j].value
+        mut n := len(elems)
+        mut i := 0
+        for i < n {
+            mut j := 0
+            for j < n - 1 - i {
+                # Compare elems[j] and elems[j+1]
+                mut swap := false
+                if elems[j] is ZInteger {
+                    if elems[j + 1] is ZInteger {
+                        swap = elems[j].value > elems[j + 1].value
                     }
                 }
-                if not (key is ZInteger) or not (elems[j] is ZInteger) {
-                    should_swap = key_str < cmp_str
+                if not (elems[j] is ZInteger) or not (elems[j + 1] is ZInteger) {
+                    swap = inspect(elems[j]) > inspect(elems[j + 1])
                 }
-                if should_swap {
-                    elems[j + 1] = elems[j]
-                    j -= 1
+                if swap {
+                    tmp := elems[j]
+                    elems[j] = elems[j + 1]
+                    elems[j + 1] = tmp
                 }
-                if not should_swap {
-                    done = true
-                }
+                j += 1
             }
-            elems[j + 1] = key
             i += 1
         }
         return new_list(elems)
@@ -2143,13 +2142,16 @@ fn eval_member_access(obj: object, member: string) -> object {
     if obj is ZMap {
         # Builtin map methods
         if member == "keys" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_keys"
+            bi := ZBuiltin()..name="map_keys"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "values" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_values"
+            bi := ZBuiltin()..name="map_values"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "contains" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="map_contains"
+            bi := ZBuiltin()..name="map_contains"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         for pair in obj.pairs {
             if pair[0] is ZString {
@@ -2167,34 +2169,44 @@ fn eval_member_access(obj: object, member: string) -> object {
             return new_integer(len(obj.elements))
         }
         if member == "append" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_append"
+            bi := ZBuiltin()..name="list_append"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "pop" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_pop"
+            bi := ZBuiltin()..name="list_pop"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "join" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_join"
+            bi := ZBuiltin()..name="list_join"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "slice" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_slice"
+            bi := ZBuiltin()..name="list_slice"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "index" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_index"
+            bi := ZBuiltin()..name="list_index"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "reverse" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_reverse"
+            bi := ZBuiltin()..name="list_reverse"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "sort" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_sort"
+            bi := ZBuiltin()..name="list_sort"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "filter" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_filter"
+            bi := ZBuiltin()..name="list_filter"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "map" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_map"
+            bi := ZBuiltin()..name="list_map"
+            return ZBoundMethod()..instance=obj..method=bi
         }
         if member == "push" {
-            return ZBoundMethod()..instance=obj..method=ZBuiltin()..name="list_append"
+            bi := ZBuiltin()..name="list_append"
+            return ZBoundMethod()..instance=obj..method=bi
         }
     }
 
