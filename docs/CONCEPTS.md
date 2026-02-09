@@ -466,6 +466,40 @@ for i in 0..10 {
 }
 ```
 
+### Postfix Conditionals
+
+Control flow statements (`return`, `break`, `continue`) support a postfix `if` syntax for concise guard
+clauses. The statement executes only when the condition is true.
+
+```txt
+return -1 if x < 0           # early return if negative
+break if done                # exit loop if condition met
+continue if should_skip      # skip iteration conditionally
+```
+
+This is equivalent to wrapping the statement in an `if` block, but more readable for simple guards:
+
+```txt
+# These are equivalent:
+return -1 if x < 0
+if x < 0 { return -1 }
+```
+
+Postfix conditionals are especially useful for early returns in functions:
+
+```txt
+fn divide(a: int, b: int) -> float {
+    return 0.0 if b == 0     # guard clause
+    return a / b
+}
+
+fn classify(x: int) -> string {
+    return "negative" if x < 0
+    return "zero" if x == 0
+    return "positive"
+}
+```
+
 ### Nop
 
 The `nop` statement is a no-operation placeholder that does nothing. Use it where a statement is required
