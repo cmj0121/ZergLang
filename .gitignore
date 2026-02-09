@@ -2,3 +2,4 @@
 
 # Go binaries
 bin/
+src/runtime/zerg-bootstrap
