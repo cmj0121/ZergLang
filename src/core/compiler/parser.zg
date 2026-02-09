@@ -186,6 +186,7 @@ impl Parser {
             token.TokenType.WITH => { return this.parse_with_statement() }
             token.TokenType.MUT => { return this.parse_maybe_declaration() }
             token.TokenType.IDENT => { return this.parse_maybe_declaration() }
+            token.TokenType.THIS => { return this.parse_expression_or_assignment() }
             _ => { return this.parse_expression_statement() }
         }
     }
@@ -840,6 +841,37 @@ impl Parser {
         return ast.ExprStmt()..token=tok..expression=expr
     }
 
+    # parse_expression_or_assignment() - Parse expression, then check for assignment
+    # Handles: this.field = value, this.list[i] = value, expr += value, etc.
+    mut fn parse_expression_or_assignment() -> object {
+        start_tok := this.cur_token
+        expr := this.parse_expression(LOWEST)
+
+        # Check for assignment (=)
+        if this.peek_token_is(token.TokenType.ASSIGN) {
+            this.next_token()
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.AssignStmt()..token=start_tok..target=expr..value=value
+        }
+
+        # Check for compound assignment (+=, -=, etc.)
+        if this.is_compound_assign(this.peek_token.type) {
+            this.next_token()
+            op := this.cur_token.literal
+            this.next_token()
+            value := this.parse_expression(LOWEST)
+            return ast.CompoundAssignStmt()
+                ..token=start_tok
+                ..target=expr
+                ..operator=op
+                ..value=value
+        }
+
+        # Just an expression statement
+        return ast.ExprStmt()..token=start_tok..expression=expr
+    }
+
     # parse_maybe_declaration() - Parse potential declaration or assignment
     mut fn parse_maybe_declaration() -> object {
         mut is_mut := false
@@ -862,17 +894,7 @@ impl Parser {
             this.next_token()
             this.next_token()
             value := this.parse_expression(LOWEST)
-
-            # Check for postfix conditional
-            mut condition := nil
-            if this.peek_token_is(token.TokenType.IF) {
-                this.next_token()
-                this.next_token()
-                condition = this.parse_expression(LOWEST)
-            }
-
-            stmt := ast.DeclareStmt()..token=start_tok..name=name..value=value..is_mut=is_mut
-            return stmt
+            return ast.DeclareStmt()..token=start_tok..name=name..value=value..is_mut=is_mut
         }
 
         # Check for assignment (=)

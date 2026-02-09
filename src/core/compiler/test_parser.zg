@@ -599,4 +599,75 @@ assert len(program.statements) == 1, "should have 1 statement"
 print("  OK")
 
 print("")
+print("--- Member/Index Assignment Tests ---")
+
+# Test 56: Member assignment (this.field = value)
+print("Test 56: Member assignment (this.field = value)")
+p := make_parser("this.ch = \"\"")
+program := p.parse_program()
+check_errors(p, "member assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 57: Chained member assignment
+print("Test 57: Chained member assignment (this.field = this.other)")
+p := make_parser("this.ch = this.input[this.read_pos]")
+program := p.parse_program()
+check_errors(p, "chained member assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 58: Ident member assignment
+print("Test 58: Ident member assignment (foo.bar = value)")
+p := make_parser("foo.bar = 42")
+program := p.parse_program()
+check_errors(p, "ident member assignment")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
+# Test 59: Declaration followed by if statement
+print("Test 59: Declaration followed by if statement")
+p := make_parser("a := 1\nif x == 1 \{\n    return a\n\}")
+program := p.parse_program()
+check_errors(p, "declaration then if")
+assert len(program.statements) == 2, "should have 2 statements"
+print("  OK")
+
+print("")
+print("--- Self-Parsing Test ---")
+
+# Test 60: Self-parsing (parser can parse all compiler files)
+print("Test 60: Self-parsing")
+fn read_file_content(path: str) -> str {
+    mut result := ""
+    unsafe {
+        result = asm("read_file", path)
+    }
+    return result
+}
+
+files := [
+    "src/core/compiler/token.zg",
+    "src/core/compiler/lexer.zg",
+    "src/core/compiler/ast.zg",
+    "src/core/compiler/parser.zg"
+]
+
+mut self_parse_ok := true
+for file in files {
+    content := read_file_content(file)
+    l := lexer.new_lexer(content)
+    p := parser.new_parser(l)
+    program := p.parse_program()
+    if len(p.errors) > 0 {
+        print("  FAIL: " + file + " (" + string(len(p.errors)) + " errors)")
+        self_parse_ok = false
+    } else {
+        print("  OK: " + file + " (" + string(len(program.statements)) + " statements)")
+    }
+}
+assert self_parse_ok, "self-parsing should succeed"
+print("  OK")
+
+print("")
 print("=== All Parser Tests PASSED! ===")
