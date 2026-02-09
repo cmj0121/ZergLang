@@ -1,0 +1,338 @@
+# test_compiler.zg - Tests for Zerg compiler components
+
+import "src/core/compiler/token"
+import "src/core/compiler/lexer"
+
+print("=== Compiler Tests ===")
+print("")
+
+# ====== Token Tests ======
+print("--- Token Tests ---")
+
+# Test make_token
+tok := token.make_token(token.TokenType.INT, "42", 1, 5)
+assert tok.type == token.TokenType.INT, "make_token type"
+assert tok.literal == "42", "make_token literal"
+assert tok.line == 1, "make_token line"
+assert tok.column == 5, "make_token column"
+print("  make_token: OK")
+
+# Test lookup_ident for keywords
+assert token.lookup_ident("fn") == token.TokenType.FN, "lookup fn"
+assert token.lookup_ident("return") == token.TokenType.RETURN, "lookup return"
+assert token.lookup_ident("if") == token.TokenType.IF, "lookup if"
+assert token.lookup_ident("else") == token.TokenType.ELSE, "lookup else"
+assert token.lookup_ident("for") == token.TokenType.FOR, "lookup for"
+assert token.lookup_ident("in") == token.TokenType.IN, "lookup in"
+assert token.lookup_ident("true") == token.TokenType.TRUE, "lookup true"
+assert token.lookup_ident("false") == token.TokenType.FALSE, "lookup false"
+assert token.lookup_ident("nil") == token.TokenType.NIL, "lookup nil"
+assert token.lookup_ident("mut") == token.TokenType.MUT, "lookup mut"
+assert token.lookup_ident("and") == token.TokenType.AND, "lookup and"
+assert token.lookup_ident("or") == token.TokenType.OR, "lookup or"
+assert token.lookup_ident("not") == token.TokenType.NOT, "lookup not"
+assert token.lookup_ident("class") == token.TokenType.CLASS, "lookup class"
+assert token.lookup_ident("impl") == token.TokenType.IMPL, "lookup impl"
+assert token.lookup_ident("this") == token.TokenType.THIS, "lookup this"
+assert token.lookup_ident("pub") == token.TokenType.PUB, "lookup pub"
+assert token.lookup_ident("static") == token.TokenType.STATIC, "lookup static"
+assert token.lookup_ident("spec") == token.TokenType.SPEC, "lookup spec"
+assert token.lookup_ident("Self") == token.TokenType.SELF, "lookup Self"
+assert token.lookup_ident("match") == token.TokenType.MATCH, "lookup match"
+assert token.lookup_ident("enum") == token.TokenType.ENUM, "lookup enum"
+assert token.lookup_ident("import") == token.TokenType.IMPORT, "lookup import"
+assert token.lookup_ident("as") == token.TokenType.AS, "lookup as"
+assert token.lookup_ident("with") == token.TokenType.WITH, "lookup with"
+assert token.lookup_ident("break") == token.TokenType.BREAK, "lookup break"
+assert token.lookup_ident("continue") == token.TokenType.CONTINUE, "lookup continue"
+assert token.lookup_ident("nop") == token.TokenType.NOP, "lookup nop"
+assert token.lookup_ident("assert") == token.TokenType.ASSERT, "lookup assert"
+assert token.lookup_ident("unsafe") == token.TokenType.UNSAFE, "lookup unsafe"
+assert token.lookup_ident("asm") == token.TokenType.ASM, "lookup asm"
+assert token.lookup_ident("is") == token.TokenType.IS, "lookup is"
+assert token.lookup_ident("_") == token.TokenType.UNDERSCORE, "lookup _"
+print("  lookup_ident keywords: OK")
+
+# Test lookup_ident for identifiers
+assert token.lookup_ident("foo") == token.TokenType.IDENT, "lookup foo"
+assert token.lookup_ident("myVar") == token.TokenType.IDENT, "lookup myVar"
+assert token.lookup_ident("_private") == token.TokenType.IDENT, "lookup _private"
+print("  lookup_ident identifiers: OK")
+
+# Test token_type_name
+assert token.token_type_name(token.TokenType.INT) == "INT", "token_type_name INT"
+assert token.token_type_name(token.TokenType.FN) == "FN", "token_type_name FN"
+assert token.token_type_name(token.TokenType.PLUS) == "PLUS", "token_type_name PLUS"
+print("  token_type_name: OK")
+
+print("")
+
+# ====== Lexer Tests ======
+print("--- Lexer Tests ---")
+
+# Test 1: Simple operators
+print("Test 1: Simple operators")
+tokens := lexer.tokenize("+ - * / %")
+assert len(tokens) == 6, "should have 6 tokens"
+assert tokens[0].type == token.TokenType.PLUS, "first is PLUS"
+assert tokens[1].type == token.TokenType.MINUS, "second is MINUS"
+assert tokens[2].type == token.TokenType.ASTERISK, "third is ASTERISK"
+assert tokens[3].type == token.TokenType.SLASH, "fourth is SLASH"
+assert tokens[4].type == token.TokenType.PERCENT, "fifth is PERCENT"
+assert tokens[5].type == token.TokenType.EOF, "last is EOF"
+print("  OK")
+
+# Test 2: Multi-char operators
+print("Test 2: Multi-char operators")
+tokens := lexer.tokenize("== != <= >= := -> ** .. ..= =>")
+assert tokens[0].type == token.TokenType.EQ, "EQ"
+assert tokens[0].literal == "==", "EQ literal"
+assert tokens[1].type == token.TokenType.NOT_EQ, "NOT_EQ"
+assert tokens[2].type == token.TokenType.LT_EQ, "LT_EQ"
+assert tokens[3].type == token.TokenType.GT_EQ, "GT_EQ"
+assert tokens[4].type == token.TokenType.DECLARE, "DECLARE"
+assert tokens[5].type == token.TokenType.ARROW, "ARROW"
+assert tokens[6].type == token.TokenType.POWER, "POWER"
+assert tokens[7].type == token.TokenType.DOTDOT, "DOTDOT"
+assert tokens[8].type == token.TokenType.DOTDOTEQ, "DOTDOTEQ"
+assert tokens[9].type == token.TokenType.FAT_ARROW, "FAT_ARROW"
+print("  OK")
+
+# Test 3: Compound assignment
+print("Test 3: Compound assignment operators")
+tokens := lexer.tokenize("+= -= *= /= %=")
+assert tokens[0].type == token.TokenType.PLUS_ASSIGN, "PLUS_ASSIGN"
+assert tokens[1].type == token.TokenType.MINUS_ASSIGN, "MINUS_ASSIGN"
+assert tokens[2].type == token.TokenType.ASTERISK_ASSIGN, "ASTERISK_ASSIGN"
+assert tokens[3].type == token.TokenType.SLASH_ASSIGN, "SLASH_ASSIGN"
+assert tokens[4].type == token.TokenType.PERCENT_ASSIGN, "PERCENT_ASSIGN"
+print("  OK")
+
+# Test 4: Delimiters
+print("Test 4: Delimiters")
+tokens := lexer.tokenize("( ) \{ } [ ] , : . & |")
+assert tokens[0].type == token.TokenType.LPAREN, "LPAREN"
+assert tokens[1].type == token.TokenType.RPAREN, "RPAREN"
+assert tokens[2].type == token.TokenType.LBRACE, "LBRACE"
+assert tokens[3].type == token.TokenType.RBRACE, "RBRACE"
+assert tokens[4].type == token.TokenType.LBRACKET, "LBRACKET"
+assert tokens[5].type == token.TokenType.RBRACKET, "RBRACKET"
+assert tokens[6].type == token.TokenType.COMMA, "COMMA"
+assert tokens[7].type == token.TokenType.COLON, "COLON"
+assert tokens[8].type == token.TokenType.DOT, "DOT"
+assert tokens[9].type == token.TokenType.AMPERSAND, "AMPERSAND"
+assert tokens[10].type == token.TokenType.PIPE, "PIPE"
+print("  OK")
+
+# Test 5: Integers
+print("Test 5: Integers")
+tokens := lexer.tokenize("42 0 123 1_000_000")
+assert tokens[0].type == token.TokenType.INT, "first is INT"
+assert tokens[0].literal == "42", "first literal"
+assert tokens[1].literal == "0", "second literal"
+assert tokens[2].literal == "123", "third literal"
+assert tokens[3].literal == "1_000_000", "fourth with underscores"
+print("  OK")
+
+# Test 6: Floats
+print("Test 6: Floats")
+tokens := lexer.tokenize("3.14 0.5 123.456")
+assert tokens[0].type == token.TokenType.FLOAT, "first is FLOAT"
+assert tokens[0].literal == "3.14", "first literal"
+assert tokens[1].literal == "0.5", "second literal"
+assert tokens[2].literal == "123.456", "third literal"
+print("  OK")
+
+# Test 7: Identifiers
+print("Test 7: Identifiers")
+tokens := lexer.tokenize("foo bar _private camelCase snake_case")
+assert tokens[0].type == token.TokenType.IDENT, "foo is IDENT"
+assert tokens[0].literal == "foo", "foo literal"
+assert tokens[1].literal == "bar", "bar literal"
+assert tokens[2].literal == "_private", "_private literal"
+assert tokens[3].literal == "camelCase", "camelCase literal"
+assert tokens[4].literal == "snake_case", "snake_case literal"
+print("  OK")
+
+# Test 8: Keywords
+print("Test 8: Keywords")
+tokens := lexer.tokenize("fn return if else for in true false nil mut")
+assert tokens[0].type == token.TokenType.FN, "fn"
+assert tokens[1].type == token.TokenType.RETURN, "return"
+assert tokens[2].type == token.TokenType.IF, "if"
+assert tokens[3].type == token.TokenType.ELSE, "else"
+assert tokens[4].type == token.TokenType.FOR, "for"
+assert tokens[5].type == token.TokenType.IN, "in"
+assert tokens[6].type == token.TokenType.TRUE, "true"
+assert tokens[7].type == token.TokenType.FALSE, "false"
+assert tokens[8].type == token.TokenType.NIL, "nil"
+assert tokens[9].type == token.TokenType.MUT, "mut"
+print("  OK")
+
+# Test 9: Strings
+print("Test 9: Strings")
+tokens := lexer.tokenize("\"hello\" \"world\"")
+assert tokens[0].type == token.TokenType.STRING, "first is STRING"
+assert tokens[0].literal == "hello", "first literal"
+assert tokens[1].type == token.TokenType.STRING, "second is STRING"
+assert tokens[1].literal == "world", "second literal"
+print("  OK")
+
+# Test 10: String escapes
+print("Test 10: String escape sequences")
+tokens := lexer.tokenize("\"hello\\nworld\" \"tab\\there\" \"quote\\\"here\"")
+assert tokens[0].literal == "hello\nworld", "newline escape"
+assert tokens[1].literal == "tab\there", "tab escape"
+assert tokens[2].literal == "quote\"here", "quote escape"
+print("  OK")
+
+# Test 11: Comments
+print("Test 11: Comments")
+tokens := lexer.tokenize("x # this is a comment\ny")
+assert len(tokens) == 3, "should have 3 tokens (x, y, EOF)"
+assert tokens[0].type == token.TokenType.IDENT, "first is IDENT"
+assert tokens[0].literal == "x", "first is x"
+assert tokens[1].type == token.TokenType.IDENT, "second is IDENT"
+assert tokens[1].literal == "y", "second is y"
+print("  OK")
+
+# Test 12: Line/column tracking
+print("Test 12: Line/column tracking")
+tokens := lexer.tokenize("x\ny\nz")
+assert tokens[0].line == 1, "x on line 1"
+assert tokens[1].line == 2, "y on line 2"
+assert tokens[2].line == 3, "z on line 3"
+print("  OK")
+
+# Test 13: Complete expression
+print("Test 13: Complete expression")
+tokens := lexer.tokenize("x := 10 + 20 * 3")
+assert tokens[0].type == token.TokenType.IDENT, "x"
+assert tokens[1].type == token.TokenType.DECLARE, ":="
+assert tokens[2].type == token.TokenType.INT, "10"
+assert tokens[3].type == token.TokenType.PLUS, "+"
+assert tokens[4].type == token.TokenType.INT, "20"
+assert tokens[5].type == token.TokenType.ASTERISK, "*"
+assert tokens[6].type == token.TokenType.INT, "3"
+print("  OK")
+
+# Test 14: Function definition
+print("Test 14: Function definition")
+tokens := lexer.tokenize("fn add(a, b) -> int \{ return a + b }")
+assert tokens[0].type == token.TokenType.FN, "fn"
+assert tokens[1].type == token.TokenType.IDENT, "add"
+assert tokens[2].type == token.TokenType.LPAREN, "("
+assert tokens[3].type == token.TokenType.IDENT, "a"
+assert tokens[4].type == token.TokenType.COMMA, ","
+assert tokens[5].type == token.TokenType.IDENT, "b"
+assert tokens[6].type == token.TokenType.RPAREN, ")"
+assert tokens[7].type == token.TokenType.ARROW, "->"
+assert tokens[8].type == token.TokenType.IDENT, "int"
+assert tokens[9].type == token.TokenType.LBRACE, "LBRACE"
+assert tokens[10].type == token.TokenType.RETURN, "return"
+assert tokens[11].type == token.TokenType.IDENT, "a"
+assert tokens[12].type == token.TokenType.PLUS, "+"
+assert tokens[13].type == token.TokenType.IDENT, "b"
+assert tokens[14].type == token.TokenType.RBRACE, "RBRACE"
+print("  OK")
+
+# Test 15: Class definition
+print("Test 15: Class definition")
+tokens := lexer.tokenize("class Point \{ pub mut x: int }")
+assert tokens[0].type == token.TokenType.CLASS, "class"
+assert tokens[1].type == token.TokenType.IDENT, "Point"
+assert tokens[2].type == token.TokenType.LBRACE, "LBRACE"
+assert tokens[3].type == token.TokenType.PUB, "pub"
+assert tokens[4].type == token.TokenType.MUT, "mut"
+assert tokens[5].type == token.TokenType.IDENT, "x"
+assert tokens[6].type == token.TokenType.COLON, ":"
+assert tokens[7].type == token.TokenType.IDENT, "int"
+assert tokens[8].type == token.TokenType.RBRACE, "RBRACE"
+print("  OK")
+
+# Test 16: Match expression
+print("Test 16: Match expression")
+tokens := lexer.tokenize("match x \{ 1 => \{ } _ => \{ } }")
+assert tokens[0].type == token.TokenType.MATCH, "match"
+assert tokens[1].type == token.TokenType.IDENT, "x"
+assert tokens[2].type == token.TokenType.LBRACE, "LBRACE"
+assert tokens[3].type == token.TokenType.INT, "1"
+assert tokens[4].type == token.TokenType.FAT_ARROW, "=>"
+assert tokens[5].type == token.TokenType.LBRACE, "LBRACE"
+assert tokens[6].type == token.TokenType.RBRACE, "RBRACE"
+assert tokens[7].type == token.TokenType.UNDERSCORE, "_"
+print("  OK")
+
+# Test 17: String interpolation
+print("Test 17: String interpolation")
+tokens := lexer.tokenize("\"hello \{name}\"")
+assert tokens[0].type == token.TokenType.INTERP_START, "INTERP_START"
+assert tokens[0].literal == "hello ", "INTERP_START literal"
+assert tokens[1].type == token.TokenType.IDENT, "name"
+assert tokens[2].type == token.TokenType.INTERP_END, "INTERP_END"
+assert tokens[2].literal == "", "INTERP_END literal"
+print("  OK")
+
+# Test 18: Multiple interpolations
+print("Test 18: Multiple interpolations")
+tokens := lexer.tokenize("\"a \{x} b \{y} c\"")
+assert tokens[0].type == token.TokenType.INTERP_START, "first INTERP_START"
+assert tokens[0].literal == "a ", "first literal"
+assert tokens[1].type == token.TokenType.IDENT, "x"
+assert tokens[2].type == token.TokenType.INTERP_MID, "INTERP_MID"
+assert tokens[2].literal == " b ", "mid literal"
+assert tokens[3].type == token.TokenType.IDENT, "y"
+assert tokens[4].type == token.TokenType.INTERP_END, "INTERP_END"
+assert tokens[4].literal == " c", "end literal"
+print("  OK")
+
+# Test 19: Comparison operators
+print("Test 19: Comparison operators")
+tokens := lexer.tokenize("< > <= >= == !=")
+assert tokens[0].type == token.TokenType.LT, "LT"
+assert tokens[1].type == token.TokenType.GT, "GT"
+assert tokens[2].type == token.TokenType.LT_EQ, "LT_EQ"
+assert tokens[3].type == token.TokenType.GT_EQ, "GT_EQ"
+assert tokens[4].type == token.TokenType.EQ, "EQ"
+assert tokens[5].type == token.TokenType.NOT_EQ, "NOT_EQ"
+print("  OK")
+
+# Test 20: Range operators
+print("Test 20: Range operators")
+tokens := lexer.tokenize("0..10 0..=10")
+assert tokens[0].type == token.TokenType.INT, "0"
+assert tokens[1].type == token.TokenType.DOTDOT, ".."
+assert tokens[2].type == token.TokenType.INT, "10"
+assert tokens[3].type == token.TokenType.INT, "0"
+assert tokens[4].type == token.TokenType.DOTDOTEQ, "..="
+assert tokens[5].type == token.TokenType.INT, "10"
+print("  OK")
+
+# Test 21: More keywords
+print("Test 21: More keywords")
+tokens := lexer.tokenize("enum impl spec assert unsafe asm import as with is")
+assert tokens[0].type == token.TokenType.ENUM, "enum"
+assert tokens[1].type == token.TokenType.IMPL, "impl"
+assert tokens[2].type == token.TokenType.SPEC, "spec"
+assert tokens[3].type == token.TokenType.ASSERT, "assert"
+assert tokens[4].type == token.TokenType.UNSAFE, "unsafe"
+assert tokens[5].type == token.TokenType.ASM, "asm"
+assert tokens[6].type == token.TokenType.IMPORT, "import"
+assert tokens[7].type == token.TokenType.AS, "as"
+assert tokens[8].type == token.TokenType.WITH, "with"
+assert tokens[9].type == token.TokenType.IS, "is"
+print("  OK")
+
+# Test 22: Nested braces in interpolation
+print("Test 22: Nested braces in interpolation")
+tokens := lexer.tokenize("\"\{map[key]}\"")
+assert tokens[0].type == token.TokenType.INTERP_START, "INTERP_START"
+assert tokens[1].type == token.TokenType.IDENT, "map"
+assert tokens[2].type == token.TokenType.LBRACKET, "["
+assert tokens[3].type == token.TokenType.IDENT, "key"
+assert tokens[4].type == token.TokenType.RBRACKET, "]"
+assert tokens[5].type == token.TokenType.INTERP_END, "INTERP_END"
+print("  OK")
+
+print("")
+print("=== All Compiler Tests PASSED! ===")

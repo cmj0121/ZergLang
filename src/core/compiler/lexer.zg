@@ -1,0 +1,455 @@
+# lexer.zg - Lexer for Zerg
+#
+# This module provides the lexer (tokenizer) for the self-hosted Zerg compiler.
+# The lexer converts source code text into a stream of tokens that can be
+# consumed by the parser.
+#
+# The lexer handles:
+#   - Operators: +, -, *, /, %, **, ==, !=, <, >, <=, >=, :=, ->, =>, etc.
+#   - Compound assignment: +=, -=, *=, /=, %=
+#   - Delimiters: (, ), \{, \}, [, ], ,, :, ., &, |
+#   - Range operators: .., ..=
+#   - Literals: integers, floats (with _ separators), strings
+#   - String interpolation: "hello \{name}" produces INTERP_START, expr, INTERP_END
+#   - Identifiers and keywords (30+ reserved words)
+#   - Comments: # single-line comments
+#   - Whitespace skipping with line/column tracking
+#
+# Usage:
+#   import "src/core/compiler/lexer"
+#
+#   tokens := lexer.tokenize("x := 1 + 2")
+#   for tok in tokens {
+#       print(tok.literal)
+#   }
+#
+# Types:
+#   Lexer - Class that holds lexer state and provides tokenization methods
+#
+# Functions:
+#   new_lexer(input) -> Lexer    Create a new lexer for the given source
+#   tokenize(input) -> list      Convenience function to tokenize source to list
+
+import "src/core/compiler/token"
+
+# Lexer - Performs lexical analysis on Zerg source code.
+#
+# The lexer maintains state as it scans through the input, tracking the
+# current position, character, line number, and column for error reporting.
+# It also tracks interpolation state for handling string interpolations.
+#
+# Fields:
+#   input        - The source code string being tokenized
+#   pos          - Current position in input (points to current char)
+#   read_pos     - Next reading position (after current char)
+#   ch           - Current character being examined (empty string = EOF)
+#   line         - Current line number (1-based)
+#   column       - Current column number (1-based)
+#   in_interp    - True when inside a string interpolation expression
+#   interp_depth - Brace nesting depth within interpolation
+class Lexer {
+    pub mut input: string
+    pub mut pos: int
+    pub mut read_pos: int
+    pub mut ch: string
+    pub mut line: int
+    pub mut column: int
+    pub mut in_interp: bool
+    pub mut interp_depth: int
+}
+
+# new_lexer(input) -> Lexer
+#
+# Creates a new Lexer initialized with the given source code.
+# The lexer is positioned at the first character, ready to produce tokens.
+#
+# Args:
+#   input - The source code string to tokenize
+#
+# Returns:
+#   A new Lexer instance ready for tokenization
+#
+# Example:
+#   l := new_lexer("x := 42")
+#   tok := l.next_token()  # returns IDENT token for "x"
+fn new_lexer(input: str) -> Lexer {
+    l := Lexer()..input=input..pos=0..read_pos=0..ch=""..line=1..column=0..in_interp=false..interp_depth=0
+    l.read_char()
+    return l
+}
+
+impl Lexer {
+    # read_char() - Advances the lexer by one character.
+    # Updates position, line, and column tracking.
+    # Sets ch to empty string when EOF is reached.
+    mut fn read_char() {
+        if this.read_pos >= len(this.input) {
+            this.ch = ""
+        } else {
+            this.ch = this.input[this.read_pos]
+        }
+        this.pos = this.read_pos
+        this.read_pos = this.read_pos + 1
+
+        if this.ch == "\n" {
+            this.line = this.line + 1
+            this.column = 0
+        } else {
+            this.column = this.column + 1
+        }
+    }
+
+    # peek_char() -> string
+    # Returns the next character without advancing the lexer.
+    # Returns empty string if at EOF.
+    fn peek_char() -> string {
+        if this.read_pos >= len(this.input) {
+            return ""
+        }
+        return this.input[this.read_pos]
+    }
+
+    # skip_whitespace_and_comments()
+    # Skips over whitespace (space, tab, newline, carriage return) and
+    # single-line comments (# to end of line). Called before reading each token.
+    mut fn skip_whitespace_and_comments() {
+        for {
+            # Skip whitespace
+            for this.ch == " " or this.ch == "\t" or this.ch == "\n" or this.ch == "\r" {
+                this.read_char()
+            }
+            # Skip comment
+            if this.ch == "#" {
+                for this.ch != "\n" and this.ch != "" {
+                    this.read_char()
+                }
+            } else {
+                break
+            }
+        }
+    }
+
+    # read_identifier() -> string
+    # Reads an identifier (letter followed by letters/digits).
+    # Returns the identifier string.
+    mut fn read_identifier() -> string {
+        start := this.pos
+        for is_letter(this.ch) or is_digit(this.ch) {
+            this.read_char()
+        }
+        return str.substring(this.input, start, this.pos)
+    }
+
+    # read_number() -> Token
+    # Reads an integer or float literal. Supports underscore separators.
+    # Returns INT token for integers, FLOAT token for decimals.
+    mut fn read_number() {
+        start := this.pos
+        line := this.line
+        col := this.column
+        mut tok_type := token.TokenType.INT
+
+        # Read integer part
+        for is_digit(this.ch) or this.ch == "_" {
+            this.read_char()
+        }
+
+        # Check for decimal
+        if this.ch == "." and is_digit(this.peek_char()) {
+            tok_type = token.TokenType.FLOAT
+            this.read_char()
+            for is_digit(this.ch) or this.ch == "_" {
+                this.read_char()
+            }
+        }
+
+        lit := str.substring(this.input, start, this.pos)
+        return token.make_token(tok_type, lit, line, col)
+    }
+
+    # handle_escape() -> string
+    # Processes an escape sequence in a string literal.
+    # Handles: \n, \t, \r, \\, \", \{, \}
+    # Returns the unescaped character(s).
+    mut fn handle_escape() -> string {
+        this.read_char()
+        ch := this.ch
+        match ch {
+            "n" => { return "\n" }
+            "t" => { return "\t" }
+            "r" => { return "\r" }
+            "\\" => { return "\\" }
+            "\"" => { return "\"" }
+            "\{" => { return "\{" }
+            "\}" => { return "\}" }
+            _ => { return "\\" + ch }
+        }
+    }
+
+    # read_string() -> Token
+    # Reads a string literal, handling escape sequences and interpolation.
+    # Returns STRING for regular strings, INTERP_START if interpolation found.
+    mut fn read_string() {
+        line := this.line
+        col := this.column
+        mut result := ""
+        this.read_char()
+
+        for {
+            if this.ch == "\"" or this.ch == "" {
+                if this.ch == "\"" {
+                    this.read_char()
+                }
+                return token.make_token(token.TokenType.STRING, result, line, col)
+            }
+            if this.ch == "\{" {
+                this.in_interp = true
+                this.interp_depth = 0
+                this.read_char()
+                return token.make_token(token.TokenType.INTERP_START, result, line, col)
+            }
+            if this.ch == "\\" {
+                result = result + this.handle_escape()
+            } else {
+                result = result + this.ch
+            }
+            this.read_char()
+        }
+    }
+
+    # read_string_continue() -> Token
+    # Continues reading a string after an interpolation expression.
+    # Returns INTERP_MID if another interpolation found, INTERP_END at string end.
+    mut fn read_string_continue() {
+        line := this.line
+        col := this.column
+        mut result := ""
+
+        for {
+            if this.ch == "\"" or this.ch == "" {
+                if this.ch == "\"" {
+                    this.read_char()
+                }
+                return token.make_token(token.TokenType.INTERP_END, result, line, col)
+            }
+            if this.ch == "\{" {
+                this.in_interp = true
+                this.interp_depth = 0
+                this.read_char()
+                return token.make_token(token.TokenType.INTERP_MID, result, line, col)
+            }
+            if this.ch == "\\" {
+                result = result + this.handle_escape()
+            } else {
+                result = result + this.ch
+            }
+            this.read_char()
+        }
+    }
+
+    # next_token() -> Token
+    # Returns the next token from the input.
+    # This is the main method called repeatedly to tokenize source code.
+    # Handles all token types: operators, literals, keywords, etc.
+    mut fn next_token() {
+        this.skip_whitespace_and_comments()
+
+        line := this.line
+        col := this.column
+        ch := this.ch
+        peek := this.peek_char()
+
+        if ch == "" {
+            return token.make_token(token.TokenType.EOF, "", line, col)
+        }
+
+        # Two-char operators check first
+        if ch == "=" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.EQ, "==", line, col)
+        }
+        if ch == "=" and peek == ">" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.FAT_ARROW, "=>", line, col)
+        }
+        if ch == "!" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.NOT_EQ, "!=", line, col)
+        }
+        if ch == "<" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.LT_EQ, "<=", line, col)
+        }
+        if ch == ">" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.GT_EQ, ">=", line, col)
+        }
+        if ch == ":" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.DECLARE, ":=", line, col)
+        }
+        if ch == "-" and peek == ">" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.ARROW, "->", line, col)
+        }
+        if ch == "*" and peek == "*" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.POWER, "**", line, col)
+        }
+        if ch == "+" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.PLUS_ASSIGN, "+=", line, col)
+        }
+        if ch == "-" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.MINUS_ASSIGN, "-=", line, col)
+        }
+        if ch == "*" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.ASTERISK_ASSIGN, "*=", line, col)
+        }
+        if ch == "/" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.SLASH_ASSIGN, "/=", line, col)
+        }
+        if ch == "%" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.PERCENT_ASSIGN, "%=", line, col)
+        }
+        if ch == "." and peek == "." {
+            this.read_char()
+            if this.peek_char() == "=" {
+                this.read_char()
+                this.read_char()
+                return token.make_token(token.TokenType.DOTDOTEQ, "..=", line, col)
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.DOTDOT, "..", line, col)
+        }
+
+        # Handle brace with interpolation state
+        if ch == "\{" {
+            if this.in_interp {
+                this.interp_depth = this.interp_depth + 1
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.LBRACE, "\{", line, col)
+        }
+
+        if ch == "\}" {
+            if this.in_interp {
+                if this.interp_depth > 0 {
+                    this.interp_depth = this.interp_depth - 1
+                    this.read_char()
+                    return token.make_token(token.TokenType.RBRACE, "\}", line, col)
+                } else {
+                    this.in_interp = false
+                    this.read_char()
+                    return this.read_string_continue()
+                }
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.RBRACE, "\}", line, col)
+        }
+
+        # String literal
+        if ch == "\"" {
+            return this.read_string()
+        }
+
+        # Identifiers and keywords
+        if is_letter(ch) {
+            lit := this.read_identifier()
+            tok_type := token.lookup_ident(lit)
+            return token.make_token(tok_type, lit, line, col)
+        }
+
+        # Numbers
+        if is_digit(ch) {
+            return this.read_number()
+        }
+
+        # Single-char tokens
+        this.read_char()
+        match ch {
+            "=" => { return token.make_token(token.TokenType.ASSIGN, "=", line, col) }
+            "+" => { return token.make_token(token.TokenType.PLUS, "+", line, col) }
+            "-" => { return token.make_token(token.TokenType.MINUS, "-", line, col) }
+            "*" => { return token.make_token(token.TokenType.ASTERISK, "*", line, col) }
+            "/" => { return token.make_token(token.TokenType.SLASH, "/", line, col) }
+            "%" => { return token.make_token(token.TokenType.PERCENT, "%", line, col) }
+            "<" => { return token.make_token(token.TokenType.LT, "<", line, col) }
+            ">" => { return token.make_token(token.TokenType.GT, ">", line, col) }
+            "," => { return token.make_token(token.TokenType.COMMA, ",", line, col) }
+            ":" => { return token.make_token(token.TokenType.COLON, ":", line, col) }
+            "(" => { return token.make_token(token.TokenType.LPAREN, "(", line, col) }
+            ")" => { return token.make_token(token.TokenType.RPAREN, ")", line, col) }
+            "[" => { return token.make_token(token.TokenType.LBRACKET, "[", line, col) }
+            "]" => { return token.make_token(token.TokenType.RBRACKET, "]", line, col) }
+            "." => { return token.make_token(token.TokenType.DOT, ".", line, col) }
+            "&" => { return token.make_token(token.TokenType.AMPERSAND, "&", line, col) }
+            "|" => { return token.make_token(token.TokenType.PIPE, "|", line, col) }
+            "!" => { return token.make_token(token.TokenType.ILLEGAL, "!", line, col) }
+            _ => { return token.make_token(token.TokenType.ILLEGAL, ch, line, col) }
+        }
+    }
+}
+
+# is_letter(ch) -> bool
+# Returns true if ch is a letter (a-z, A-Z) or underscore.
+# Used to identify the start of identifiers.
+fn is_letter(ch: str) -> bool {
+    return false if ch == ""
+    code := char.ord(ch)
+    return (code >= 97 and code <= 122) or (code >= 65 and code <= 90) or ch == "_"
+}
+
+# is_digit(ch) -> bool
+# Returns true if ch is a digit (0-9).
+# Used for number literals and identifier continuation.
+fn is_digit(ch: str) -> bool {
+    return false if ch == ""
+    return char.is_digit(ch)
+}
+
+# tokenize(input) -> list[Token]
+#
+# Convenience function that tokenizes the entire input and returns a list
+# of all tokens including the final EOF token.
+#
+# Args:
+#   input - The source code string to tokenize
+#
+# Returns:
+#   A list of Token objects representing the tokenized input
+#
+# Example:
+#   tokens := tokenize("1 + 2")
+#   # tokens = [INT("1"), PLUS("+"), INT("2"), EOF("")]
+fn tokenize(input: str) -> list {
+    l := new_lexer(input)
+    mut tokens := []
+
+    for {
+        tok := l.next_token()
+        tokens = tokens.append(tok)
+        if tok.type == token.TokenType.EOF {
+            break
+        }
+    }
+
+    return tokens
+}

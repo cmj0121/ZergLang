@@ -1,0 +1,308 @@
+# token.zg - Token types and Token class for Zerg lexer
+#
+# This module provides the fundamental types for lexical analysis in the
+# self-hosted Zerg compiler. It defines all token types recognized by the
+# language and provides utilities for token creation and keyword lookup.
+#
+# Usage:
+#   import "src/core/compiler/token"
+#
+#   tok := token.make_token(token.TokenType.INT, "42", 1, 5)
+#   print(token.token_type_name(tok.type))  # prints "INT"
+#
+# Types:
+#   TokenType  - Enum of all token types (operators, keywords, literals, etc.)
+#   Token      - Class representing a single token with type, literal, position
+#
+# Functions:
+#   make_token(type, literal, line, col) -> Token
+#   lookup_ident(ident) -> TokenType
+#   token_type_name(type) -> string
+
+# TokenType - Enumeration of all token types recognized by the Zerg lexer.
+#
+# Categories:
+#   - Special: ILLEGAL (invalid token), EOF (end of file)
+#   - Literals: IDENT, INT, FLOAT, STRING, INTERP_* (interpolation)
+#   - Operators: arithmetic, comparison, assignment
+#   - Delimiters: parentheses, braces, brackets, punctuation
+#   - Keywords: control flow, declarations, modifiers
+enum TokenType {
+    # Special
+    ILLEGAL
+    EOF
+
+    # Literals
+    IDENT
+    INT
+    FLOAT
+    STRING
+    INTERP_START
+    INTERP_MID
+    INTERP_END
+
+    # Operators
+    ASSIGN
+    DECLARE
+    PLUS
+    MINUS
+    ASTERISK
+    SLASH
+    PERCENT
+    POWER
+
+    # Comparison
+    EQ
+    NOT_EQ
+    LT
+    GT
+    LT_EQ
+    GT_EQ
+
+    # Delimiters
+    COMMA
+    COLON
+    LPAREN
+    RPAREN
+    LBRACE
+    RBRACE
+    LBRACKET
+    RBRACKET
+    DOT
+    ARROW
+    AMPERSAND
+    PIPE
+    DOTDOT
+    DOTDOTEQ
+    FAT_ARROW
+
+    # Compound assignment
+    PLUS_ASSIGN
+    MINUS_ASSIGN
+    ASTERISK_ASSIGN
+    SLASH_ASSIGN
+    PERCENT_ASSIGN
+
+    # Keywords
+    TRUE
+    FALSE
+    NIL
+    MUT
+    AND
+    OR
+    NOT
+    FN
+    RETURN
+    IF
+    ELSE
+    FOR
+    IN
+    BREAK
+    CONTINUE
+    NOP
+    MATCH
+    CLASS
+    IMPL
+    THIS
+    PUB
+    STATIC
+    SPEC
+    SELF
+    ASSERT
+    UNSAFE
+    ASM
+    ENUM
+    UNDERSCORE
+    IS
+    IMPORT
+    AS
+    WITH
+}
+
+# Token - Represents a single lexical token.
+#
+# A token is the smallest unit of meaning in source code, produced by the
+# lexer during tokenization. Each token carries its type, the original text
+# (literal), and its position in the source file for error reporting.
+#
+# Fields:
+#   type    - The TokenType indicating what kind of token this is
+#   literal - The original text from the source code
+#   line    - 1-based line number where the token appears
+#   column  - 1-based column number where the token starts
+class Token {
+    pub mut type: TokenType
+    pub mut literal: string
+    pub mut line: int
+    pub mut column: int
+}
+
+# make_token(type, literal, line, col) -> Token
+#
+# Creates a new Token with the specified type, literal text, and position.
+# This is the primary constructor for creating tokens during lexical analysis.
+#
+# Args:
+#   t    - The TokenType for this token
+#   lit  - The literal text from the source
+#   line - The 1-based line number
+#   col  - The 1-based column number
+#
+# Returns:
+#   A new Token instance with the given values
+#
+# Example:
+#   tok := make_token(TokenType.INT, "42", 1, 5)
+fn make_token(t: TokenType, lit: str, line: int, col: int) -> Token {
+    return Token()..type=t..literal=lit..line=line..column=col
+}
+
+# lookup_ident(ident) -> TokenType
+#
+# Determines if an identifier is a keyword or a regular identifier.
+# This function is called by the lexer after reading an identifier to
+# check if it matches any of Zerg's reserved keywords.
+#
+# Args:
+#   ident - The identifier string to look up
+#
+# Returns:
+#   The corresponding keyword TokenType if ident is a keyword,
+#   otherwise TokenType.IDENT for regular identifiers
+#
+# Example:
+#   lookup_ident("fn")     # returns TokenType.FN
+#   lookup_ident("myVar")  # returns TokenType.IDENT
+fn lookup_ident(ident: str) -> TokenType {
+    if ident == "true" { return TokenType.TRUE }
+    if ident == "false" { return TokenType.FALSE }
+    if ident == "nil" { return TokenType.NIL }
+    if ident == "mut" { return TokenType.MUT }
+    if ident == "and" { return TokenType.AND }
+    if ident == "or" { return TokenType.OR }
+    if ident == "not" { return TokenType.NOT }
+    if ident == "fn" { return TokenType.FN }
+    if ident == "return" { return TokenType.RETURN }
+    if ident == "if" { return TokenType.IF }
+    if ident == "else" { return TokenType.ELSE }
+    if ident == "for" { return TokenType.FOR }
+    if ident == "in" { return TokenType.IN }
+    if ident == "break" { return TokenType.BREAK }
+    if ident == "continue" { return TokenType.CONTINUE }
+    if ident == "nop" { return TokenType.NOP }
+    if ident == "match" { return TokenType.MATCH }
+    if ident == "class" { return TokenType.CLASS }
+    if ident == "impl" { return TokenType.IMPL }
+    if ident == "this" { return TokenType.THIS }
+    if ident == "pub" { return TokenType.PUB }
+    if ident == "static" { return TokenType.STATIC }
+    if ident == "spec" { return TokenType.SPEC }
+    if ident == "Self" { return TokenType.SELF }
+    if ident == "assert" { return TokenType.ASSERT }
+    if ident == "unsafe" { return TokenType.UNSAFE }
+    if ident == "asm" { return TokenType.ASM }
+    if ident == "enum" { return TokenType.ENUM }
+    if ident == "_" { return TokenType.UNDERSCORE }
+    if ident == "is" { return TokenType.IS }
+    if ident == "import" { return TokenType.IMPORT }
+    if ident == "as" { return TokenType.AS }
+    if ident == "with" { return TokenType.WITH }
+    return TokenType.IDENT
+}
+
+# token_type_name(type) -> string
+#
+# Returns the string name of a TokenType for debugging and error messages.
+# Useful for printing tokens in a human-readable format.
+#
+# Args:
+#   t - The TokenType to get the name for
+#
+# Returns:
+#   A string representation of the token type (e.g., "INT", "PLUS", "FN")
+#   Returns "UNKNOWN" for unrecognized types
+#
+# Example:
+#   token_type_name(TokenType.PLUS)  # returns "PLUS"
+#   token_type_name(TokenType.FN)    # returns "FN"
+fn token_type_name(t: TokenType) -> string {
+    match t {
+        TokenType.ILLEGAL => { return "ILLEGAL" }
+        TokenType.EOF => { return "EOF" }
+        TokenType.IDENT => { return "IDENT" }
+        TokenType.INT => { return "INT" }
+        TokenType.FLOAT => { return "FLOAT" }
+        TokenType.STRING => { return "STRING" }
+        TokenType.INTERP_START => { return "INTERP_START" }
+        TokenType.INTERP_MID => { return "INTERP_MID" }
+        TokenType.INTERP_END => { return "INTERP_END" }
+        TokenType.ASSIGN => { return "ASSIGN" }
+        TokenType.DECLARE => { return "DECLARE" }
+        TokenType.PLUS => { return "PLUS" }
+        TokenType.MINUS => { return "MINUS" }
+        TokenType.ASTERISK => { return "ASTERISK" }
+        TokenType.SLASH => { return "SLASH" }
+        TokenType.PERCENT => { return "PERCENT" }
+        TokenType.POWER => { return "POWER" }
+        TokenType.EQ => { return "EQ" }
+        TokenType.NOT_EQ => { return "NOT_EQ" }
+        TokenType.LT => { return "LT" }
+        TokenType.GT => { return "GT" }
+        TokenType.LT_EQ => { return "LT_EQ" }
+        TokenType.GT_EQ => { return "GT_EQ" }
+        TokenType.COMMA => { return "COMMA" }
+        TokenType.COLON => { return "COLON" }
+        TokenType.LPAREN => { return "LPAREN" }
+        TokenType.RPAREN => { return "RPAREN" }
+        TokenType.LBRACE => { return "LBRACE" }
+        TokenType.RBRACE => { return "RBRACE" }
+        TokenType.LBRACKET => { return "LBRACKET" }
+        TokenType.RBRACKET => { return "RBRACKET" }
+        TokenType.DOT => { return "DOT" }
+        TokenType.ARROW => { return "ARROW" }
+        TokenType.AMPERSAND => { return "AMPERSAND" }
+        TokenType.PIPE => { return "PIPE" }
+        TokenType.DOTDOT => { return "DOTDOT" }
+        TokenType.DOTDOTEQ => { return "DOTDOTEQ" }
+        TokenType.FAT_ARROW => { return "FAT_ARROW" }
+        TokenType.PLUS_ASSIGN => { return "PLUS_ASSIGN" }
+        TokenType.MINUS_ASSIGN => { return "MINUS_ASSIGN" }
+        TokenType.ASTERISK_ASSIGN => { return "ASTERISK_ASSIGN" }
+        TokenType.SLASH_ASSIGN => { return "SLASH_ASSIGN" }
+        TokenType.PERCENT_ASSIGN => { return "PERCENT_ASSIGN" }
+        TokenType.TRUE => { return "TRUE" }
+        TokenType.FALSE => { return "FALSE" }
+        TokenType.NIL => { return "NIL" }
+        TokenType.MUT => { return "MUT" }
+        TokenType.AND => { return "AND" }
+        TokenType.OR => { return "OR" }
+        TokenType.NOT => { return "NOT" }
+        TokenType.FN => { return "FN" }
+        TokenType.RETURN => { return "RETURN" }
+        TokenType.IF => { return "IF" }
+        TokenType.ELSE => { return "ELSE" }
+        TokenType.FOR => { return "FOR" }
+        TokenType.IN => { return "IN" }
+        TokenType.BREAK => { return "BREAK" }
+        TokenType.CONTINUE => { return "CONTINUE" }
+        TokenType.NOP => { return "NOP" }
+        TokenType.MATCH => { return "MATCH" }
+        TokenType.CLASS => { return "CLASS" }
+        TokenType.IMPL => { return "IMPL" }
+        TokenType.THIS => { return "THIS" }
+        TokenType.PUB => { return "PUB" }
+        TokenType.STATIC => { return "STATIC" }
+        TokenType.SPEC => { return "SPEC" }
+        TokenType.SELF => { return "SELF" }
+        TokenType.ASSERT => { return "ASSERT" }
+        TokenType.UNSAFE => { return "UNSAFE" }
+        TokenType.ASM => { return "ASM" }
+        TokenType.ENUM => { return "ENUM" }
+        TokenType.UNDERSCORE => { return "UNDERSCORE" }
+        TokenType.IS => { return "IS" }
+        TokenType.IMPORT => { return "IMPORT" }
+        TokenType.AS => { return "AS" }
+        TokenType.WITH => { return "WITH" }
+        _ => { return "UNKNOWN" }
+    }
+}
