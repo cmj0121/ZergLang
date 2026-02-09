@@ -154,12 +154,7 @@ class Token {
 # Example:
 #   tok := make_token(TokenType.INT, "42", 1, 5)
 fn make_token(t: TokenType, lit: str, line: int, col: int) -> Token {
-    tok := Token()
-    tok.type = t
-    tok.literal = lit
-    tok.line = line
-    tok.column = col
-    return tok
+    return Token()..type=t..literal=lit..line=line..column=col
 }
 
 # lookup_ident(ident) -> TokenType

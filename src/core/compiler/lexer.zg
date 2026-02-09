@@ -73,15 +73,7 @@ class Lexer {
 #   l := new_lexer("x := 42")
 #   tok := l.next_token()  # returns IDENT token for "x"
 fn new_lexer(input: str) -> Lexer {
-    l := Lexer()
-    l.input = input
-    l.pos = 0
-    l.read_pos = 0
-    l.ch = ""
-    l.line = 1
-    l.column = 0
-    l.in_interp = false
-    l.interp_depth = 0
+    l := Lexer()..input=input..pos=0..read_pos=0..ch=""..line=1..column=0..in_interp=false..interp_depth=0
     l.read_char()
     return l
 }
