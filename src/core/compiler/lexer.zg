@@ -1,0 +1,355 @@
+# lexer.zg - Lexer for Zerg
+
+import "src/core/compiler/token"
+
+class Lexer {
+    pub mut input: string
+    pub mut pos: int
+    pub mut read_pos: int
+    pub mut ch: string
+    pub mut line: int
+    pub mut column: int
+    pub mut in_interp: bool
+    pub mut interp_depth: int
+}
+
+fn new_lexer(input: str) -> Lexer {
+    l := Lexer()
+    l.input = input
+    l.pos = 0
+    l.read_pos = 0
+    l.ch = ""
+    l.line = 1
+    l.column = 0
+    l.in_interp = false
+    l.interp_depth = 0
+    l.read_char()
+    return l
+}
+
+impl Lexer {
+    mut fn read_char() {
+        if this.read_pos >= len(this.input) {
+            this.ch = ""
+        } else {
+            this.ch = this.input[this.read_pos]
+        }
+        this.pos = this.read_pos
+        this.read_pos = this.read_pos + 1
+
+        if this.ch == "\n" {
+            this.line = this.line + 1
+            this.column = 0
+        } else {
+            this.column = this.column + 1
+        }
+    }
+
+    fn peek_char() -> string {
+        if this.read_pos >= len(this.input) {
+            return ""
+        }
+        return this.input[this.read_pos]
+    }
+
+    mut fn skip_whitespace_and_comments() {
+        for {
+            # Skip whitespace
+            for this.ch == " " or this.ch == "\t" or this.ch == "\n" or this.ch == "\r" {
+                this.read_char()
+            }
+            # Skip comment
+            if this.ch == "#" {
+                for this.ch != "\n" and this.ch != "" {
+                    this.read_char()
+                }
+            } else {
+                break
+            }
+        }
+    }
+
+    mut fn read_identifier() -> string {
+        start := this.pos
+        for is_letter(this.ch) or is_digit(this.ch) {
+            this.read_char()
+        }
+        return str.substring(this.input, start, this.pos)
+    }
+
+    mut fn read_number() {
+        start := this.pos
+        line := this.line
+        col := this.column
+        mut tok_type := token.TokenType.INT
+
+        # Read integer part
+        for is_digit(this.ch) or this.ch == "_" {
+            this.read_char()
+        }
+
+        # Check for decimal
+        if this.ch == "." and is_digit(this.peek_char()) {
+            tok_type = token.TokenType.FLOAT
+            this.read_char()
+            for is_digit(this.ch) or this.ch == "_" {
+                this.read_char()
+            }
+        }
+
+        lit := str.substring(this.input, start, this.pos)
+        return token.make_token(tok_type, lit, line, col)
+    }
+
+    mut fn handle_escape() -> string {
+        this.read_char()
+        ch := this.ch
+        match ch {
+            "n" => { return "\n" }
+            "t" => { return "\t" }
+            "r" => { return "\r" }
+            "\\" => { return "\\" }
+            "\"" => { return "\"" }
+            "\{" => { return "\{" }
+            "\}" => { return "\}" }
+            _ => { return "\\" + ch }
+        }
+    }
+
+    mut fn read_string() {
+        line := this.line
+        col := this.column
+        mut result := ""
+        this.read_char()
+
+        for {
+            if this.ch == "\"" or this.ch == "" {
+                if this.ch == "\"" {
+                    this.read_char()
+                }
+                return token.make_token(token.TokenType.STRING, result, line, col)
+            }
+            if this.ch == "\{" {
+                this.in_interp = true
+                this.interp_depth = 0
+                this.read_char()
+                return token.make_token(token.TokenType.INTERP_START, result, line, col)
+            }
+            if this.ch == "\\" {
+                result = result + this.handle_escape()
+            } else {
+                result = result + this.ch
+            }
+            this.read_char()
+        }
+    }
+
+    mut fn read_string_continue() {
+        line := this.line
+        col := this.column
+        mut result := ""
+
+        for {
+            if this.ch == "\"" or this.ch == "" {
+                if this.ch == "\"" {
+                    this.read_char()
+                }
+                return token.make_token(token.TokenType.INTERP_END, result, line, col)
+            }
+            if this.ch == "\{" {
+                this.in_interp = true
+                this.interp_depth = 0
+                this.read_char()
+                return token.make_token(token.TokenType.INTERP_MID, result, line, col)
+            }
+            if this.ch == "\\" {
+                result = result + this.handle_escape()
+            } else {
+                result = result + this.ch
+            }
+            this.read_char()
+        }
+    }
+
+    mut fn next_token() {
+        this.skip_whitespace_and_comments()
+
+        line := this.line
+        col := this.column
+        ch := this.ch
+        peek := this.peek_char()
+
+        if ch == "" {
+            return token.make_token(token.TokenType.EOF, "", line, col)
+        }
+
+        # Two-char operators check first
+        if ch == "=" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.EQ, "==", line, col)
+        }
+        if ch == "=" and peek == ">" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.FAT_ARROW, "=>", line, col)
+        }
+        if ch == "!" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.NOT_EQ, "!=", line, col)
+        }
+        if ch == "<" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.LT_EQ, "<=", line, col)
+        }
+        if ch == ">" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.GT_EQ, ">=", line, col)
+        }
+        if ch == ":" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.DECLARE, ":=", line, col)
+        }
+        if ch == "-" and peek == ">" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.ARROW, "->", line, col)
+        }
+        if ch == "*" and peek == "*" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.POWER, "**", line, col)
+        }
+        if ch == "+" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.PLUS_ASSIGN, "+=", line, col)
+        }
+        if ch == "-" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.MINUS_ASSIGN, "-=", line, col)
+        }
+        if ch == "*" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.ASTERISK_ASSIGN, "*=", line, col)
+        }
+        if ch == "/" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.SLASH_ASSIGN, "/=", line, col)
+        }
+        if ch == "%" and peek == "=" {
+            this.read_char()
+            this.read_char()
+            return token.make_token(token.TokenType.PERCENT_ASSIGN, "%=", line, col)
+        }
+        if ch == "." and peek == "." {
+            this.read_char()
+            if this.peek_char() == "=" {
+                this.read_char()
+                this.read_char()
+                return token.make_token(token.TokenType.DOTDOTEQ, "..=", line, col)
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.DOTDOT, "..", line, col)
+        }
+
+        # Handle brace with interpolation state
+        if ch == "\{" {
+            if this.in_interp {
+                this.interp_depth = this.interp_depth + 1
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.LBRACE, "\{", line, col)
+        }
+
+        if ch == "\}" {
+            if this.in_interp {
+                if this.interp_depth > 0 {
+                    this.interp_depth = this.interp_depth - 1
+                    this.read_char()
+                    return token.make_token(token.TokenType.RBRACE, "\}", line, col)
+                } else {
+                    this.in_interp = false
+                    this.read_char()
+                    return this.read_string_continue()
+                }
+            }
+            this.read_char()
+            return token.make_token(token.TokenType.RBRACE, "\}", line, col)
+        }
+
+        # String literal
+        if ch == "\"" {
+            return this.read_string()
+        }
+
+        # Identifiers and keywords
+        if is_letter(ch) {
+            lit := this.read_identifier()
+            tok_type := token.lookup_ident(lit)
+            return token.make_token(tok_type, lit, line, col)
+        }
+
+        # Numbers
+        if is_digit(ch) {
+            return this.read_number()
+        }
+
+        # Single-char tokens
+        this.read_char()
+        match ch {
+            "=" => { return token.make_token(token.TokenType.ASSIGN, "=", line, col) }
+            "+" => { return token.make_token(token.TokenType.PLUS, "+", line, col) }
+            "-" => { return token.make_token(token.TokenType.MINUS, "-", line, col) }
+            "*" => { return token.make_token(token.TokenType.ASTERISK, "*", line, col) }
+            "/" => { return token.make_token(token.TokenType.SLASH, "/", line, col) }
+            "%" => { return token.make_token(token.TokenType.PERCENT, "%", line, col) }
+            "<" => { return token.make_token(token.TokenType.LT, "<", line, col) }
+            ">" => { return token.make_token(token.TokenType.GT, ">", line, col) }
+            "," => { return token.make_token(token.TokenType.COMMA, ",", line, col) }
+            ":" => { return token.make_token(token.TokenType.COLON, ":", line, col) }
+            "(" => { return token.make_token(token.TokenType.LPAREN, "(", line, col) }
+            ")" => { return token.make_token(token.TokenType.RPAREN, ")", line, col) }
+            "[" => { return token.make_token(token.TokenType.LBRACKET, "[", line, col) }
+            "]" => { return token.make_token(token.TokenType.RBRACKET, "]", line, col) }
+            "." => { return token.make_token(token.TokenType.DOT, ".", line, col) }
+            "&" => { return token.make_token(token.TokenType.AMPERSAND, "&", line, col) }
+            "|" => { return token.make_token(token.TokenType.PIPE, "|", line, col) }
+            "!" => { return token.make_token(token.TokenType.ILLEGAL, "!", line, col) }
+            _ => { return token.make_token(token.TokenType.ILLEGAL, ch, line, col) }
+        }
+    }
+}
+
+fn is_letter(ch: str) -> bool {
+    if ch == "" { return false }
+    code := char.ord(ch)
+    return (code >= 97 and code <= 122) or (code >= 65 and code <= 90) or ch == "_"
+}
+
+fn is_digit(ch: str) -> bool {
+    if ch == "" { return false }
+    return char.is_digit(ch)
+}
+
+fn tokenize(input: str) -> list {
+    l := new_lexer(input)
+    mut tokens := []
+
+    for {
+        tok := l.next_token()
+        tokens = tokens.append(tok)
+        if tok.type == token.TokenType.EOF {
+            break
+        }
+    }
+
+    return tokens
+}
