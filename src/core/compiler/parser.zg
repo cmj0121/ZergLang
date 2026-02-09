@@ -263,6 +263,7 @@ impl Parser {
             token.TokenType.THIS => { return this.parse_this_expression() }
             token.TokenType.SELF => { return this.parse_self_expression() }
             token.TokenType.UNDERSCORE => { return this.parse_underscore() }
+            token.TokenType.ASM => { return this.parse_asm_expression() }
             _ => {
                 this.no_prefix_parse_error(this.cur_token.type)
                 return nil
@@ -1551,5 +1552,33 @@ impl Parser {
             ..variable=variable
             ..value=value
             ..body=body
+    }
+
+    # parse_asm_expression() - Parse asm("instruction", arg1, arg2, ...)
+    mut fn parse_asm_expression() -> object {
+        tok := this.cur_token
+
+        if not this.expect_peek(token.TokenType.LPAREN) {
+            return nil
+        }
+
+        if not this.expect_peek(token.TokenType.STRING) {
+            return nil
+        }
+
+        instruction := this.cur_token.literal
+
+        mut arguments := []
+        for this.peek_token_is(token.TokenType.COMMA) {
+            this.next_token()
+            this.next_token()
+            arguments = arguments.append(this.parse_expression(LOWEST))
+        }
+
+        if not this.expect_peek(token.TokenType.RPAREN) {
+            return nil
+        }
+
+        return ast.AsmExpr()..token=tok..instruction=instruction..args=arguments
     }
 }

@@ -262,6 +262,64 @@ check("int + float", eval_input("1 + 2.5"), "3.5")
 check("float comparison", eval_input("1.5 > 1.0"), "true")
 
 # ============================================================
+# Test 27: List Methods
+# ============================================================
+print("=== List Methods ===")
+check("list append", eval_input("x := [1, 2]\ny := x.append(3)\ny"), "[1, 2, 3]")
+check("list pop", eval_input("[10, 20, 30].pop()"), "30")
+check("list join", eval_input("[\"a\", \"b\", \"c\"].join(\", \")"), "a, b, c")
+check("list slice", eval_input("[1, 2, 3, 4, 5].slice(1, 4)"), "[2, 3, 4]")
+check("list index", eval_input("[10, 20, 30].index(20)"), "1")
+check("list index not found", eval_input("[10, 20, 30].index(99)"), "-1")
+check("list reverse", eval_input("[1, 2, 3].reverse()"), "[3, 2, 1]")
+check("list sort", eval_input("[3, 1, 2].sort()"), "[1, 2, 3]")
+check("list filter", eval_input("[1, 2, 3, 4, 5].filter(fn(x) \{ return x > 3 \})"), "[4, 5]")
+check("list map", eval_input("[1, 2, 3].map(fn(x) \{ return x * 2 \})"), "[2, 4, 6]")
+
+# ============================================================
+# Test 28: Map Methods
+# ============================================================
+print("=== Map Methods ===")
+check("map keys", eval_input("m := \{\"a\": 1, \"b\": 2\}\nk := m.keys()\nlen(k)"), "2")
+check("map values", eval_input("m := \{\"a\": 1, \"b\": 2\}\nv := m.values()\nlen(v)"), "2")
+check("map contains", eval_input("m := \{\"a\": 1, \"b\": 2\}\nm.contains(\"a\")"), "true")
+check("map not contains", eval_input("m := \{\"a\": 1\}\nm.contains(\"z\")"), "false")
+
+# ============================================================
+# Test 29: str Module
+# ============================================================
+print("=== str Module ===")
+check("str substring", eval_input("str.substring(\"hello world\", 0, 5)"), "hello")
+check("str replace", eval_input("str.replace(\"hello world\", \"world\", \"zerg\")"), "hello zerg")
+check("str split", eval_input("parts := str.split(\"a,b,c\", \",\")\nlen(parts)"), "3")
+check("str find", eval_input("str.find(\"hello world\", \"world\")"), "6")
+check("str find not found", eval_input("str.find(\"hello\", \"xyz\")"), "-1")
+check("str starts_with", eval_input("str.starts_with(\"hello\", \"hel\")"), "true")
+check("str ends_with", eval_input("str.ends_with(\"hello\", \"llo\")"), "true")
+check("str contains", eval_input("str.contains(\"hello world\", \"lo wo\")"), "true")
+check("str trim", eval_input("str.trim(\"  hello  \")"), "hello")
+
+# ============================================================
+# Test 30: char Module
+# ============================================================
+print("=== char Module ===")
+check("char ord", eval_input("char.ord(\"A\")"), "65")
+check("char chr", eval_input("char.chr(65)"), "A")
+check("char is_digit true", eval_input("char.is_digit(\"5\")"), "true")
+check("char is_digit false", eval_input("char.is_digit(\"x\")"), "false")
+check("char is_alpha", eval_input("char.is_alpha(\"a\")"), "true")
+check("char is_space", eval_input("char.is_space(\" \")"), "true")
+
+# ============================================================
+# Test 31: Self-Evaluation Smoke Test
+# ============================================================
+print("=== Self-Evaluation ===")
+check("self-eval simple", evaluator.run("1 + 2"), "3")
+check("self-eval list append", evaluator.run("x := [1, 2]\ny := x.append(3)\nlen(y)"), "3")
+check("self-eval str module", evaluator.run("str.substring(\"hello\", 0, 3)"), "hel")
+check("self-eval char module", evaluator.run("char.ord(\"A\")"), "65")
+
+# ============================================================
 # Summary
 # ============================================================
 print("")

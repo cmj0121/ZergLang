@@ -265,10 +265,11 @@ class StringPart {
     pub mut expr: object
 }
 
-# AsmExpr - Inline assembly (e.g., asm("sys_os"))
+# AsmExpr - Inline assembly (e.g., asm("sys_os", arg1, arg2))
 class AsmExpr {
     pub mut token: object
     pub mut instruction: string
+    pub mut args: list
 }
 
 # ============================================================
