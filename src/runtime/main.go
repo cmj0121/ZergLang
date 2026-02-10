@@ -15,9 +15,10 @@ import (
 var Version = "0.1.0"
 
 type CLI struct {
-	File    string `arg:"" optional:"" help:"Zerg source file to run (.zg)"`
-	Verbose bool   `short:"v" help:"Enable verbose logging"`
-	Version bool   `help:"Show version information"`
+	File    string   `arg:"" optional:"" help:"Zerg source file to run (.zg)"`
+	Args    []string `arg:"" optional:"" help:"Arguments passed to the Zerg program"`
+	Verbose bool     `short:"v" help:"Enable verbose logging"`
+	Version bool     `help:"Show version information"`
 }
 
 func main() {
