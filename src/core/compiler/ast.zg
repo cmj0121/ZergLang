@@ -250,6 +250,7 @@ class Parameter {
     pub mut name: string
     pub mut type_annotation: object
     pub mut is_mut: bool
+    pub mut default_value: object
 }
 
 # InterpolatedString - A string with interpolation (e.g., "hello {name}")

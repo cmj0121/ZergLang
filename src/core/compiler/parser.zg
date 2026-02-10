@@ -793,6 +793,7 @@ impl Parser {
     }
 
     # parse_parameter() - Parse a single function parameter
+    # Supports: name, name: type, name: type = default, name = default
     mut fn parse_parameter() -> object {
         tok := this.cur_token
         mut is_mut := false
@@ -811,7 +812,15 @@ impl Parser {
             type_annotation = this.parse_type_annotation()
         }
 
-        return ast.Parameter()..token=tok..name=name..type_annotation=type_annotation..is_mut=is_mut
+        # Parse optional default value: = expr
+        mut default_value := nil
+        if this.peek_token_is(token.TokenType.ASSIGN) {
+            this.next_token()
+            this.next_token()
+            default_value = this.parse_expression(LOWEST)
+        }
+
+        return ast.Parameter()..token=tok..name=name..type_annotation=type_annotation..is_mut=is_mut..default_value=default_value
     }
 
     # parse_type_annotation() - Parse a type annotation
@@ -1530,22 +1539,22 @@ impl Parser {
         return ast.UnsafeBlock()..token=tok..body=body
     }
 
-    # parse_with_statement() - Parse with var := expr { ... }
+    # parse_with_statement() - Parse with expr as name { body }
     mut fn parse_with_statement() -> object {
         tok := this.cur_token
+
+        this.next_token()
+        value := this.parse_expression(LOWEST)
+
+        if not this.expect_peek(token.TokenType.AS) {
+            return nil
+        }
 
         if not this.expect_peek(token.TokenType.IDENT) {
             return nil
         }
 
         variable := this.parse_identifier()
-
-        if not this.expect_peek(token.TokenType.DECLARE) {
-            return nil
-        }
-
-        this.next_token()
-        value := this.parse_expression(LOWEST)
 
         if not this.expect_peek(token.TokenType.LBRACE) {
             return nil

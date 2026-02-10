@@ -621,17 +621,17 @@ fn apply_builtin(name: string, args: list) -> object {
         if len(args) < 2 {
             return new_error("str.join() takes 2 arguments (sep, list)")
         }
-        if not (args[0] is ZString) {
-            return new_error("str.join() first argument must be string")
+        if not (args[0] is ZList) {
+            return new_error("str.join() first argument must be list")
         }
-        if not (args[1] is ZList) {
-            return new_error("str.join() second argument must be list")
+        if not (args[1] is ZString) {
+            return new_error("str.join() second argument must be string")
         }
-        sep := args[0].value
+        sep := args[1].value
         mut result := ""
-        for i in 0..len(args[1].elements) {
+        for i in 0..len(args[0].elements) {
             if i > 0 { result += sep }
-            result += inspect(args[1].elements[i])
+            result += inspect(args[0].elements[i])
         }
         return new_string(result)
     }
@@ -840,10 +840,8 @@ fn apply_builtin(name: string, args: list) -> object {
         if not (args[0] is ZString) {
             return new_error("char.is_digit() argument must be string")
         }
-        if len(args[0].value) != 1 {
-            return new_error("char.is_digit() requires a single character")
-        }
-        ch := char_byte(args[0].value)
+        if len(args[0].value) == 0 { return Z_FALSE }
+        ch := char_byte(args[0].value[0])
         return new_boolean(ch >= 48 and ch <= 57)
     }
     if name == "char_is_alpha" {
@@ -853,10 +851,8 @@ fn apply_builtin(name: string, args: list) -> object {
         if not (args[0] is ZString) {
             return new_error("char.is_alpha() argument must be string")
         }
-        if len(args[0].value) != 1 {
-            return new_error("char.is_alpha() requires a single character")
-        }
-        ch := char_byte(args[0].value)
+        if len(args[0].value) == 0 { return Z_FALSE }
+        ch := char_byte(args[0].value[0])
         mut is_a := false
         if ch >= 65 {
             if ch <= 90 { is_a = true }
@@ -874,10 +870,8 @@ fn apply_builtin(name: string, args: list) -> object {
         if not (args[0] is ZString) {
             return new_error("char.is_space() argument must be string")
         }
-        if len(args[0].value) != 1 {
-            return new_error("char.is_space() requires a single character")
-        }
-        ch := char_byte(args[0].value)
+        if len(args[0].value) == 0 { return Z_FALSE }
+        ch := char_byte(args[0].value[0])
         return new_boolean(ch == 32 or ch == 9 or ch == 10 or ch == 13)
     }
     if name == "char_is_alnum" {
@@ -887,9 +881,7 @@ fn apply_builtin(name: string, args: list) -> object {
         if not (args[0] is ZString) {
             return new_error("char.is_alnum() argument must be string")
         }
-        if len(args[0].value) != 1 {
-            return new_error("char.is_alnum() requires a single character")
-        }
+        if len(args[0].value) == 0 { return Z_FALSE }
         ch := char_byte(args[0].value)
         mut is_an := false
         if ch >= 48 {
@@ -901,7 +893,6 @@ fn apply_builtin(name: string, args: list) -> object {
         if ch >= 97 {
             if ch <= 122 { is_an = true }
         }
-        if ch == 95 { is_an = true }
         return new_boolean(is_an)
     }
 
@@ -1772,6 +1763,17 @@ fn apply_function(func: object, args: list, named_args: map) -> object {
             if named_val == nil {
                 if i < len(args) {
                     env_declare(fn_env, param_name, args[i], false)
+                }
+                if i >= len(args) {
+                    # Use default value if available
+                    if param.default_value != nil {
+                        default_val := eval(param.default_value, func.env)
+                        if is_error(default_val) { return default_val }
+                        env_declare(fn_env, param_name, default_val, false)
+                    }
+                    if param.default_value == nil {
+                        env_declare(fn_env, param_name, Z_NULL, false)
+                    }
                 }
             }
         }
