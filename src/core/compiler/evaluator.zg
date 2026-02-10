@@ -137,6 +137,12 @@ class ZSpecMethod {
     pub mut is_mut: bool
 }
 
+class ZFile {
+    pub mut handle: object
+    pub mut path: string
+    pub mut mode: string
+}
+
 # ============================================================
 # Singletons
 # ============================================================
@@ -252,6 +258,7 @@ fn obj_type(obj: object) -> string {
     if obj is ZEnumValue { return "ENUM_VALUE" }
     if obj is ZRange { return "RANGE" }
     if obj is ZSpec { return "SPEC" }
+    if obj is ZFile { return "FILE" }
     return "UNKNOWN"
 }
 
@@ -306,6 +313,7 @@ fn inspect(obj: object) -> string {
         return string(obj.start) + ".." + string(obj.end)
     }
     if obj is ZSpec { return "<spec " + obj.name + ">" }
+    if obj is ZFile { return "<file:" + obj.path + ">" }
     return "<unknown>"
 }
 
@@ -401,6 +409,13 @@ fn create_char_module() -> object {
     return ZModule()..name="char"..env=mod_env
 }
 
+fn create_io_module() -> object {
+    mod_env := new_environment()
+    env_declare(mod_env, "open", ZBuiltin()..name="io_open", false)
+    env_declare(mod_env, "exists", ZBuiltin()..name="io_exists", false)
+    return ZModule()..name="_io"..env=mod_env
+}
+
 fn new_environment_with_builtins() -> object {
     env := new_environment()
     env_declare(env, "print", ZBuiltin()..name="print", false)
@@ -413,6 +428,7 @@ fn new_environment_with_builtins() -> object {
     env_declare(env, "Err", ZBuiltin()..name="Err", false)
     env_declare(env, "str", create_str_module(), false)
     env_declare(env, "char", create_char_module(), false)
+    env_declare(env, "_io", create_io_module(), false)
     return env
 }
 
@@ -493,6 +509,37 @@ fn apply_builtin(name: string, args: list) -> object {
             return new_error("wrong number of arguments to Err: got " + string(len(args)) + ", want 1")
         }
         return ZEnumValue()..enum_name="Result"..variant="Err"
+    }
+
+    # --- io module builtins ---
+    if name == "io_open" {
+        if len(args) < 1 {
+            return new_error("io.open() requires at least 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("io.open() path must be a string")
+        }
+        path := args[0].value
+        mut mode := "r"
+        if len(args) >= 2 {
+            if args[1] is ZString {
+                mode = args[1].value
+            }
+        }
+        mut handle := nil
+        unsafe { handle = asm("file_open", path, mode) }
+        return ZFile()..handle=handle..path=path..mode=mode
+    }
+    if name == "io_exists" {
+        if len(args) != 1 {
+            return new_error("io.exists() takes exactly 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("io.exists() argument must be a string")
+        }
+        mut result := false
+        unsafe { result = asm("file_exists", args[0].value) }
+        return new_boolean(result)
     }
 
     # --- str module builtins ---
@@ -2042,6 +2089,93 @@ fn apply_bound_builtin(receiver: object, name: string, args: list) -> object {
         return Z_FALSE
     }
 
+    # --- File methods ---
+    if name == "file_read" {
+        native_handle := receiver.handle
+        if len(args) == 0 {
+            # Read all bytes
+            mut result := ""
+            unsafe { result = asm("file_read", native_handle) }
+            mut elements := []
+            for i in 0..len(result) {
+                mut byte_val := 0
+                unsafe { byte_val = asm("char_ord", result[i]) }
+                elements = elements.append(new_integer(byte_val))
+            }
+            return new_list(elements)
+        }
+        if len(args) == 1 {
+            if not (args[0] is ZInteger) {
+                return new_error("read() size must be an integer")
+            }
+            n := args[0].value
+            mut result := ""
+            unsafe { result = asm("file_read_n", native_handle, n) }
+            mut elements := []
+            for i in 0..len(result) {
+                mut byte_val := 0
+                unsafe { byte_val = asm("char_ord", result[i]) }
+                elements = elements.append(new_integer(byte_val))
+            }
+            return new_list(elements)
+        }
+        return new_error("read() takes 0 or 1 argument")
+    }
+    if name == "file_write" {
+        native_handle := receiver.handle
+        if len(args) != 1 {
+            return new_error("write() takes exactly 1 argument")
+        }
+        arg := args[0]
+        if arg is ZString {
+            mut n := 0
+            unsafe { n = asm("file_write", native_handle, arg.value) }
+            return new_integer(n)
+        }
+        if arg is ZList {
+            # Convert list of byte integers to raw byte string
+            mut byte_str := ""
+            for elem in arg.elements {
+                if elem is ZInteger {
+                    mut ch := ""
+                    unsafe { ch = asm("byte_chr", elem.value) }
+                    byte_str += ch
+                }
+            }
+            mut n := 0
+            unsafe { n = asm("file_write", native_handle, byte_str) }
+            return new_integer(n)
+        }
+        return new_error("write() argument must be string or list")
+    }
+    if name == "file_close" {
+        unsafe { asm("file_close", receiver.handle) }
+        return Z_NULL
+    }
+    if name == "file_seek" {
+        if len(args) < 1 {
+            return new_error("seek() takes 1 or 2 arguments")
+        }
+        if not (args[0] is ZInteger) {
+            return new_error("seek() offset must be an integer")
+        }
+        offset := args[0].value
+        mut whence := 0
+        if len(args) >= 2 {
+            if args[1] is ZInteger {
+                whence = args[1].value
+            }
+        }
+        mut pos := 0
+        unsafe { pos = asm("file_seek", receiver.handle, offset, whence) }
+        return new_integer(pos)
+    }
+    if name == "file_tell" {
+        mut pos := 0
+        unsafe { pos = asm("file_tell", receiver.handle) }
+        return new_integer(pos)
+    }
+
     return new_error("unknown bound builtin: " + name)
 }
 
@@ -2226,6 +2360,31 @@ fn eval_member_access(obj: object, member: string) -> object {
         if member == "length" {
             return new_integer(len(obj.value))
         }
+    }
+
+    # File methods
+    if obj is ZFile {
+        if member == "read" {
+            bi := ZBuiltin()..name="file_read"
+            return ZBoundMethod()..instance=obj..method=bi
+        }
+        if member == "write" {
+            bi := ZBuiltin()..name="file_write"
+            return ZBoundMethod()..instance=obj..method=bi
+        }
+        if member == "close" {
+            bi := ZBuiltin()..name="file_close"
+            return ZBoundMethod()..instance=obj..method=bi
+        }
+        if member == "seek" {
+            bi := ZBuiltin()..name="file_seek"
+            return ZBoundMethod()..instance=obj..method=bi
+        }
+        if member == "tell" {
+            bi := ZBuiltin()..name="file_tell"
+            return ZBoundMethod()..instance=obj..method=bi
+        }
+        return new_error("file has no method '" + member + "'")
     }
 
     return new_error("no member '" + member + "' on type " + obj_type(obj))
@@ -2566,6 +2725,12 @@ fn eval_with(node: object, env: object) -> object {
     inner_env := new_enclosed_environment(env)
     env_declare(inner_env, node.variable.value, resource, false)
     result := eval(node.body, inner_env)
+
+    # Auto-close: if resource is a ZFile, close it
+    if resource is ZFile {
+        unsafe { asm("file_close", resource.handle) }
+    }
+
     return result
 }
 
