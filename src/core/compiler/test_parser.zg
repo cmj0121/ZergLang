@@ -633,11 +633,25 @@ check_errors(p, "declaration then if")
 assert len(program.statements) == 2, "should have 2 statements"
 print("  OK")
 
+# Test 60: Impl-for-spec declaration
+print("Test 60: Impl-for-spec declaration")
+p := make_parser("impl Dog for Animal \{ fn speak() \{ return \"woof\" \} \}")
+program := p.parse_program()
+check_errors(p, "impl-for-spec")
+assert len(program.statements) == 1, "should have 1 statement"
+stmt := program.statements[0]
+assert stmt is ImplDecl, "should be ImplDecl"
+assert stmt.type_name.value == "Dog", "type_name should be Dog"
+assert stmt.spec_name != nil, "spec_name should not be nil"
+assert stmt.spec_name.value == "Animal", "spec_name should be Animal"
+assert len(stmt.methods) == 1, "should have 1 method"
+print("  OK")
+
 print("")
 print("--- Self-Parsing Test ---")
 
-# Test 60: Self-parsing (parser can parse all compiler files)
-print("Test 60: Self-parsing")
+# Test 61: Self-parsing (parser can parse all compiler files)
+print("Test 61: Self-parsing")
 fn read_file_content(path: str) -> str {
     mut result := ""
     unsafe {
