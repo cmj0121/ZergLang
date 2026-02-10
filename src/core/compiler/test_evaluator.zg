@@ -349,6 +349,24 @@ if parser_type == "ERROR" {
 }
 
 # ============================================================
+# Test 33: Self-Hosting Verification
+# ============================================================
+print("=== Self-Hosting Verification ===")
+
+evaluator.clear_module_cache()
+selfhost_result := evaluator.run_file("src/core/compiler/test_self_hosting.zg")
+selfhost_type := evaluator.obj_type(selfhost_result)
+test_count += 1
+if selfhost_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_self_hosting.zg through self-hosted pipeline")
+}
+if selfhost_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_self_hosting.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(selfhost_result))
+}
+
+# ============================================================
 # Summary
 # ============================================================
 print("")
