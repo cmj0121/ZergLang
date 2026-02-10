@@ -361,7 +361,80 @@ if parser_type == "ERROR" {
 }
 
 # ============================================================
-# Test 33: Self-Hosting Verification
+# Test 33: _io module - open/write/read
+# ============================================================
+print("=== _io Module ===")
+
+check("io_open and write", eval_input("import \"src/std/io\"
+with io.open(\"/tmp/zerg_eval_test.txt\", \"w\") as fd \{
+    fd.write(\"hello\")
+\}
+with io.open(\"/tmp/zerg_eval_test.txt\", \"r\") as fd \{
+    data := fd.read()
+    len(data)
+\}"), "5")
+
+# Test 34: _io module - exists
+check("io_exists true", eval_input("import \"src/std/io\"
+io.exists(\"/tmp/zerg_eval_test.txt\")"), "true")
+check("io_exists false", eval_input("import \"src/std/io\"
+io.exists(\"/tmp/nonexistent_zerg_99999\")"), "false")
+
+# Test 35: _io module - binary write/read
+check("io binary roundtrip", eval_input("import \"src/std/io\"
+with io.open(\"/tmp/zerg_eval_bin.bin\", \"w\") as fd \{
+    fd.write([byte(137), byte(80)])
+\}
+with io.open(\"/tmp/zerg_eval_bin.bin\", \"r\") as fd \{
+    data := fd.read()
+    int(data[0])
+\}"), "137")
+
+# Test 36: _io module - seek and tell
+check("io seek/tell", eval_input("import \"src/std/io\"
+with io.open(\"/tmp/zerg_eval_test.txt\", \"r\") as fd \{
+    fd.seek(2)
+    pos := fd.tell()
+    pos
+\}"), "2")
+
+# Test 37: _io module - partial read
+check("io read(n)", eval_input("import \"src/std/io\"
+with io.open(\"/tmp/zerg_eval_test.txt\", \"r\") as fd \{
+    chunk := fd.read(3)
+    len(chunk)
+\}"), "3")
+
+# Test 38: Integration - test_with_statement.zg through self-hosted
+evaluator.clear_module_cache()
+with_result := evaluator.run_file("tests/test_with_statement.zg")
+with_type := evaluator.obj_type(with_result)
+test_count += 1
+if with_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_with_statement.zg through self-hosted pipeline")
+}
+if with_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_with_statement.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(with_result))
+}
+
+# Test 39: Integration - test_std_io.zg through self-hosted
+evaluator.clear_module_cache()
+stdio_result := evaluator.run_file("tests/test_std_io.zg")
+stdio_type := evaluator.obj_type(stdio_result)
+test_count += 1
+if stdio_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_std_io.zg through self-hosted pipeline")
+}
+if stdio_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_std_io.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(stdio_result))
+}
+
+# ============================================================
+# Test 40: Self-Hosting Verification
 # ============================================================
 print("=== Self-Hosting Verification ===")
 
