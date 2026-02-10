@@ -433,8 +433,42 @@ if stdio_type == "ERROR" {
     print("    error: " + evaluator.inspect(stdio_result))
 }
 
+# Test 40: _sys module - os/arch
+check("sys_os", eval_input("import \"src/std/sys\"
+sys.os()"), "darwin")
+check("sys_arch", eval_input("import \"src/std/sys\"
+sys.arch()"), "arm64")
+
+# Test 41: _sys module - env
+check("sys_env HOME", eval_input("import \"src/std/sys\"
+home := sys.env(\"HOME\")
+len(home) > 0"), "true")
+check("sys_env missing", eval_input("import \"src/std/sys\"
+sys.env(\"ZERG_NONEXISTENT_99999\")"), "nil")
+check("sys_env default", eval_input("import \"src/std/sys\"
+sys.env(\"ZERG_NONEXISTENT_99999\", \"fallback\")"), "fallback")
+
+# Test 42: _sys module - args
+check("sys_args list", eval_input("import \"src/std/sys\"
+args := sys.args()
+len(args) >= 0"), "true")
+
+# Test 43: Integration - test_std_sys.zg through self-hosted
+evaluator.clear_module_cache()
+sys_result := evaluator.run_file("tests/test_std_sys.zg")
+sys_type := evaluator.obj_type(sys_result)
+test_count += 1
+if sys_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_std_sys.zg through self-hosted pipeline")
+}
+if sys_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_std_sys.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(sys_result))
+}
+
 # ============================================================
-# Test 40: Self-Hosting Verification
+# Test 44: Self-Hosting Verification
 # ============================================================
 print("=== Self-Hosting Verification ===")
 
