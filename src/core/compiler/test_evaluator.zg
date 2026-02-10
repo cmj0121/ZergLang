@@ -155,6 +155,8 @@ print("=== Functions ===")
 check("function literal", eval_input("add := fn(a, b) \{ return a + b \}\nadd(1, 2)"), "3")
 check("closure", eval_input("make_adder := fn(x) \{ return fn(y) \{ return x + y \} \}\nadd5 := make_adder(5)\nadd5(3)"), "8")
 check("recursive", eval_input("factorial := fn(n) \{\nif n <= 1 \{ return 1 \}\nreturn n * factorial(n - 1)\n\}\nfactorial(5)"), "120")
+check("default param", eval_input("fn greet(name: string, greeting: string = \"hello\") \{ return greeting + \" \" + name \}\ngreet(\"world\")"), "hello world")
+check("default param override", eval_input("fn greet(name: string, greeting: string = \"hello\") \{ return greeting + \" \" + name \}\ngreet(\"world\", \"hi\")"), "hi world")
 
 # ============================================================
 # Test 13: For Loops
@@ -301,6 +303,7 @@ check("str replace", eval_input("str.replace(\"hello world\", \"world\", \"zerg\
 check("str split", eval_input("parts := str.split(\"a,b,c\", \",\")\nlen(parts)"), "3")
 check("str find", eval_input("str.find(\"hello world\", \"world\")"), "6")
 check("str find not found", eval_input("str.find(\"hello\", \"xyz\")"), "-1")
+check("str join list-sep", eval_input("str.join([\"a\", \"b\", \"c\"], \"-\")"), "a-b-c")
 check("str starts_with", eval_input("str.starts_with(\"hello\", \"hel\")"), "true")
 check("str ends_with", eval_input("str.ends_with(\"hello\", \"llo\")"), "true")
 check("str contains", eval_input("str.contains(\"hello world\", \"lo wo\")"), "true")
@@ -316,6 +319,8 @@ check("char is_digit true", eval_input("char.is_digit(\"5\")"), "true")
 check("char is_digit false", eval_input("char.is_digit(\"x\")"), "false")
 check("char is_alpha", eval_input("char.is_alpha(\"a\")"), "true")
 check("char is_space", eval_input("char.is_space(\" \")"), "true")
+check("char is_digit empty", eval_input("char.is_digit(\"\")"), "false")
+check("char is_space empty", eval_input("char.is_space(\"\")"), "false")
 
 # ============================================================
 # Test 31: Self-Evaluation Smoke Test
