@@ -914,6 +914,10 @@ fn apply_builtin(name: string, args: list) -> object {
 
 mut module_cache := {}
 
+fn clear_module_cache() {
+    module_cache = {}
+}
+
 # ============================================================
 # Main Eval Dispatch
 # ============================================================

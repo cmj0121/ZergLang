@@ -1,0 +1,110 @@
+# test_self_hosting.zg - Self-hosting verification tests
+#
+# Proves that the self-hosted evaluator (evaluator.zg) can evaluate
+# all the language features it itself uses. Each test passes code as
+# a string to evaluator.run(), which lexes/parses/evaluates it through
+# the self-hosted pipeline (eval1 -> eval2 -> code).
+#
+# Run: ./bin/zerg-bootstrap src/core/compiler/test_self_hosting.zg
+
+import "src/core/compiler/evaluator"
+
+# ============================================================
+# Test Helpers
+# ============================================================
+
+mut test_count := 0
+mut pass_count := 0
+
+fn check(name: string, result: object, expected: string) {
+    test_count += 1
+    actual := evaluator.inspect(result)
+    if actual == expected {
+        pass_count += 1
+        print("  PASS " + string(test_count) + ": " + name)
+    }
+    if actual != expected {
+        print("  FAIL " + string(test_count) + ": " + name)
+        print("    expected: " + expected)
+        print("    got:      " + actual)
+    }
+}
+
+fn check_not_error(name: string, result: object) {
+    test_count += 1
+    if evaluator.obj_type(result) != "ERROR" {
+        pass_count += 1
+        print("  PASS " + string(test_count) + ": " + name)
+    }
+    if evaluator.obj_type(result) == "ERROR" {
+        print("  FAIL " + string(test_count) + ": " + name)
+        print("    error: " + evaluator.inspect(result))
+    }
+}
+
+# ============================================================
+# Test 1: Arithmetic & Comparisons
+# (evaluator.zg uses +, -, *, /, %, **, ==, !=, <, >, <=, >=)
+# ============================================================
+print("=== Self-Hosting: Arithmetic ===")
+check("add + mul precedence", evaluator.run("2 + 3 * 4"), "14")
+check("modulo", evaluator.run("10 % 3"), "1")
+check("power", evaluator.run("2 ** 8"), "256")
+check("comparison chain", evaluator.run("x := 5\nmut r := \"no\"\nif x > 0 \{\nif x < 10 \{\nr = \"yes\"\n\}\n\}\nr"), "yes")
+
+# ============================================================
+# Test 2: Functions & Closures
+# (evaluator.zg defines ~40 functions, uses closures for environments)
+# ============================================================
+print("=== Self-Hosting: Functions ===")
+check("named function", evaluator.run("fn add(a, b) \{ return a + b \}\nadd(10, 20)"), "30")
+check("recursive function", evaluator.run("fn fib(n) \{\nif n <= 1 \{ return n \}\nreturn fib(n - 1) + fib(n - 2)\n\}\nfib(10)"), "55")
+check("closure", evaluator.run("fn make_counter() \{\nmut count := 0\nreturn fn() \{\ncount += 1\nreturn count\n\}\n\}\nc := make_counter()\nc()\nc()\nc()"), "3")
+check("postfix return", evaluator.run("fn abs(x) \{\nreturn -x if x < 0\nreturn x\n\}\nabs(-42)"), "42")
+
+# ============================================================
+# Test 3: String Processing via str/char modules
+# (evaluator.zg uses str.substring, str.replace, char.ord for lexing)
+# ============================================================
+print("=== Self-Hosting: String Processing ===")
+check("str.substring", evaluator.run("str.substring(\"hello world\", 0, 5)"), "hello")
+check("str.replace", evaluator.run("str.replace(\"aaa\", \"a\", \"bb\")"), "bbbbbb")
+check("str.find", evaluator.run("str.find(\"hello world\", \"world\")"), "6")
+check("str.split count", evaluator.run("parts := str.split(\"a,b,c\", \",\")\nlen(parts)"), "3")
+check("str.contains", evaluator.run("str.contains(\"hello\", \"ell\")"), "true")
+check("char.ord", evaluator.run("char.ord(\"A\")"), "65")
+check("char.is_digit", evaluator.run("char.is_digit(\"5\")"), "true")
+
+# ============================================================
+# Test 4: Classes, Builder Pattern & Methods
+# (evaluator.zg's core: ZInteger, ZString, etc. all use class+builder)
+# ============================================================
+print("=== Self-Hosting: Classes & Builder ===")
+check("class + builder", evaluator.run("class ZValue \{\npub mut kind: string\npub mut data: int\n\}\nv := ZValue()..kind=\"integer\"..data=42\nv.kind"), "integer")
+check("builder field sum", evaluator.run("class Pair \{\npub mut first: int\npub mut second: int\n\}\np := Pair()..first=10..second=20\np.first + p.second"), "30")
+check("impl + method", evaluator.run("class Counter \{\npub mut count: int\n\}\nimpl Counter \{\nmut fn inc() \{ this.count += 1 \}\nfn get() -> int \{ return this.count \}\n\}\nc := Counter()..count=0\nc.inc()\nc.inc()\nc.get()"), "2")
+check("is expression", evaluator.run("class Foo \{\npub mut x: int\n\}\nf := Foo()..x=1\nf is Foo"), "true")
+check("enum + match", evaluator.run("enum Color \{ Red\nGreen\nBlue \}\nc := Color.Green\nmatch c \{\nColor.Red => \{ \"red\" \}\nColor.Green => \{ \"green\" \}\n_ => \{ \"other\" \}\n\}"), "green")
+
+# ============================================================
+# Test 5: Module Import via asm delegation
+# (evaluator.zg imports token, lexer, parser, ast through asm read_file)
+# ============================================================
+print("=== Self-Hosting: Module Import ===")
+evaluator.clear_module_cache()
+check_not_error("import token module", evaluator.run("import \"src/core/compiler/token\"\ntoken.token_type_name(1)"))
+
+evaluator.clear_module_cache()
+check_not_error("import + use lexer", evaluator.run("import \"src/core/compiler/token\"\nimport \"src/core/compiler/lexer\"\nl := lexer.new_lexer(\"1 + 2\")\ntok := l.next_token()\ntok.literal"))
+
+# ============================================================
+# Summary
+# ============================================================
+print("")
+print("=== Self-Hosting Results: " + string(pass_count) + "/" + string(test_count) + " passed ===")
+if pass_count == test_count {
+    print("All self-hosting tests passed!")
+}
+if pass_count != test_count {
+    print("Some tests FAILED!")
+}
