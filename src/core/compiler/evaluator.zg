@@ -416,6 +416,16 @@ fn create_io_module() -> object {
     return ZModule()..name="_io"..env=mod_env
 }
 
+fn create_sys_module() -> object {
+    mod_env := new_environment()
+    env_declare(mod_env, "os", ZBuiltin()..name="sys_os", false)
+    env_declare(mod_env, "arch", ZBuiltin()..name="sys_arch", false)
+    env_declare(mod_env, "args", ZBuiltin()..name="sys_args", false)
+    env_declare(mod_env, "exit", ZBuiltin()..name="sys_exit", false)
+    env_declare(mod_env, "env", ZBuiltin()..name="sys_env", false)
+    return ZModule()..name="_sys"..env=mod_env
+}
+
 fn new_environment_with_builtins() -> object {
     env := new_environment()
     env_declare(env, "print", ZBuiltin()..name="print", false)
@@ -429,6 +439,7 @@ fn new_environment_with_builtins() -> object {
     env_declare(env, "str", create_str_module(), false)
     env_declare(env, "char", create_char_module(), false)
     env_declare(env, "_io", create_io_module(), false)
+    env_declare(env, "_sys", create_sys_module(), false)
     return env
 }
 
@@ -540,6 +551,48 @@ fn apply_builtin(name: string, args: list) -> object {
         mut result := false
         unsafe { result = asm("file_exists", args[0].value) }
         return new_boolean(result)
+    }
+
+    # --- sys module builtins ---
+    if name == "sys_os" {
+        mut result := ""
+        unsafe { result = asm("sys_os") }
+        return new_string(result)
+    }
+    if name == "sys_arch" {
+        mut result := ""
+        unsafe { result = asm("sys_arch") }
+        return new_string(result)
+    }
+    if name == "sys_args" {
+        mut native_list := nil
+        unsafe { native_list = asm("sys_args") }
+        mut elements := []
+        for i in 0..len(native_list) {
+            elements = elements.append(new_string(native_list[i]))
+        }
+        return new_list(elements)
+    }
+    if name == "sys_exit" {
+        if len(args) != 1 {
+            return new_error("sys.exit() takes exactly 1 argument")
+        }
+        if not (args[0] is ZInteger) {
+            return new_error("sys.exit() argument must be an integer")
+        }
+        unsafe { asm("sys_exit", args[0].value) }
+        return Z_NULL
+    }
+    if name == "sys_env" {
+        if len(args) < 1 {
+            return new_error("sys.env() takes 1 argument")
+        }
+        if not (args[0] is ZString) {
+            return new_error("sys.env() argument must be a string")
+        }
+        mut result := ""
+        unsafe { result = asm("sys_env", args[0].value) }
+        return new_string(result)
     }
 
     # --- str module builtins ---

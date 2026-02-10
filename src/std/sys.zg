@@ -50,7 +50,7 @@ fn arch() -> str {
 #   if len(args) > 1 {
 #       print("First arg:", args[1])
 #   }
-fn args() -> list[str] {
+fn args() -> list {
     return _sys.args()
 }
 
@@ -67,7 +67,7 @@ fn args() -> list[str] {
 # Example:
 #   home := sys.env("HOME")
 #   port := sys.env("PORT", "8080")
-fn env(name: str, default: str? = nil) -> str? {
+fn env(name: str, default = nil) {
     val := _sys.env(name)
     if val == "" {
         if default == nil {
