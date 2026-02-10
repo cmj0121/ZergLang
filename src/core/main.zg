@@ -1,0 +1,27 @@
+# main.zg - Self-hosted Zerg interpreter
+#
+# Usage: ./bin/zerg-bootstrap src/core/main.zg <file.zg>
+#
+# This is the self-hosted Zerg interpreter. It uses the self-hosted
+# lexer, parser, and evaluator to run Zerg source files.
+
+import "src/std/sys"
+import "src/core/compiler/evaluator"
+
+# sys.args() = ["./bin/zerg-bootstrap", "src/core/main.zg", "target.zg", ...]
+args := sys.args()
+
+if len(args) < 3 {
+    print("Usage: zerg <file.zg>")
+    print("error: missing required argument: <file>")
+    sys.exit(1)
+}
+
+file := args[2]
+
+result := evaluator.run_file(file)
+
+if evaluator.is_error(result) {
+    print(evaluator.inspect(result))
+    sys.exit(1)
+}

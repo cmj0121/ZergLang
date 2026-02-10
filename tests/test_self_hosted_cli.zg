@@ -1,0 +1,76 @@
+# test_self_hosted_cli.zg - Tests for self-hosted CLI components
+#
+# Run: ./bin/zerg-bootstrap tests/test_self_hosted_cli.zg
+
+import "src/core/compiler/evaluator"
+
+mut pass := 0
+mut total := 0
+
+# Test 1: evaluator.run_file on a simple file
+total += 1
+unsafe { asm("write_file", "/tmp/zerg_cli_test.zg", "1 + 2") }
+evaluator.clear_module_cache()
+result := evaluator.run_file("/tmp/zerg_cli_test.zg")
+if evaluator.inspect(result) == "3" {
+    pass += 1
+    print("  PASS 1: run_file basic arithmetic")
+}
+if evaluator.inspect(result) != "3" {
+    print("  FAIL 1: expected 3, got " + evaluator.inspect(result))
+}
+
+# Test 2: run_file with print (no error)
+total += 1
+unsafe { asm("write_file", "/tmp/zerg_cli_test2.zg", "x := 42\nprint(x)") }
+evaluator.clear_module_cache()
+r2 := evaluator.run_file("/tmp/zerg_cli_test2.zg")
+if not evaluator.is_error(r2) {
+    pass += 1
+    print("  PASS 2: run_file with print")
+}
+if evaluator.is_error(r2) {
+    print("  FAIL 2: " + evaluator.inspect(r2))
+}
+
+# Test 3: run_file with runtime error (undefined variable)
+total += 1
+unsafe { asm("write_file", "/tmp/zerg_cli_test3.zg", "x + 1") }
+evaluator.clear_module_cache()
+r3 := evaluator.run_file("/tmp/zerg_cli_test3.zg")
+if evaluator.is_error(r3) {
+    pass += 1
+    print("  PASS 3: runtime error returns error")
+}
+if not evaluator.is_error(r3) {
+    print("  FAIL 3: expected error for undefined variable")
+}
+
+# Test 4: run_file with parse error
+total += 1
+unsafe { asm("write_file", "/tmp/zerg_cli_test_err.zg", "if \{\{\{") }
+evaluator.clear_module_cache()
+r4 := evaluator.run_file("/tmp/zerg_cli_test_err.zg")
+if evaluator.is_error(r4) {
+    pass += 1
+    print("  PASS 4: parse error returns error")
+}
+if not evaluator.is_error(r4) {
+    print("  FAIL 4: expected error for bad syntax")
+}
+
+# Test 5: End-to-end with imports
+total += 1
+unsafe { asm("write_file", "/tmp/zerg_cli_test5.zg", "import \"src/core/compiler/token\"\ntoken.token_type_name(token.TokenType.INT)") }
+evaluator.clear_module_cache()
+r5 := evaluator.run_file("/tmp/zerg_cli_test5.zg")
+if not evaluator.is_error(r5) {
+    pass += 1
+    print("  PASS 5: run_file with import")
+}
+if evaluator.is_error(r5) {
+    print("  FAIL 5: " + evaluator.inspect(r5))
+}
+
+print("")
+print("=== Self-Hosted CLI: " + string(pass) + "/" + string(total) + " passed ===")

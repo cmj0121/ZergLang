@@ -486,6 +486,24 @@ if selfhost_type == "ERROR" {
 }
 
 # ============================================================
+# Test 45: Self-Hosted CLI Components
+# ============================================================
+print("=== Self-Hosted CLI ===")
+
+evaluator.clear_module_cache()
+cli_result := evaluator.run_file("tests/test_self_hosted_cli.zg")
+cli_type := evaluator.obj_type(cli_result)
+test_count += 1
+if cli_type != "ERROR" {
+    pass_count += 1
+    print("  PASS " + string(test_count) + ": test_self_hosted_cli.zg through self-hosted pipeline")
+}
+if cli_type == "ERROR" {
+    print("  FAIL " + string(test_count) + ": test_self_hosted_cli.zg through self-hosted pipeline")
+    print("    error: " + evaluator.inspect(cli_result))
+}
+
+# ============================================================
 # Summary
 # ============================================================
 print("")
