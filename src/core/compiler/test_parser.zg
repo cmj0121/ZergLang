@@ -505,6 +505,25 @@ check_errors(p, "nop statement")
 assert len(program.statements) == 1, "should have 1 statement"
 print("  OK")
 
+# Test 46b: With statement (with expr as name { body })
+print("Test 46b: With statement")
+p := make_parser("with foo() as x \{ x \}")
+program := p.parse_program()
+check_errors(p, "with statement")
+assert len(program.statements) == 1, "should have 1 statement"
+stmt := program.statements[0]
+assert stmt is WithStmt, "should be WithStmt"
+assert stmt.variable.value == "x", "variable should be x"
+print("  OK")
+
+# Test 46c: Function with default parameter
+print("Test 46c: Default parameter")
+p := make_parser("fn greet(name: str, greeting: str = \"hello\") \{ return greeting \}")
+program := p.parse_program()
+check_errors(p, "default parameter")
+assert len(program.statements) == 1, "should have 1 statement"
+print("  OK")
+
 print("")
 
 # ============================================================
