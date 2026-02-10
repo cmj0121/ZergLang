@@ -210,6 +210,13 @@ check("enum value", eval_input("enum Color \{ Red\nGreen\nBlue \}\nColor.Red"), 
 check("enum match", eval_input("enum Color \{ Red\nGreen\nBlue \}\nc := Color.Green\nmatch c \{\nColor.Red => \{ \"red\" \}\nColor.Green => \{ \"green\" \}\n_ => \{ \"other\" \}\n\}"), "green")
 
 # ============================================================
+# Test 19b: Impl For Spec
+# ============================================================
+print("=== Impl For Spec ===")
+check("impl for spec", eval_input("spec Greetable \{\nfn greet() -> string\n\}\nclass Dog \{\npub mut name: string\n\}\nimpl Dog for Greetable \{\nfn greet() -> string \{ return \"woof from \" + this.name \}\n\}\nd := Dog()..name=\"Rex\"\nd.greet()"), "woof from Rex")
+check("impl for spec verify", eval_input("spec Describable \{\nfn describe() -> string\n\}\nclass Item \{\npub mut label: string\n\}\nimpl Item for Describable \{\nfn describe() -> string \{ return this.label \}\n\}\ni := Item()..label=\"test\"\ni.describe()"), "test")
+
+# ============================================================
 # Test 20: Builtins
 # ============================================================
 print("=== Builtins ===")
