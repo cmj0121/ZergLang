@@ -1296,9 +1296,15 @@ impl Parser {
 
         type_name := this.parse_identifier()
 
-        # Check for spec implementation: impl Spec for Type
+        # Check for spec implementation: impl Class for Spec { ... }
         mut spec_name := nil
-        # Note: Zerg doesn't use "for" for spec impl, skip this for now
+        if this.peek_token_is(token.TokenType.FOR) {
+            this.next_token()
+            if not this.expect_peek(token.TokenType.IDENT) {
+                return nil
+            }
+            spec_name = this.parse_identifier()
+        }
 
         if not this.expect_peek(token.TokenType.LBRACE) {
             return nil
