@@ -966,7 +966,7 @@ func evalStringIndexExpression(str, index Object) Object {
 		return NULL
 	}
 
-	return &String{Value: string(strObj.Value[idx])}
+	return &String{Value: string([]byte{strObj.Value[idx]})}
 }
 
 func evalMemberExpression(obj Object, member string) Object {
@@ -1511,11 +1511,15 @@ var AsmRegistry = map[string]AsmFunction{
 	// io functions
 	"file_open":   func(args ...Object) Object { return ioOpen(args...) },
 	"file_read":   func(args ...Object) Object { return ioRead(args...) },
+	"file_read_n": func(args ...Object) Object { return asmFileReadN(args...) },
 	"file_write":  func(args ...Object) Object { return ioWrite(args...) },
 	"file_close":  func(args ...Object) Object { return ioClose(args...) },
+	"file_seek":   func(args ...Object) Object { return asmFileSeek(args...) },
+	"file_tell":   func(args ...Object) Object { return asmFileTell(args...) },
 	"file_exists": func(args ...Object) Object { return ioExists(args...) },
 	"read_file":   func(args ...Object) Object { return ioReadFile(args...) },
 	"write_file":  func(args ...Object) Object { return ioWriteFile(args...) },
+	"byte_chr":    func(args ...Object) Object { return asmByteChr(args...) },
 
 	// str functions
 	"str_split":       func(args ...Object) Object { return strSplit(args...) },

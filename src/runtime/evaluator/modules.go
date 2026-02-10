@@ -344,6 +344,100 @@ func ioWriteFile(args ...Object) Object {
 }
 
 // ============================================================================
+// Additional asm functions for self-hosted evaluator
+// ============================================================================
+
+// asmFileReadN reads exactly n bytes from a file handle, returns string.
+func asmFileReadN(args ...Object) Object {
+	if len(args) < 2 {
+		return newError("file_read_n requires 2 arguments (handle, n)")
+	}
+	fh, ok := args[0].(*File)
+	if !ok {
+		return newError("file_read_n first argument must be a file handle")
+	}
+	file, ok := fh.Handle.(*os.File)
+	if !ok {
+		return newError("file_read_n invalid file handle")
+	}
+	n, ok := args[1].(*Integer)
+	if !ok {
+		return newError("file_read_n second argument must be an integer")
+	}
+	data := make([]byte, n.Value)
+	bytesRead, err := file.Read(data)
+	if err != nil && err != io.EOF {
+		return newError("file_read_n failed: %s", err.Error())
+	}
+	return &String{Value: string(data[:bytesRead])}
+}
+
+// asmFileSeek seeks to a position in a file handle.
+func asmFileSeek(args ...Object) Object {
+	if len(args) < 2 {
+		return newError("file_seek requires at least 2 arguments (handle, offset)")
+	}
+	fh, ok := args[0].(*File)
+	if !ok {
+		return newError("file_seek first argument must be a file handle")
+	}
+	file, ok := fh.Handle.(*os.File)
+	if !ok {
+		return newError("file_seek invalid file handle")
+	}
+	offset, ok := args[1].(*Integer)
+	if !ok {
+		return newError("file_seek offset must be an integer")
+	}
+	whence := 0
+	if len(args) > 2 {
+		w, ok := args[2].(*Integer)
+		if !ok {
+			return newError("file_seek whence must be an integer")
+		}
+		whence = int(w.Value)
+	}
+	pos, err := file.Seek(offset.Value, whence)
+	if err != nil {
+		return newError("file_seek failed: %s", err.Error())
+	}
+	return &Integer{Value: pos}
+}
+
+// asmFileTell returns the current position in a file handle.
+func asmFileTell(args ...Object) Object {
+	if len(args) < 1 {
+		return newError("file_tell requires 1 argument (handle)")
+	}
+	fh, ok := args[0].(*File)
+	if !ok {
+		return newError("file_tell argument must be a file handle")
+	}
+	file, ok := fh.Handle.(*os.File)
+	if !ok {
+		return newError("file_tell invalid file handle")
+	}
+	pos, err := file.Seek(0, 1)
+	if err != nil {
+		return newError("file_tell failed: %s", err.Error())
+	}
+	return &Integer{Value: pos}
+}
+
+// asmByteChr converts an integer (0-255) to a single raw byte string.
+// Unlike char_chr which does UTF-8 encoding, this produces exactly 1 byte.
+func asmByteChr(args ...Object) Object {
+	if len(args) != 1 {
+		return newError("byte_chr takes exactly 1 argument (%d given)", len(args))
+	}
+	code, ok := args[0].(*Integer)
+	if !ok {
+		return newError("byte_chr argument must be an integer, not %s", args[0].Type())
+	}
+	return &String{Value: string([]byte{byte(code.Value)})}
+}
+
+// ============================================================================
 // str module implementations
 // ============================================================================
 
