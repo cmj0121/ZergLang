@@ -1,23 +1,20 @@
 # Zerg
 
-> Write your programs as zerg-rush
+> Write the code as you think — one way, and only one way, to do it.
 
-Zerg is an open-source programming language designed for writing programs as a zerg-rush.
+Like a zerg rush, Zerg programs are fast to write, easy to read, and overwhelmingly straightforward
+— swarm your problems with simplicity.
 
-It helps you easily turn your ideas into programs, with simple and clear syntax and no complicated rules.
-You can focus on your ideas and creativity instead of wasting time learning complex programming languages.
-Write the code as you think -- one way, and only one way, to do it.
+## Design Principles
 
-## Concepts
-
-The Zerg language is designed to follow principles of:
-
-- small and crisp
-- procedural-first
-- concurrent
-- garbage-collected
-- strongly typed
-- null-safety
+| Principle         | Description                            |
+| ----------------- | -------------------------------------- |
+| small and crisp   | minimal syntax, easy to learn          |
+| procedural-first  | straightforward, top-down control flow |
+| concurrent        | built-in support for concurrency       |
+| garbage-collected | no manual memory management            |
+| strongly typed    | catch errors at compile time           |
+| null-safe         | no billion-dollar mistakes             |
 
 ## DDD (Dream-Driven Development)
 
