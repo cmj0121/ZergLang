@@ -1,0 +1,3 @@
+# Hello World
+# The simplest Zerg program — no main(), no imports, just code.
+print "Hello, Zerg!"

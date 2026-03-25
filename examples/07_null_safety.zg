@@ -1,0 +1,28 @@
+# Null Safety
+# ? marks nullable types. nil is the only null value.
+# ?. safe navigation. ?? nil coalescing.
+
+fn find(names: list, target: str) -> str? {
+    for name in names {
+        if name == target {
+            return name
+        }
+    }
+    return nil
+}
+
+names := ["Alice", "Bob", "Charlie"]
+
+# Nil coalescing — provide default
+result := find(names, "Dave") ?? "not found"
+print result
+
+# Safe navigation — access field without crash
+struct User {
+    name: str
+    email: str?
+}
+
+user := User { name: "Alice", email: nil }
+domain := user.email?.length() ?? 0
+print domain
