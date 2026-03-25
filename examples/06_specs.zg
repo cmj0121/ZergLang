@@ -1,0 +1,29 @@
+# Specs — interfaces that types can implement.
+
+spec Printable {
+    fn to_str() -> str
+}
+
+spec Measurable {
+    fn length() -> int
+}
+
+struct Vec2 {
+    x: float
+    y: float
+}
+
+# Implement a spec for a struct
+impl Printable for Vec2 {
+    fn to_str() -> str {
+        return "({this.x}, {this.y})"
+    }
+}
+
+# Generic function with spec constraint
+fn display[T: Printable](item: T) {
+    print item.to_str()
+}
+
+v := Vec2 { x: 3.0, y: 4.0 }
+display(v)

@@ -1,0 +1,31 @@
+# Functions
+# fn keyword, typed parameters, optional return type.
+# Default parameter values supported.
+
+fn greet(name: str) -> str {
+    return "Hello, {name}!"
+}
+
+fn add(a: int, b: int = 0) -> int {
+    return a + b
+}
+
+# Guard on return — early exit with condition
+fn abs(x: int) -> int {
+    return -x if x < 0
+    return x
+}
+
+# Multiple return values with unpack
+fn divmod(a: int, b: int) -> int, int {
+    return a / b, a % b
+}
+
+print greet("World")
+print add(10, 20)
+print add(10)
+print abs(-42)
+
+q, r := divmod(17, 5)
+print q
+print r
