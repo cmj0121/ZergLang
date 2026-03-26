@@ -285,13 +285,16 @@ field_init     = IDENT ":" expr
 
 # ── Types ──────────────────────────────────────────────────
 # Types are either a name (int, str, MyStruct), a qualified name
-# (module.Type), or a mutable reference (&mut T).
+# (module.Type), a function type, or a mutable reference (&mut T).
 # Only one level of &mut is allowed — no &mut &mut T.
 # Append "?" for nullable types: int?, str?, MyStruct?
 # "&" and "mut" are lexed as separate tokens but parsed together.
 # Generic type arguments: Map[str, int], List[T]
+# Function types: fn(int, str) -> bool
+# Typically used with type alias: type Visitor = fn(Expr) -> Expr
 
-type            = [ "&" "mut" ] qualified_ident [ "[" type_args "]" ] [ "?" ]
+type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
+fn_type         = "fn" "(" [ type_args ] ")" [ "->" type ]
 type_args       = type { "," type }
 qualified_ident = IDENT { "." IDENT }
 
