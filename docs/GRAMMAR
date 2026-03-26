@@ -69,6 +69,10 @@ type_alias     = "type" IDENT "=" type
 
 # Module imports — path is a string literal resolved by the compiler.
 # Single import or grouped with parentheses.
+# On first import, the compiler runs:
+#   1. _init() — compiler-generated, initializes globals/statics
+#   2. init()  — user-defined setup (optional, regular fn with reserved name)
+# Subsequent imports are no-ops (module is cached).
 import_stmt    = "import" ( STRING | "(" NEWLINE { STRING NEWLINE } ")" )
 
 # Early exit — return, break, continue all support an optional guard.
