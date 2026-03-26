@@ -1,0 +1,24 @@
+# Inline Assembly
+# ARM64 GNU assembler (as) syntax inside asm { ... } block.
+# No return value — caller uses mutable byte buffers for output.
+# ${expr} interpolates byte values (mut or immut) from Zerg.
+# # inside asm is ARM immediate prefix, not a Zerg comment.
+# // inside asm is the assembly line comment.
+
+# Write "hello\n" to stdout via syscall
+msg := [0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x0A]    # "hello\n" as bytes
+
+asm {
+    mov x0, #1            // fd = stdout
+    mov x1, ${msg}        // buf = msg bytes
+    mov x2, #6            // len = 6
+    mov x16, #4           // syscall = write
+    svc #0x80             // trap to kernel
+}
+
+# Exit with code 0
+asm {
+    mov x0, #0            // exit code
+    mov x16, #1           // syscall = exit
+    svc #0x80
+}
