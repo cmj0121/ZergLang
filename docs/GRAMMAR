@@ -16,7 +16,7 @@
 # Reserved keywords (lexed as distinct tokens, not IDENT):
 #   import return break continue if elif else print
 #   mut const pub fn impl spec struct enum for in match
-#   or and xor not true false nil this nop type defer
+#   or and xor not true false nil this nop type defer asm
 #
 # Deferred features (not in this subset):
 #   concurrency (rush, channels, select)
@@ -123,6 +123,7 @@ compound_stmt  = fn_decl
                | if_stmt
                | for_stmt
                | match_stmt
+               | asm_stmt
 
 # Functions — params support type annotations and defaults.
 # Use &mut T for mutable reference parameters.
@@ -191,6 +192,23 @@ pattern        = "_"
                | expr
 pattern_list   = pattern { "," pattern }
 field_pattern  = IDENT [ ":" pattern ]
+
+# Asm — inline ARM64 assembly block. Statement-only, no return value.
+# Uses GNU assembler (as) syntax for ARM64/AArch64.
+# Lexer switches to raw mode after "asm {" until closing "}".
+# Lines are passed through as-is:
+#   - # is ARM immediate prefix (not a Zerg comment)
+#   - // is assembly line comment
+#   - ${expr} interpolates Zerg byte values (mut or immut)
+#     Uses $ prefix to avoid conflict with asm block closing }.
+#   buf := [0x01, 0x02]
+#   asm {
+#       mov x0, ${buf}       // interpolate byte variable
+#       mov x16, #4           // # is immediate, not comment
+#       svc #0x80
+#   }
+asm_stmt       = "asm" "{" { ASM_LINE NEWLINE } "}"
+ASM_LINE       = ? ARM64 GNU as syntax, with ${expr} for byte interpolation ?
 
 # Blocks — always multi-line, braces required.
 # No single-line blocks (one way to format it).
