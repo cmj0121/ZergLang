@@ -1,0 +1,30 @@
+# Strings
+# Double-quoted with interpolation, escapes, multi-line, and raw.
+
+name := "Zerg"
+
+# Interpolation — embed expressions with {expr}
+print "Hello, {name}!"
+print "1 + 2 = {1 + 2}"
+
+# Escape sequences
+print "tab:\there"
+print "newline:\nhere"
+print "quote: \""
+print "brace: \{"
+
+# Multi-line string — triple double-quote
+msg := """
+    This is a
+    multi-line string
+    """
+print msg
+
+# Raw string — no escapes, no interpolation
+pattern := r"^\d+\.\d+$"
+print pattern
+
+# Rune — single character literal
+ch := 'A'
+newline := '\n'
+print ch

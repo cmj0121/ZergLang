@@ -1,0 +1,41 @@
+# Enums
+# Variants with optional associated data.
+
+enum Color {
+    Red
+    Green
+    Blue
+    Custom(int, int, int)
+}
+
+# Match — pattern matching with destructure
+fn describe(c: Color) -> str {
+    match c {
+        Color.Red -> return "red"
+        Color.Green -> return "green"
+        Color.Blue -> return "blue"
+        Color.Custom(r, g, b) -> return "rgb({r}, {g}, {b})"
+    }
+}
+
+print describe(Color.Red)
+print describe(Color.Custom(128, 64, 255))
+
+# Wildcard pattern
+enum Direction {
+    North
+    South
+    East
+    West
+}
+
+fn is_vertical(d: Direction) -> bool {
+    match d {
+        Direction.North -> return true
+        Direction.South -> return true
+        _ -> return false
+    }
+}
+
+print is_vertical(Direction.North)
+print is_vertical(Direction.East)

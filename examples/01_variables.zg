@@ -1,0 +1,24 @@
+# Variables
+# := declares with type inference. Default is immutable.
+# mut allows reassignment. const is compile-time constant.
+
+name := "Zerg"
+const VERSION := 1
+mut count := 0
+
+# Explicit type annotation
+ratio: float = 3.14
+
+# Reassignment (only mut variables)
+count = count + 1
+count += 1
+
+# Integer literal bases and digit separators
+hex := 0xFF
+bin := 0b1010_0011
+oct := 0o755
+big := 1_000_000
+
+print name
+print count
+print big
