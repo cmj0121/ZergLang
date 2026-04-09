@@ -9,17 +9,18 @@ if exists("b:current_syntax")
 endif
 
 " ── Keywords ───────────────────────────────────────────────────────────
-syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer
-syn keyword zergConditional if elif else match
+syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer as
+syn keyword zergConditional if elif else match select
 syn keyword zergRepeat      for break continue in
-syn keyword zergControl     return nop
+syn keyword zergControl     return nop rush raise
+syn keyword zergException   try except finally
 syn keyword zergOperator    and or not xor
 syn keyword zergConstant    true false nil
 syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
 " Built-in types
-syn keyword zergType        int float bool str byte rune
+syn keyword zergType        int float bool str byte rune list map set tuple chan Result Option Exception
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"
@@ -45,6 +46,7 @@ syn match   zergOp          "!="
 syn match   zergOp          "<="
 syn match   zergOp          ">="
 syn match   zergOp          "->"
+syn match   zergOp          "<-"
 syn match   zergOp          "\.\."
 syn match   zergOp          "\.\.="
 syn match   zergOp          "??"
@@ -91,13 +93,14 @@ syn match   zergAsmLabel    contained "^\s*\w\+:"
 " Exclude #<digit> and #0x so ARM immediates (#1, #0x80) in asm blocks
 " are not treated as comments.
 syn match   zergDocComment  "##.*$"
-syn match   zergComment     "#\([0-9]\|0x\)\@!.*$"
+syn match   zergComment     "#\(#\|[0-9]\|0x\)\@!.*$"
 
 " ── Highlight groups ───────────────────────────────────────────────────
 hi def link zergDecl        Keyword
 hi def link zergConditional Conditional
 hi def link zergRepeat      Repeat
 hi def link zergControl     Statement
+hi def link zergException   Exception
 hi def link zergOperator    Operator
 hi def link zergConstant    Constant
 hi def link zergSpecial     Special

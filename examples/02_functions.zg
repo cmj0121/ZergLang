@@ -16,10 +16,26 @@ fn abs(x: int) -> int {
     return x
 }
 
-# Multiple return values with unpack
-fn divmod(a: int, b: int) -> int, int {
-    return a / b, a % b
+# Multiple return values with tuple unpack
+fn divmod(a: int, b: int) -> tuple[int, int] {
+    return (a / b, a % b)
 }
+
+# Pass by mutable reference — modifies the original variable
+fn increment(x: &mut int) {
+    x += 1
+}
+
+mut counter := 0
+increment(&mut counter)
+print counter              # 1
+
+# Lambda — anonymous functions with |params| syntax
+double := |x| x * 2
+triple := |x| x * 3
+
+nums := [1, 2, 3, 4, 5]
+evens := nums.filter(|x| x % 2 == 0)
 
 print greet("World")
 print add(10, 20)

@@ -2,7 +2,7 @@
 # ? marks nullable types. nil is the only null value.
 # ?. safe navigation. ?? nil coalescing.
 
-fn find(names: list, target: str) -> str? {
+fn find(names: list[str], target: str) -> str? {
     for name in names {
         if name == target {
             return name

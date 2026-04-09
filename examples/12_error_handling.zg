@@ -1,0 +1,56 @@
+# Error Handling
+# Result[T, E] + ? for recoverable errors.
+# Exception + try/except/finally for exceptional failures.
+# Exception is a built-in spec: { fn message() -> str }
+
+# ── Result and ? propagation ─────────────────────────────
+
+fn parse_int(s: str) -> Result[int, str] {
+    if s == "" {
+        return Result.Err("empty string")
+    }
+    # ... parsing logic ...
+    return Result.Ok(42)
+}
+
+fn load_port(config: map[str, str]) -> Result[int, str] {
+    raw := config["port"] ?? return Result.Err("missing port")
+    port := parse_int(raw)?    # propagates Err early
+    return Result.Ok(port)
+}
+
+# ── Custom exception types ───────────────────────────────
+
+struct IOError {
+    msg: str
+    path: str
+}
+
+impl Exception for IOError {
+    fn message() -> str {
+        return "{this.msg}: {this.path}"
+    }
+}
+
+# ── try/except/finally ──────────────────────────────────
+
+fn read_config(path: str) -> map[str, str] {
+    try {
+        # ... file operations that may fail ...
+        return {:}
+    } except IOError as e {
+        print "IO error: {e.message()}"
+        return {:}
+    } except Exception as e {
+        print "unexpected: {e.message()}"
+        raise               # re-raise
+    } finally {
+        print "cleanup done"
+    }
+}
+
+# ── raise with guard ────────────────────────────────────
+
+fn validate(x: int) {
+    raise IOError { msg: "negative", path: "" } if x < 0
+}

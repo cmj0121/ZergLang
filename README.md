@@ -11,7 +11,7 @@ More examples in [`examples/`](examples/).
 
 | Principle         | Description                            |
 | ----------------- | -------------------------------------- |
-| small and crisp   | minimal syntax (88 grammar rules)      |
+| small and crisp   | minimal syntax (109 grammar rules)     |
 | procedural-first  | straightforward, top-down control flow |
 | concurrent        | built-in support for concurrency       |
 | garbage-collected | no manual memory management            |
@@ -20,21 +20,26 @@ More examples in [`examples/`](examples/).
 
 ## Language Highlights
 
-| Feature              | Syntax                                 |
-| -------------------- | -------------------------------------- |
-| variables            | `x := 1` / `mut x := 1`                |
-| explicit type        | `x: int = 1`                           |
-| print statement      | `print "hello"`                        |
-| string interpolation | `"hello {name}"`                       |
-| null safety          | `T?`, `?.`, `??`                       |
-| pattern matching     | `match x { ... }`                      |
-| specs (interfaces)   | `spec Printable { ... }`               |
-| generics             | `fn sort[T: Comparable](...)`          |
-| range                | `1..5` (exclusive) `1..=5` (inclusive) |
-| guard                | `return x if condition`                |
-| enum with data       | `Token.Ident(str)`                     |
-| defer                | `defer close(fd)`                      |
-| raw strings          | `r"no \escapes"`                       |
+| Feature              | Syntax                                                      |
+| -------------------- | ----------------------------------------------------------- |
+| variables            | `x := 1` / `mut x := 1`                                     |
+| explicit type        | `x: int = 1`                                                |
+| print statement      | `print "hello"`                                             |
+| string interpolation | `"hello {name}"`                                            |
+| null safety          | `T?`, `?.`, `??`                                            |
+| pattern matching     | `match x { ... }`                                           |
+| specs (interfaces)   | `spec Printable { ... }`                                    |
+| generics             | `fn sort[T: Comparable](...)`                               |
+| range                | `1..5` (exclusive) `1..=5` (inclusive)                      |
+| collections          | `list[int]`, `map[str, int]`, `set[int]`, `tuple[int, str]` |
+| guard                | `return x if condition`                                     |
+| enum with data       | `Token.Ident(str)`                                          |
+| lambda               | `\|x\| x * 2`, `\|\| { block }`                             |
+| pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
+| error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
+| defer                | `defer close(fd)`                                           |
+| concurrency          | `rush task()`, `ch <- val`, `<- ch`                         |
+| raw strings          | `r"no \escapes"`                                            |
 
 ## DDD (Dream-Driven Development)
 

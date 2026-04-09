@@ -17,11 +17,7 @@
 #   import return break continue if elif else print
 #   mut const pub fn impl spec struct enum for in match
 #   or and xor not true false nil this nop type defer asm
-#
-# Deferred features (not in this subset):
-#   concurrency (rush, channels, select)
-#   error handling (Result, try/catch/final)
-#   lambdas, sets, tuples
+#   rush select try except finally raise as
 
 # ── Program ──────────────────────────────────────────────
 # A program is a sequence of statements separated by newlines.
@@ -37,9 +33,11 @@ statement      = simple_stmt | compound_stmt
 # ── Simple Statements ────────────────────────────────────
 # Single-line statements terminated by NEWLINE.
 # Parser resolves ambiguity by trying in order:
-#   1. declare_stmt  (look for ":=" or IDENT ":")
-#   2. assign_stmt   (parse lvalue, look for "=" or compound operator)
-#   3. expr_stmt     (fallback — reparse as full expression)
+#   1. keyword stmts (import, return, break, continue, print, nop, defer, rush, raise)
+#   2. send_stmt     (parse expr, if followed by "<-", it's send)
+#   3. declare_stmt  (look for ":=" or IDENT ":")
+#   4. assign_stmt   (parse lvalue, look for "=" or compound operator)
+#   5. expr_stmt     (fallback — reparse as full expression)
 # This requires backtracking when lvalue is a prefix of a call expression
 # (e.g., a.b(c) — lvalue parses a.b, sees "(", backtracks to expr_stmt).
 
@@ -50,6 +48,9 @@ simple_stmt    = import_stmt
                | print_stmt
                | nop_stmt
                | defer_stmt
+               | rush_stmt
+               | raise_stmt
+               | send_stmt
                | type_alias
                | declare_stmt
                | assign_stmt
@@ -62,18 +63,51 @@ nop_stmt       = "nop"
 # Deferred statements execute in reverse order (LIFO).
 defer_stmt     = "defer" ( expr_stmt | block )
 
+# Rush — spawn a concurrent task. Fire-and-forget, no return value.
+# Only accepts a function call (named or anonymous).
+#   rush do_work()
+#   rush || { compute() }()
+#   rush |c: chan[int]| { c <- 1 }(ch)
+rush_stmt      = "rush" expr_stmt
+
+# Send — push a value into a channel.
+#   ch <- 42
+# Disambiguation: parser tries send_stmt before assign_stmt/expr_stmt.
+# If LHS expr is followed by "<-", parse as send. Otherwise backtrack.
+send_stmt      = expr "<-" expr
+
+# Raise — throw an exception. The expr must implement the Exception spec.
+# Bare "raise" re-raises the current exception (only valid inside except).
+# Supports guard like return/break/continue.
+#   raise IOError { msg: "not found", path: "/etc/config" }
+#   raise if x < 0
+#   raise                # re-raise inside except block
+raise_stmt     = "raise" [ expr ] [ guard ]
+
 # Type alias — gives a name to an existing type.
 #   type TokenKind = int
-#   type NodeList = List[Node]
+#   type NodeList = list[Node]
 type_alias     = "type" IDENT "=" type
 
 # Module imports — path is a string literal resolved by the compiler.
+# A module is either a single file (net/http.zg) or a directory with
+# a mod.zg entry point (net/tcp/mod.zg). No re-exports — import what
+# you need directly.
+# Default qualifier is the last segment of the path.
+# Use "as" to alias long module paths.
 # Single import or grouped with parentheses.
 # On first import, the compiler runs:
 #   1. _init() — compiler-generated, initializes globals/statics
 #   2. init()  — user-defined setup (optional, regular fn with reserved name)
 # Subsequent imports are no-ops (module is cached).
-import_stmt    = "import" ( STRING | "(" NEWLINE { STRING NEWLINE } ")" )
+#   import "net/http"                  qualifier: http
+#   import "graphics/rendering" as gfx qualifier: gfx
+#   import (
+#       "fmt"
+#       "net/http" as http
+#   )
+import_stmt    = "import" ( import_path | "(" NEWLINE { import_path NEWLINE } ")" )
+import_path    = STRING [ "as" IDENT ]
 
 # Early exit — return, break, continue all support an optional guard.
 # The guard must be on the same line; NEWLINE terminates the statement.
@@ -127,24 +161,35 @@ compound_stmt  = fn_decl
                | if_stmt
                | for_stmt
                | match_stmt
+               | select_stmt
+               | try_stmt
                | asm_stmt
 
 # Functions — params support type annotations and defaults.
 # Use &mut T for mutable reference parameters.
-# Generic type parameters with optional spec constraints:
-#   fn map[T, U](list: [T], f: fn(T) -> U) -> [U]
-#   fn sort[T: Comparable](list: [T]) -> [T]
+# Generic type parameters with optional spec constraints (use + for multiple):
+#   fn transform[T, U](items: list[T], f: fn(T) -> U) -> list[U]
+#   fn sort[T: Comparable](items: list[T]) -> list[T]
+#   fn serialize[T: Printable + Hashable](item: T) -> str
 fn_decl        = visibility "fn" IDENT [ type_params ] "(" [ param_list ] ")" [ "->" type ] block
 param_list     = param { "," param }
 param          = IDENT ":" type [ "=" expr ]
 
 # Specs — interfaces that types can implement.
 # A spec declares method signatures without bodies.
+# Specs can extend other specs with ":" (uses constraint syntax: A + B).
+# A type implementing a child spec must also implement all parent specs.
 #   pub spec Printable {
 #       fn to_str() -> str
 #   }
+#   spec Comparable: Printable {
+#       fn compare(other: this) -> int
+#   }
+#   spec Serializable: Printable + Hashable {
+#       fn serialize() -> list[byte]
+#   }
 # Specs can also constrain generic type parameters (see fn_decl, type_params).
-spec_decl      = visibility "spec" IDENT [ type_params ] "{" NEWLINE { fn_sig NEWLINE } "}"
+spec_decl      = visibility "spec" IDENT [ type_params ] [ ":" constraint ] "{" NEWLINE { fn_sig NEWLINE } "}"
 fn_sig         = "fn" IDENT [ type_params ] "(" [ param_list ] ")" [ "->" type ]
 
 # Impl blocks — attach methods to a struct or enum, or implement a spec.
@@ -174,15 +219,18 @@ if_stmt        = "if" expr block { "elif" expr block } [ "else" block ]
 
 # For — three forms:
 #   for { }              infinite loop
-#   for x in expr { }    iterate over an iterator
+#   for x in expr { }    iterate (expr must implement Iterable[T])
 #   for x, y in fn() {}  unpack during iteration
 #   for x < y { }        conditional loop (while-style)
+# The iterator form creates a mutable copy of expr (copy-by-value),
+# then calls next() until nil. The original value is not modified.
 # Disambiguation: after "for", if next tokens are ident_list "in",
 # parse as iteration. Otherwise parse as conditional or bare block.
 for_stmt       = "for" [ ident_list "in" expr | expr ] block
 
 # Match — structural pattern matching on values.
-# "_" is a reserved wildcard pattern (not an identifier).
+# "_" is a valid identifier used as a discard placeholder — it binds
+# but is intentionally unused (compiler suppresses unused-variable warnings).
 # Arms use "->" to separate pattern from body.
 # After "->", "{" always starts a block, never a map_literal.
 # Patterns can destructure enum variants and struct fields:
@@ -196,6 +244,48 @@ pattern        = "_"
                | expr
 pattern_list   = pattern { "," pattern }
 field_pattern  = IDENT [ ":" pattern ]
+
+# Select — multiplexed channel wait. Blocks until one arm is ready.
+# Mirrors match syntax: each arm is a channel operation followed by "->".
+# Arms are tried in order. "_" is a non-blocking default (like match wildcard).
+# Disambiguation: IDENT ":=" "<-" is receive-bind, "<-" expr is receive-discard,
+# expr "<-" expr is send, "_" is default.
+#   ch1 := chan[int]()     unbuffered (send blocks until receiver ready)
+#   ch2 := chan[int](10)   buffered (send blocks when buffer full)
+#   select {
+#       x := <- ch1 -> { print x }
+#       <- ch2       -> { nop }
+#       ch1 <- 10    -> { print "sent" }
+#       _            -> { print "default" }
+#   }
+select_stmt    = "select" "{" NEWLINE { select_arm NEWLINE } "}"
+select_arm     = select_op "->" ( statement | block )
+select_op      = IDENT ":=" "<-" expr
+               | "<-" expr
+               | expr "<-" expr
+               | "_"
+
+# Try/except/finally — structured exception handling.
+# Exception is a built-in spec with a minimal interface:
+#   spec Exception { fn message() -> str }
+# Users implement Exception on their own structs.
+# Result[T, E] + ? handles recoverable errors.
+# Exception + try/except handles exceptional failures.
+#   try {
+#       config := load_config()
+#   } except IOError as e {
+#       print e.message()
+#   } except Exception as e {
+#       print e.message()
+#       raise              # re-raise
+#   } except {
+#       print "unknown error"
+#   } finally {
+#       cleanup()
+#   }
+try_stmt       = "try" block { except_clause } [ finally_clause ]
+except_clause  = "except" [ type [ "as" IDENT ] ] block
+finally_clause = "finally" block
 
 # Asm — inline ARM64 assembly block. Statement-only, no return value.
 # Uses GNU assembler (as) syntax for ARM64/AArch64.
@@ -221,8 +311,8 @@ block          = "{" NEWLINE { statement NEWLINE } "}"
 # ── Expressions ──────────────────────────────────────────
 # Precedence from lowest to highest:
 #   ??  →  or  →  and  →  xor  →  comparison  →  bitor  →  bitxor
-#   →  bitand  →  shift  →  range  →  add  →  mul  →  unary
-#   →  postfix  →  primary
+#   →  bitand  →  shift  →  range  →  add  →  mul
+#   →  unary (not, -, ~, <-, &mut)  →  postfix (.  ?.  ()  []  ?)  →  primary
 #
 # Comparison is non-associative: "a < b < c" is a syntax error.
 # Use "a < b and b < c" instead.
@@ -246,12 +336,23 @@ range_expr     = add_expr [ ( ".." | "..=" ) add_expr ]
 
 add_expr       = mul_expr { ( "+" | "-" ) mul_expr }
 mul_expr       = unary_expr { ( "*" | "/" | "%" ) unary_expr }
-unary_expr     = ( "not" | "-" | "~" ) unary_expr | postfix_expr
+# Receive — "<-" prefix reads a value from a channel.
+#   value := <- ch
+#   <- ch              discard received value
+# Mutable reference — "&" "mut" creates a mutable reference to a variable.
+# Only mut variables can be referenced. Auto-deref inside the callee.
+#   increment(&mut count)
+unary_expr     = ( "not" | "-" | "~" | "<-" ) unary_expr
+               | "&" "mut" unary_expr
+               | postfix_expr
 
 # Postfix — call, index, and member access chain left-to-right.
 # Method calls work via chaining: obj.method(args) = member then call.
 # Safe navigation: obj?.field returns nil if obj is nil instead of error.
-postfix_expr   = primary { call | index | member | safe_member }
+# Propagation: expr? unwraps Result.Ok, returns Result.Err early.
+# Disambiguation: "?" in type position = nullable, in expr position = propagate.
+postfix_expr   = primary { call | index | member | safe_member | propagate }
+propagate      = "?"
 
 # Call — supports named arguments (key=value) and trailing comma.
 call           = "(" [ arg_list ] ")"
@@ -265,19 +366,50 @@ safe_member    = "?." IDENT
 # When parser sees IDENT followed by "{", it is a struct_literal.
 # A bare IDENT is a variable reference.
 # "this" is valid inside impl methods — refers to the receiver instance.
+# Disambiguation: "|" at the start of an expression is a lambda.
+# "|" after a complete expression is bitwise OR.
 primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
                | "true" | "false" | "nil"
                | "this"
                | IDENT
+               | lambda
                | list_literal
                | map_literal
+               | set_literal
+               | tuple_literal
                | "(" expr ")"
                | struct_literal
 
+# Lambda — anonymous function using |params| syntax.
+# Produces a callable value. Often called immediately or passed as argument.
+# Captures are copy-by-value: the closure receives a snapshot of each
+# captured variable at the time of creation. Mutations inside the closure
+# do not affect the original, and vice versa. Use channels to communicate
+# between concurrent tasks.
+# Param types are optional (inferred from context). Return type is always inferred.
+# Expression body returns its value implicitly. Block body uses explicit return.
+# No ambiguity with "|" (bitwise OR) — Zerg uses "or" for logical OR,
+# and "|" after a complete expression is always bitwise OR.
+#   |x| x * 2                        expression body, inferred types
+#   |x, y| x + y                     multiple params
+#   |x: int| x * 2                   explicit type when needed
+#   || { do_work() }                  no params, block body
+#   items.filter(|x| x > 0)          inline usage
+#   rush || { ch <- compute() }()    immediately invoked
+lambda         = "|" [ lambda_params ] "|" ( expr | block )
+lambda_params  = lambda_param { "," lambda_param }
+lambda_param   = IDENT [ ":" type ]
+
 # Composite literals — all support trailing commas.
+# Disambiguation: "{" followed by expr ":" expr is a map_literal.
+# "{" ":" "}" is an empty map. "{" "}" is an empty set.
+# "(" expr "," is a tuple_literal. "(" expr ")" is grouping.
 list_literal   = "[" [ expr { "," expr } [ "," ] ] "]"
-map_literal    = "{" [ map_entry { "," map_entry } [ "," ] ] "}"
+map_literal    = "{" map_entry { "," map_entry } [ "," ] "}"
+               | "{" ":" "}"
 map_entry      = expr ":" expr
+set_literal    = "{" [ expr { "," expr } [ "," ] ] "}"
+tuple_literal  = "(" expr "," [ expr { "," expr } ] [ "," ] ")"
 
 # Struct literal — IDENT disambiguated from bare IDENT by lookahead for "{".
 struct_literal = IDENT "{" [ field_init { "," field_init } [ "," ] ] "}"
@@ -287,11 +419,38 @@ field_init     = IDENT ":" expr
 # Types are either a name (int, str, MyStruct), a qualified name
 # (module.Type), a function type, or a mutable reference (&mut T).
 # Only one level of &mut is allowed — no &mut &mut T.
-# Append "?" for nullable types: int?, str?, MyStruct?
+# Append "?" for nullable types: int?, str?, list[int]?
 # "&" and "mut" are lexed as separate tokens but parsed together.
-# Generic type arguments: Map[str, int], List[T]
+# Generic type arguments: list[int], map[str, int]
 # Function types: fn(int, str) -> bool
 # Typically used with type alias: type Visitor = fn(Expr) -> Expr
+#
+# Built-in types (not keywords — resolved as IDENT by the lexer):
+#   int                    platform-width signed integer
+#   float                  64-bit IEEE 754
+#   bool                   true or false
+#   str                    UTF-8 string
+#   byte                   8-bit unsigned integer (0–255)
+#   rune                   Unicode code point
+#   list[T]                ordered, variable-length sequence
+#   map[K, V]              key-value associative container
+#   set[T]                 unordered collection of unique values
+#   tuple[T, U, ...]       fixed-size, heterogeneous sequence
+#   chan[T]                typed channel for concurrent communication
+#   Result[T, E]           success (Ok) or error (Err) — built-in enum
+#   Option[T]              type alias for Result[T, nil]
+# T? in type position is syntax sugar for Option[T] = Result[T, nil].
+# Arity of generic arguments is checked semantically, not syntactically.
+# Channels are created via constructor call: chan[int]() or chan[int](10).
+#
+# Built-in specs (compiler-provided):
+#   Printable, Iterable[T], Exception
+#   Operator specs: Add[T], Sub[T], Mul[T], Div[T], Mod[T], Neg
+#   Eq, Comparable, Hashable, Index[K, V]
+#   BitAnd[T], BitOr[T], BitXor[T], BitNot, Shl, Shr
+# Built-in enums (compiler-provided):
+#   enum Result[T, E] { Ok(T), Err(E) }
+# See docs/BUILTIN.md for full documentation.
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
 fn_type         = "fn" "(" [ type_args ] ")" [ "->" type ]
@@ -299,12 +458,15 @@ type_args       = type { "," type }
 qualified_ident = IDENT { "." IDENT }
 
 # Generic type parameters — used in fn, spec, struct, enum declarations.
-# Each parameter may have a spec constraint:
-#   [T]                 unconstrained
-#   [T: Printable]      T must implement Printable
-#   [K: Hashable, V]    mixed constraints
+# Each parameter may have one or more spec constraints joined with "+".
+#   [T]                           unconstrained
+#   [T: Printable]                single constraint
+#   [T: Printable + Hashable]     multiple constraints (T must implement both)
+#   [K: Hashable, V]              mixed — K constrained, V unconstrained
+#   [T: Printable + Comparable, U: Hashable]
 type_params     = "[" type_param { "," type_param } "]"
-type_param      = IDENT [ ":" type ]
+type_param      = IDENT [ ":" constraint ]
+constraint      = type { "+" type }
 
 # ── Tokens ─────────────────────────────────────────────────
 # Lexer produces these tokens before parsing.
@@ -344,8 +506,12 @@ NEWLINE        = "\n"
 EOF            = ? end of input ?
 
 # Comments start with # and run to end of line.
-# Discarded by the lexer before parsing (not referenced in grammar rules).
+# Doc comments start with ## and are preserved by the compiler for
+# documentation tooling. Regular comments are discarded by the lexer.
+# Both are not referenced in grammar rules.
+# Lexer uses maximal munch: ## is matched as DOC_COMMENT before COMMENT.
 COMMENT        = "#" { CHAR } NEWLINE
+DOC_COMMENT    = "##" { CHAR } NEWLINE
 
 LETTER         = "a"..."z" | "A"..."Z" | "_"
 DIGIT          = "0"..."9"
