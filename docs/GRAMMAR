@@ -221,8 +221,8 @@ block          = "{" NEWLINE { statement NEWLINE } "}"
 # ── Expressions ──────────────────────────────────────────
 # Precedence from lowest to highest:
 #   ??  →  or  →  and  →  xor  →  comparison  →  bitor  →  bitxor
-#   →  bitand  →  shift  →  range  →  add  →  mul  →  unary
-#   →  postfix  →  primary
+#   →  bitand  →  shift  →  range  →  add  →  mul
+#   →  unary (not, -, ~, &mut)  →  postfix (.  ?.  ()  [])  →  primary
 #
 # Comparison is non-associative: "a < b < c" is a syntax error.
 # Use "a < b and b < c" instead.
@@ -246,7 +246,12 @@ range_expr     = add_expr [ ( ".." | "..=" ) add_expr ]
 
 add_expr       = mul_expr { ( "+" | "-" ) mul_expr }
 mul_expr       = unary_expr { ( "*" | "/" | "%" ) unary_expr }
-unary_expr     = ( "not" | "-" | "~" ) unary_expr | postfix_expr
+# Mutable reference — "&" "mut" creates a mutable reference to a variable.
+# Only mut variables can be referenced. Auto-deref inside the callee.
+#   increment(&mut count)
+unary_expr     = ( "not" | "-" | "~" ) unary_expr
+               | "&" "mut" unary_expr
+               | postfix_expr
 
 # Postfix — call, index, and member access chain left-to-right.
 # Method calls work via chaining: obj.method(args) = member then call.

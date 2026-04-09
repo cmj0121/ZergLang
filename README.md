@@ -35,6 +35,7 @@ More examples in [`examples/`](examples/).
 | guard                | `return x if condition`                                     |
 | enum with data       | `Token.Ident(str)`                                          |
 | lambda               | `fn(x: int) -> int { return x * 2 }`                        |
+| pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
 | defer                | `defer close(fd)`                                           |
 | raw strings          | `r"no \escapes"`                                            |
 

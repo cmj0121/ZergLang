@@ -21,6 +21,15 @@ fn divmod(a: int, b: int) -> tuple[int, int] {
     return (a / b, a % b)
 }
 
+# Pass by mutable reference — modifies the original variable
+fn increment(x: &mut int) {
+    x += 1
+}
+
+mut counter := 0
+increment(&mut counter)
+print counter              # 1
+
 print greet("World")
 print add(10, 20)
 print add(10)
