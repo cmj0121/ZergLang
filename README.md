@@ -11,7 +11,7 @@ More examples in [`examples/`](examples/).
 
 | Principle         | Description                            |
 | ----------------- | -------------------------------------- |
-| small and crisp   | minimal syntax (106 grammar rules)     |
+| small and crisp   | minimal syntax (108 grammar rules)     |
 | procedural-first  | straightforward, top-down control flow |
 | concurrent        | built-in support for concurrency       |
 | garbage-collected | no manual memory management            |
@@ -34,7 +34,7 @@ More examples in [`examples/`](examples/).
 | collections          | `list[int]`, `map[str, int]`, `set[int]`, `tuple[int, str]` |
 | guard                | `return x if condition`                                     |
 | enum with data       | `Token.Ident(str)`                                          |
-| lambda               | `fn(x: int) -> int { return x * 2 }`                        |
+| lambda               | `fn(x) x * 2`, `fn() { block }`                             |
 | pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
 | error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
 | defer                | `defer close(fd)`                                           |

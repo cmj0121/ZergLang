@@ -30,6 +30,13 @@ mut counter := 0
 increment(&mut counter)
 print counter              # 1
 
+# Lambda — anonymous functions (types and return inferred)
+double := fn(x) x * 2
+triple := fn(x) x * 3
+
+nums := [1, 2, 3, 4, 5]
+evens := nums.filter(fn(x) x % 2 == 0)
+
 print greet("World")
 print add(10, 20)
 print add(10)

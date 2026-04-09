@@ -362,10 +362,15 @@ primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
 # captured variable at the time of creation. Mutations inside the closure
 # do not affect the original, and vice versa. Use channels to communicate
 # between concurrent tasks.
-#   fn(x: int) -> int { return x * 2 }
-#   rush fn() { do_work() }()
-#   items.filter(fn(x: int) -> bool { return x > 0 })
-lambda         = "fn" [ type_params ] "(" [ param_list ] ")" [ "->" type ] block
+# Param types are optional (inferred from context). Return type is always inferred.
+# Expression body returns its value implicitly. Block body uses explicit return.
+#   fn(x) x * 2                      expression body, inferred types
+#   fn(x, y) x + y                   multiple params
+#   items.filter(fn(x) x > 0)        inline usage
+#   rush fn() { do_work() }()        block body for side effects
+lambda         = "fn" "(" [ lambda_params ] ")" ( expr | block )
+lambda_params  = lambda_param { "," lambda_param }
+lambda_param   = IDENT [ ":" type ]
 
 # Composite literals — all support trailing commas.
 # Disambiguation: "{" followed by expr ":" expr is a map_literal.
