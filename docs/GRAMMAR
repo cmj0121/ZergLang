@@ -450,7 +450,6 @@ field_init     = IDENT ":" expr
 #   BitAnd[T], BitOr[T], BitXor[T], BitNot, Shl, Shr
 # Built-in enums (compiler-provided):
 #   enum Result[T, E] { Ok(T), Err(E) }
-# See docs/BUILTIN.md for full spec definitions and operator mapping.
 # See docs/BUILTIN.md for full documentation.
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
