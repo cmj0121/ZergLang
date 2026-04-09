@@ -1,0 +1,54 @@
+# Concurrency
+# rush spawns a fire-and-forget concurrent task (function call only).
+# chan[T] is a typed channel. <- sends and receives.
+# Closures capture by value — no shared mutable state.
+
+# Unbuffered channel — send blocks until receiver ready
+ch1 := chan[int]()
+
+# Buffered channel — send blocks only when buffer full
+ch2 := chan[str](10)
+
+# Rush a named function
+fn produce(ch: chan[int]) {
+    for i in 0..5 {
+        ch <- i
+    }
+}
+
+rush produce(ch1)
+
+# Rush an anonymous function (lambda)
+rush fn() {
+    ch2 <- "hello"
+}()
+
+# Closures capture by value — mutations don't leak
+mut x := 42
+rush fn() {
+    x += 1      # modifies local copy, not original
+    ch1 <- x    # sends 43
+}()
+print x         # still 42
+
+# Receive values
+for _ in 0..5 {
+    value := <- ch1
+    print value
+}
+
+# Select — multiplexed channel wait
+select {
+    x := <- ch1 -> {
+        print x
+    }
+    <- ch2 -> {
+        nop
+    }
+    ch1 <- 99 -> {
+        print "sent"
+    }
+    _ -> {
+        print "no channel ready"
+    }
+}

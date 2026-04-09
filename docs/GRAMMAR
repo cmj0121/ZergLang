@@ -17,9 +17,9 @@
 #   import return break continue if elif else print
 #   mut const pub fn impl spec struct enum for in match
 #   or and xor not true false nil this nop type defer asm
+#   rush select
 #
 # Deferred features (not in this subset):
-#   concurrency (rush, channels, select)
 #   error handling (Result, try/catch/final)
 
 # ── Program ──────────────────────────────────────────────
@@ -36,9 +36,11 @@ statement      = simple_stmt | compound_stmt
 # ── Simple Statements ────────────────────────────────────
 # Single-line statements terminated by NEWLINE.
 # Parser resolves ambiguity by trying in order:
-#   1. declare_stmt  (look for ":=" or IDENT ":")
-#   2. assign_stmt   (parse lvalue, look for "=" or compound operator)
-#   3. expr_stmt     (fallback — reparse as full expression)
+#   1. keyword stmts (import, return, break, continue, print, nop, defer, rush)
+#   2. send_stmt     (parse expr, if followed by "<-", it's send)
+#   3. declare_stmt  (look for ":=" or IDENT ":")
+#   4. assign_stmt   (parse lvalue, look for "=" or compound operator)
+#   5. expr_stmt     (fallback — reparse as full expression)
 # This requires backtracking when lvalue is a prefix of a call expression
 # (e.g., a.b(c) — lvalue parses a.b, sees "(", backtracks to expr_stmt).
 
@@ -49,6 +51,8 @@ simple_stmt    = import_stmt
                | print_stmt
                | nop_stmt
                | defer_stmt
+               | rush_stmt
+               | send_stmt
                | type_alias
                | declare_stmt
                | assign_stmt
@@ -60,6 +64,19 @@ nop_stmt       = "nop"
 # Defer — guarantees execution when the enclosing scope exits.
 # Deferred statements execute in reverse order (LIFO).
 defer_stmt     = "defer" ( expr_stmt | block )
+
+# Rush — spawn a concurrent task. Fire-and-forget, no return value.
+# Only accepts a function call (named or anonymous).
+#   rush do_work()
+#   rush fn() { compute() }()
+#   rush fn(c: chan[int]) { c <- 1 }(ch)
+rush_stmt      = "rush" expr_stmt
+
+# Send — push a value into a channel.
+#   ch <- 42
+# Disambiguation: parser tries send_stmt before assign_stmt/expr_stmt.
+# If LHS expr is followed by "<-", parse as send. Otherwise backtrack.
+send_stmt      = expr "<-" expr
 
 # Type alias — gives a name to an existing type.
 #   type TokenKind = int
@@ -126,6 +143,7 @@ compound_stmt  = fn_decl
                | if_stmt
                | for_stmt
                | match_stmt
+               | select_stmt
                | asm_stmt
 
 # Functions — params support type annotations and defaults.
@@ -197,6 +215,26 @@ pattern        = "_"
 pattern_list   = pattern { "," pattern }
 field_pattern  = IDENT [ ":" pattern ]
 
+# Select — multiplexed channel wait. Blocks until one arm is ready.
+# Mirrors match syntax: each arm is a channel operation followed by "->".
+# Arms are tried in order. "_" is a non-blocking default (like match wildcard).
+# Disambiguation: IDENT ":=" "<-" is receive-bind, "<-" expr is receive-discard,
+# expr "<-" expr is send, "_" is default.
+#   ch1 := chan[int]()     unbuffered (send blocks until receiver ready)
+#   ch2 := chan[int](10)   buffered (send blocks when buffer full)
+#   select {
+#       x := <- ch1 -> { print x }
+#       <- ch2       -> { nop }
+#       ch1 <- 10    -> { print "sent" }
+#       _            -> { print "default" }
+#   }
+select_stmt    = "select" "{" NEWLINE { select_arm NEWLINE } "}"
+select_arm     = select_op "->" ( statement | block )
+select_op      = IDENT ":=" "<-" expr
+               | "<-" expr
+               | expr "<-" expr
+               | "_"
+
 # Asm — inline ARM64 assembly block. Statement-only, no return value.
 # Uses GNU assembler (as) syntax for ARM64/AArch64.
 # Lexer switches to raw mode after "asm {" until closing "}".
@@ -222,7 +260,7 @@ block          = "{" NEWLINE { statement NEWLINE } "}"
 # Precedence from lowest to highest:
 #   ??  →  or  →  and  →  xor  →  comparison  →  bitor  →  bitxor
 #   →  bitand  →  shift  →  range  →  add  →  mul
-#   →  unary (not, -, ~, &mut)  →  postfix (.  ?.  ()  [])  →  primary
+#   →  unary (not, -, ~, <-, &mut)  →  postfix (.  ?.  ()  [])  →  primary
 #
 # Comparison is non-associative: "a < b < c" is a syntax error.
 # Use "a < b and b < c" instead.
@@ -246,10 +284,13 @@ range_expr     = add_expr [ ( ".." | "..=" ) add_expr ]
 
 add_expr       = mul_expr { ( "+" | "-" ) mul_expr }
 mul_expr       = unary_expr { ( "*" | "/" | "%" ) unary_expr }
+# Receive — "<-" prefix reads a value from a channel.
+#   value := <- ch
+#   <- ch              discard received value
 # Mutable reference — "&" "mut" creates a mutable reference to a variable.
 # Only mut variables can be referenced. Auto-deref inside the callee.
 #   increment(&mut count)
-unary_expr     = ( "not" | "-" | "~" ) unary_expr
+unary_expr     = ( "not" | "-" | "~" | "<-" ) unary_expr
                | "&" "mut" unary_expr
                | postfix_expr
 
@@ -331,7 +372,9 @@ field_init     = IDENT ":" expr
 #   map[K, V]              key-value associative container
 #   set[T]                 unordered collection of unique values
 #   tuple[T, U, ...]       fixed-size, heterogeneous sequence
+#   chan[T]                typed channel for concurrent communication
 # Arity of generic arguments is checked semantically, not syntactically.
+# Channels are created via constructor call: chan[int]() or chan[int](10).
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
 fn_type         = "fn" "(" [ type_args ] ")" [ "->" type ]

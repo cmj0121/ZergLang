@@ -10,16 +10,16 @@ endif
 
 " ── Keywords ───────────────────────────────────────────────────────────
 syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer
-syn keyword zergConditional if elif else match
+syn keyword zergConditional if elif else match select
 syn keyword zergRepeat      for break continue in
-syn keyword zergControl     return nop
+syn keyword zergControl     return nop rush
 syn keyword zergOperator    and or not xor
 syn keyword zergConstant    true false nil
 syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
 " Built-in types
-syn keyword zergType        int float bool str byte rune list map set tuple
+syn keyword zergType        int float bool str byte rune list map set tuple chan
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"
@@ -45,6 +45,7 @@ syn match   zergOp          "!="
 syn match   zergOp          "<="
 syn match   zergOp          ">="
 syn match   zergOp          "->"
+syn match   zergOp          "<-"
 syn match   zergOp          "\.\."
 syn match   zergOp          "\.\.="
 syn match   zergOp          "??"
