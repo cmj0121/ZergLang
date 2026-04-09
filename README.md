@@ -11,7 +11,7 @@ More examples in [`examples/`](examples/).
 
 | Principle         | Description                            |
 | ----------------- | -------------------------------------- |
-| small and crisp   | minimal syntax (108 grammar rules)     |
+| small and crisp   | minimal syntax (109 grammar rules)     |
 | procedural-first  | straightforward, top-down control flow |
 | concurrent        | built-in support for concurrency       |
 | garbage-collected | no manual memory management            |

@@ -9,7 +9,7 @@ if exists("b:current_syntax")
 endif
 
 " ── Keywords ───────────────────────────────────────────────────────────
-syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer
+syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer as
 syn keyword zergConditional if elif else match select
 syn keyword zergRepeat      for break continue in
 syn keyword zergControl     return nop rush raise

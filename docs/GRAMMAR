@@ -17,7 +17,7 @@
 #   import return break continue if elif else print
 #   mut const pub fn impl spec struct enum for in match
 #   or and xor not true false nil this nop type defer asm
-#   rush select try except finally raise
+#   rush select try except finally raise as
 
 # ── Program ──────────────────────────────────────────────
 # A program is a sequence of statements separated by newlines.
@@ -90,12 +90,24 @@ raise_stmt     = "raise" [ expr ] [ guard ]
 type_alias     = "type" IDENT "=" type
 
 # Module imports — path is a string literal resolved by the compiler.
+# A module is either a single file (net/http.zg) or a directory with
+# a mod.zg entry point (net/tcp/mod.zg). No re-exports — import what
+# you need directly.
+# Default qualifier is the last segment of the path.
+# Use "as" to alias long module paths.
 # Single import or grouped with parentheses.
 # On first import, the compiler runs:
 #   1. _init() — compiler-generated, initializes globals/statics
 #   2. init()  — user-defined setup (optional, regular fn with reserved name)
 # Subsequent imports are no-ops (module is cached).
-import_stmt    = "import" ( STRING | "(" NEWLINE { STRING NEWLINE } ")" )
+#   import "net/http"                  qualifier: http
+#   import "graphics/rendering" as gfx qualifier: gfx
+#   import (
+#       "fmt"
+#       "net/http" as http
+#   )
+import_stmt    = "import" ( import_path | "(" NEWLINE { import_path NEWLINE } ")" )
+import_path    = STRING [ "as" IDENT ]
 
 # Early exit — return, break, continue all support an optional guard.
 # The guard must be on the same line; NEWLINE terminates the statement.
@@ -261,16 +273,18 @@ select_op      = IDENT ":=" "<-" expr
 # Exception + try/except handles exceptional failures.
 #   try {
 #       config := load_config()
-#   } except e: IOError {
+#   } except IOError as e {
 #       print e.message()
-#   } except e {
+#   } except Exception as e {
 #       print e.message()
 #       raise              # re-raise
+#   } except {
+#       print "unknown error"
 #   } finally {
 #       cleanup()
 #   }
 try_stmt       = "try" block { except_clause } [ finally_clause ]
-except_clause  = "except" [ IDENT [ ":" type ] ] block
+except_clause  = "except" [ type [ "as" IDENT ] ] block
 finally_clause = "finally" block
 
 # Asm — inline ARM64 assembly block. Statement-only, no return value.

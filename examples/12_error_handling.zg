@@ -38,10 +38,10 @@ fn read_config(path: str) -> map[str, str] {
     try {
         # ... file operations that may fail ...
         return {:}
-    } except e: IOError {
+    } except IOError as e {
         print "IO error: {e.message()}"
         return {:}
-    } except e {
+    } except Exception as e {
         print "unexpected: {e.message()}"
         raise               # re-raise
     } finally {
