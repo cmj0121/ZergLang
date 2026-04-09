@@ -155,9 +155,10 @@ compound_stmt  = fn_decl
 
 # Functions — params support type annotations and defaults.
 # Use &mut T for mutable reference parameters.
-# Generic type parameters with optional spec constraints:
+# Generic type parameters with optional spec constraints (use + for multiple):
 #   fn transform[T, U](items: list[T], f: fn(T) -> U) -> list[U]
 #   fn sort[T: Comparable](items: list[T]) -> list[T]
+#   fn serialize[T: Printable + Hashable](item: T) -> str
 fn_decl        = visibility "fn" IDENT [ type_params ] "(" [ param_list ] ")" [ "->" type ] block
 param_list     = param { "," param }
 param          = IDENT ":" type [ "=" expr ]
@@ -420,12 +421,15 @@ type_args       = type { "," type }
 qualified_ident = IDENT { "." IDENT }
 
 # Generic type parameters — used in fn, spec, struct, enum declarations.
-# Each parameter may have a spec constraint:
-#   [T]                 unconstrained
-#   [T: Printable]      T must implement Printable
-#   [K: Hashable, V]    mixed constraints
+# Each parameter may have one or more spec constraints joined with "+".
+#   [T]                           unconstrained
+#   [T: Printable]                single constraint
+#   [T: Printable + Hashable]     multiple constraints (T must implement both)
+#   [K: Hashable, V]              mixed — K constrained, V unconstrained
+#   [T: Printable + Comparable, U: Hashable]
 type_params     = "[" type_param { "," type_param } "]"
-type_param      = IDENT [ ":" type ]
+type_param      = IDENT [ ":" constraint ]
+constraint      = type { "+" type }
 
 # ── Tokens ─────────────────────────────────────────────────
 # Lexer produces these tokens before parsing.

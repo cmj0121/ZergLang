@@ -25,5 +25,11 @@ fn display[T: Printable](item: T) {
     print item.to_str()
 }
 
+# Multiple spec constraints with +
+fn display_and_measure[T: Printable + Measurable](item: T) {
+    print item.to_str()
+    print item.length()
+}
+
 v := Vec2 { x: 3.0, y: 4.0 }
 display(v)
