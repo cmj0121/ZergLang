@@ -19,7 +19,7 @@ syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
 " Built-in types
-syn keyword zergType        int float bool str byte rune
+syn keyword zergType        int float bool str byte rune list map set tuple
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"

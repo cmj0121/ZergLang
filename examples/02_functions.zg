@@ -16,9 +16,9 @@ fn abs(x: int) -> int {
     return x
 }
 
-# Multiple return values with unpack
-fn divmod(a: int, b: int) -> int, int {
-    return a / b, a % b
+# Multiple return values with tuple unpack
+fn divmod(a: int, b: int) -> tuple[int, int] {
+    return (a / b, a % b)
 }
 
 print greet("World")

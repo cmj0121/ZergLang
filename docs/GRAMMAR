@@ -21,7 +21,7 @@
 # Deferred features (not in this subset):
 #   concurrency (rush, channels, select)
 #   error handling (Result, try/catch/final)
-#   lambdas, sets, tuples
+#   lambdas
 
 # ── Program ──────────────────────────────────────────────
 # A program is a sequence of statements separated by newlines.
@@ -132,8 +132,8 @@ compound_stmt  = fn_decl
 # Functions — params support type annotations and defaults.
 # Use &mut T for mutable reference parameters.
 # Generic type parameters with optional spec constraints:
-#   fn map[T, U](list: [T], f: fn(T) -> U) -> [U]
-#   fn sort[T: Comparable](list: [T]) -> [T]
+#   fn transform[T, U](items: list[T], f: fn(T) -> U) -> list[U]
+#   fn sort[T: Comparable](items: list[T]) -> list[T]
 fn_decl        = visibility "fn" IDENT [ type_params ] "(" [ param_list ] ")" [ "->" type ] block
 param_list     = param { "," param }
 param          = IDENT ":" type [ "=" expr ]
@@ -266,19 +266,29 @@ safe_member    = "?." IDENT
 # When parser sees IDENT followed by "{", it is a struct_literal.
 # A bare IDENT is a variable reference.
 # "this" is valid inside impl methods — refers to the receiver instance.
+# Disambiguation: "fn" followed by IDENT is fn_decl (compound_stmt).
+# "fn" followed by "(" or "[" is a lambda (anonymous function).
 primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
                | "true" | "false" | "nil"
                | "this"
                | IDENT
                | list_literal
                | map_literal
+               | set_literal
+               | tuple_literal
                | "(" expr ")"
                | struct_literal
 
 # Composite literals — all support trailing commas.
+# Disambiguation: "{" followed by expr ":" expr is a map_literal.
+# "{" ":" "}" is an empty map. "{" "}" is an empty set.
+# "(" expr "," is a tuple_literal. "(" expr ")" is grouping.
 list_literal   = "[" [ expr { "," expr } [ "," ] ] "]"
-map_literal    = "{" [ map_entry { "," map_entry } [ "," ] ] "}"
+map_literal    = "{" map_entry { "," map_entry } [ "," ] "}"
+               | "{" ":" "}"
 map_entry      = expr ":" expr
+set_literal    = "{" [ expr { "," expr } [ "," ] ] "}"
+tuple_literal  = "(" expr "," [ expr { "," expr } ] [ "," ] ")"
 
 # Struct literal — IDENT disambiguated from bare IDENT by lookahead for "{".
 struct_literal = IDENT "{" [ field_init { "," field_init } [ "," ] ] "}"
@@ -288,11 +298,24 @@ field_init     = IDENT ":" expr
 # Types are either a name (int, str, MyStruct), a qualified name
 # (module.Type), a function type, or a mutable reference (&mut T).
 # Only one level of &mut is allowed — no &mut &mut T.
-# Append "?" for nullable types: int?, str?, MyStruct?
+# Append "?" for nullable types: int?, str?, list[int]?
 # "&" and "mut" are lexed as separate tokens but parsed together.
-# Generic type arguments: Map[str, int], List[T]
+# Generic type arguments: list[int], map[str, int]
 # Function types: fn(int, str) -> bool
 # Typically used with type alias: type Visitor = fn(Expr) -> Expr
+#
+# Built-in types (not keywords — resolved as IDENT by the lexer):
+#   int                    platform-width signed integer
+#   float                  64-bit IEEE 754
+#   bool                   true or false
+#   str                    UTF-8 string
+#   byte                   8-bit unsigned integer (0–255)
+#   rune                   Unicode code point
+#   list[T]                ordered, variable-length sequence
+#   map[K, V]              key-value associative container
+#   set[T]                 unordered collection of unique values
+#   tuple[T, U, ...]       fixed-size, heterogeneous sequence
+# Arity of generic arguments is checked semantically, not syntactically.
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
 fn_type         = "fn" "(" [ type_args ] ")" [ "->" type ]

@@ -6,7 +6,7 @@
 # // inside asm is the assembly line comment.
 
 # Write "hello\n" to stdout via syscall
-msg := [0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x0A]    # "hello\n" as bytes
+msg: list[byte] = [0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x0A]    # "hello\n" as bytes
 
 asm {
     mov x0, #1            // fd = stdout
