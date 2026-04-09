@@ -34,6 +34,7 @@ More examples in [`examples/`](examples/).
 | collections          | `list[int]`, `map[str, int]`, `set[int]`, `tuple[int, str]` |
 | guard                | `return x if condition`                                     |
 | enum with data       | `Token.Ident(str)`                                          |
+| lambda               | `fn(x: int) -> int { return x * 2 }`                        |
 | defer                | `defer close(fd)`                                           |
 | raw strings          | `r"no \escapes"`                                            |
 
