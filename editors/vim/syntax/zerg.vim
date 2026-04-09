@@ -12,14 +12,15 @@ endif
 syn keyword zergDecl        fn struct enum spec impl type import const pub mut defer
 syn keyword zergConditional if elif else match select
 syn keyword zergRepeat      for break continue in
-syn keyword zergControl     return nop rush
+syn keyword zergControl     return nop rush raise
+syn keyword zergException   try except finally
 syn keyword zergOperator    and or not xor
 syn keyword zergConstant    true false nil
 syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
 " Built-in types
-syn keyword zergType        int float bool str byte rune list map set tuple chan
+syn keyword zergType        int float bool str byte rune list map set tuple chan Result Option Exception
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"
@@ -99,6 +100,7 @@ hi def link zergDecl        Keyword
 hi def link zergConditional Conditional
 hi def link zergRepeat      Repeat
 hi def link zergControl     Statement
+hi def link zergException   Exception
 hi def link zergOperator    Operator
 hi def link zergConstant    Constant
 hi def link zergSpecial     Special

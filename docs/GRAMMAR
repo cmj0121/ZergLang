@@ -17,10 +17,7 @@
 #   import return break continue if elif else print
 #   mut const pub fn impl spec struct enum for in match
 #   or and xor not true false nil this nop type defer asm
-#   rush select
-#
-# Deferred features (not in this subset):
-#   error handling (Result, try/catch/final)
+#   rush select try except finally raise
 
 # ── Program ──────────────────────────────────────────────
 # A program is a sequence of statements separated by newlines.
@@ -36,7 +33,7 @@ statement      = simple_stmt | compound_stmt
 # ── Simple Statements ────────────────────────────────────
 # Single-line statements terminated by NEWLINE.
 # Parser resolves ambiguity by trying in order:
-#   1. keyword stmts (import, return, break, continue, print, nop, defer, rush)
+#   1. keyword stmts (import, return, break, continue, print, nop, defer, rush, raise)
 #   2. send_stmt     (parse expr, if followed by "<-", it's send)
 #   3. declare_stmt  (look for ":=" or IDENT ":")
 #   4. assign_stmt   (parse lvalue, look for "=" or compound operator)
@@ -52,6 +49,7 @@ simple_stmt    = import_stmt
                | nop_stmt
                | defer_stmt
                | rush_stmt
+               | raise_stmt
                | send_stmt
                | type_alias
                | declare_stmt
@@ -77,6 +75,14 @@ rush_stmt      = "rush" expr_stmt
 # Disambiguation: parser tries send_stmt before assign_stmt/expr_stmt.
 # If LHS expr is followed by "<-", parse as send. Otherwise backtrack.
 send_stmt      = expr "<-" expr
+
+# Raise — throw an exception. The expr must implement the Exception spec.
+# Bare "raise" re-raises the current exception (only valid inside except).
+# Supports guard like return/break/continue.
+#   raise IOError { msg: "not found", path: "/etc/config" }
+#   raise if x < 0
+#   raise                # re-raise inside except block
+raise_stmt     = "raise" [ expr ] [ guard ]
 
 # Type alias — gives a name to an existing type.
 #   type TokenKind = int
@@ -144,6 +150,7 @@ compound_stmt  = fn_decl
                | for_stmt
                | match_stmt
                | select_stmt
+               | try_stmt
                | asm_stmt
 
 # Functions — params support type annotations and defaults.
@@ -235,6 +242,26 @@ select_op      = IDENT ":=" "<-" expr
                | expr "<-" expr
                | "_"
 
+# Try/except/finally — structured exception handling.
+# Exception is a built-in spec with a minimal interface:
+#   spec Exception { fn message() -> str }
+# Users implement Exception on their own structs.
+# Result[T, E] + ? handles recoverable errors.
+# Exception + try/except handles exceptional failures.
+#   try {
+#       config := load_config()
+#   } except e: IOError {
+#       print e.message()
+#   } except e {
+#       print e.message()
+#       raise              # re-raise
+#   } finally {
+#       cleanup()
+#   }
+try_stmt       = "try" block { except_clause } [ finally_clause ]
+except_clause  = "except" [ IDENT [ ":" type ] ] block
+finally_clause = "finally" block
+
 # Asm — inline ARM64 assembly block. Statement-only, no return value.
 # Uses GNU assembler (as) syntax for ARM64/AArch64.
 # Lexer switches to raw mode after "asm {" until closing "}".
@@ -260,7 +287,7 @@ block          = "{" NEWLINE { statement NEWLINE } "}"
 # Precedence from lowest to highest:
 #   ??  →  or  →  and  →  xor  →  comparison  →  bitor  →  bitxor
 #   →  bitand  →  shift  →  range  →  add  →  mul
-#   →  unary (not, -, ~, <-, &mut)  →  postfix (.  ?.  ()  [])  →  primary
+#   →  unary (not, -, ~, <-, &mut)  →  postfix (.  ?.  ()  []  ?)  →  primary
 #
 # Comparison is non-associative: "a < b < c" is a syntax error.
 # Use "a < b and b < c" instead.
@@ -297,7 +324,10 @@ unary_expr     = ( "not" | "-" | "~" | "<-" ) unary_expr
 # Postfix — call, index, and member access chain left-to-right.
 # Method calls work via chaining: obj.method(args) = member then call.
 # Safe navigation: obj?.field returns nil if obj is nil instead of error.
-postfix_expr   = primary { call | index | member | safe_member }
+# Propagation: expr? unwraps Result.Ok, returns Result.Err early.
+# Disambiguation: "?" in type position = nullable, in expr position = propagate.
+postfix_expr   = primary { call | index | member | safe_member | propagate }
+propagate      = "?"
 
 # Call — supports named arguments (key=value) and trailing comma.
 call           = "(" [ arg_list ] ")"
@@ -373,8 +403,16 @@ field_init     = IDENT ":" expr
 #   set[T]                 unordered collection of unique values
 #   tuple[T, U, ...]       fixed-size, heterogeneous sequence
 #   chan[T]                typed channel for concurrent communication
+#   Result[T, E]           success (Ok) or error (Err) — built-in enum
+#   Option[T]              type alias for Result[T, nil]
+# T? in type position is syntax sugar for Option[T] = Result[T, nil].
 # Arity of generic arguments is checked semantically, not syntactically.
 # Channels are created via constructor call: chan[int]() or chan[int](10).
+#
+# Built-in specs (compiler-provided):
+#   spec Exception { fn message() -> str }
+# Built-in enums (compiler-provided):
+#   enum Result[T, E] { Ok(T), Err(E) }
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]
 fn_type         = "fn" "(" [ type_args ] ")" [ "->" type ]

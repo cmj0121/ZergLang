@@ -36,6 +36,7 @@ More examples in [`examples/`](examples/).
 | enum with data       | `Token.Ident(str)`                                          |
 | lambda               | `fn(x: int) -> int { return x * 2 }`                        |
 | pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
+| error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
 | defer                | `defer close(fd)`                                           |
 | concurrency          | `rush task()`, `ch <- val`, `<- ch`                         |
 | raw strings          | `r"no \escapes"`                                            |
