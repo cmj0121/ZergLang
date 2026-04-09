@@ -165,11 +165,19 @@ param          = IDENT ":" type [ "=" expr ]
 
 # Specs — interfaces that types can implement.
 # A spec declares method signatures without bodies.
+# Specs can extend other specs with ":" (uses constraint syntax: A + B).
+# A type implementing a child spec must also implement all parent specs.
 #   pub spec Printable {
 #       fn to_str() -> str
 #   }
+#   spec Comparable: Printable {
+#       fn compare(other: this) -> int
+#   }
+#   spec Serializable: Printable + Hashable {
+#       fn serialize() -> list[byte]
+#   }
 # Specs can also constrain generic type parameters (see fn_decl, type_params).
-spec_decl      = visibility "spec" IDENT [ type_params ] "{" NEWLINE { fn_sig NEWLINE } "}"
+spec_decl      = visibility "spec" IDENT [ type_params ] [ ":" constraint ] "{" NEWLINE { fn_sig NEWLINE } "}"
 fn_sig         = "fn" IDENT [ type_params ] "(" [ param_list ] ")" [ "->" type ]
 
 # Impl blocks — attach methods to a struct or enum, or implement a spec.

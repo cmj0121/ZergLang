@@ -31,5 +31,10 @@ fn display_and_measure[T: Printable + Measurable](item: T) {
     print item.length()
 }
 
+# Spec composition — extend other specs with ":"
+spec Describable: Printable + Measurable {
+    fn describe() -> str
+}
+
 v := Vec2 { x: 3.0, y: 4.0 }
 display(v)
