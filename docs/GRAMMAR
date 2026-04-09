@@ -426,11 +426,13 @@ field_init     = IDENT ":" expr
 # Channels are created via constructor call: chan[int]() or chan[int](10).
 #
 # Built-in specs (compiler-provided):
-#   spec Printable { fn to_str() -> str }
-#   spec Iterable[T] { fn next() -> T? }
-#   spec Exception { fn message() -> str }
+#   Printable, Iterable[T], Exception
+#   Operator specs: Add[T], Sub[T], Mul[T], Div[T], Mod[T], Neg
+#   Eq, Comparable, Hashable, Index[K, V]
+#   BitAnd[T], BitOr[T], BitXor[T], BitNot, Shl, Shr
 # Built-in enums (compiler-provided):
 #   enum Result[T, E] { Ok(T), Err(E) }
+# See docs/BUILTIN.md for full spec definitions and operator mapping.
 # See docs/BUILTIN.md for full documentation.
 
 type            = [ "&" "mut" ] ( fn_type | qualified_ident [ "[" type_args "]" ] ) [ "?" ]

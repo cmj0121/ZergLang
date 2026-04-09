@@ -75,6 +75,94 @@ Built-in iterables:
 | `chan[T]`    | `T`    | receive order   |
 | `range (..)` | `int`  | ascending       |
 
+### Operator Specs
+
+Operator overloading is implemented through specs. The compiler rewrites
+operator expressions into method calls. Built-in types implement these
+specs automatically.
+
+#### Arithmetic
+
+| Operator    | Spec     | Method                  | Rewrite              |
+| ----------- | -------- | ----------------------- | -------------------- |
+| `+`         | `Add[T]` | `fn add(other: T) -> T` | `a + b` = `a.add(b)` |
+| `-`         | `Sub[T]` | `fn sub(other: T) -> T` | `a - b` = `a.sub(b)` |
+| `*`         | `Mul[T]` | `fn mul(other: T) -> T` | `a * b` = `a.mul(b)` |
+| `/`         | `Div[T]` | `fn div(other: T) -> T` | `a / b` = `a.div(b)` |
+| `%`         | `Mod[T]` | `fn mod(other: T) -> T` | `a % b` = `a.mod(b)` |
+| `-` (unary) | `Neg`    | `fn neg() -> this`      | `-a` = `a.neg()`     |
+
+```zerg
+spec Add[T] { fn add(other: T) -> T }
+spec Sub[T] { fn sub(other: T) -> T }
+spec Mul[T] { fn mul(other: T) -> T }
+spec Div[T] { fn div(other: T) -> T }
+spec Mod[T] { fn mod(other: T) -> T }
+spec Neg    { fn neg() -> this }
+```
+
+#### Comparison
+
+| Operator             | Spec         | Method                           |
+| -------------------- | ------------ | -------------------------------- |
+| `==`, `!=`           | `Eq`         | `fn eq(other: this) -> bool`     |
+| `<`, `>`, `<=`, `>=` | `Comparable` | `fn compare(other: this) -> int` |
+
+`!=` is the negation of `eq()`. `>`, `<=`, `>=` are derived from `compare()`:
+returns negative (less), zero (equal), or positive (greater).
+
+```zerg
+spec Eq {
+    fn eq(other: this) -> bool
+}
+
+spec Comparable: Eq {
+    fn compare(other: this) -> int
+}
+```
+
+#### Bitwise
+
+| Operator | Spec        | Method                      |
+| -------- | ----------- | --------------------------- |
+| `&`      | `BitAnd[T]` | `fn bitand(other: T) -> T`  |
+| `\|`     | `BitOr[T]`  | `fn bitor(other: T) -> T`   |
+| `^`      | `BitXor[T]` | `fn bitxor(other: T) -> T`  |
+| `~`      | `BitNot`    | `fn bitnot() -> this`       |
+| `<<`     | `Shl`       | `fn shl(bits: int) -> this` |
+| `>>`     | `Shr`       | `fn shr(bits: int) -> this` |
+
+```zerg
+spec BitAnd[T] { fn bitand(other: T) -> T }
+spec BitOr[T]  { fn bitor(other: T) -> T }
+spec BitXor[T] { fn bitxor(other: T) -> T }
+spec BitNot    { fn bitnot() -> this }
+spec Shl       { fn shl(bits: int) -> this }
+spec Shr       { fn shr(bits: int) -> this }
+```
+
+#### Indexing
+
+| Operator | Spec          | Method                  |
+| -------- | ------------- | ----------------------- |
+| `a[i]`   | `Index[K, V]` | `fn index(key: K) -> V` |
+
+```zerg
+spec Index[K, V] {
+    fn index(key: K) -> V
+}
+```
+
+#### Hashable
+
+Required for use as `map` keys or `set` elements.
+
+```zerg
+spec Hashable {
+    fn hash() -> int
+}
+```
+
 ### Exception
 
 The exception protocol. Any type implementing `Exception` can be
