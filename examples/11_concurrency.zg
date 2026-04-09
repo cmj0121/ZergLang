@@ -19,13 +19,13 @@ fn produce(ch: chan[int]) {
 rush produce(ch1)
 
 # Rush an anonymous function (lambda)
-rush fn() {
+rush || {
     ch2 <- "hello"
 }()
 
 # Closures capture by value — mutations don't leak
 mut x := 42
-rush fn() {
+rush || {
     x += 1      # modifies local copy, not original
     ch1 <- x    # sends 43
 }()

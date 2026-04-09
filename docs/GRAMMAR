@@ -66,8 +66,8 @@ defer_stmt     = "defer" ( expr_stmt | block )
 # Rush — spawn a concurrent task. Fire-and-forget, no return value.
 # Only accepts a function call (named or anonymous).
 #   rush do_work()
-#   rush fn() { compute() }()
-#   rush fn(c: chan[int]) { c <- 1 }(ch)
+#   rush || { compute() }()
+#   rush |c: chan[int]| { c <- 1 }(ch)
 rush_stmt      = "rush" expr_stmt
 
 # Send — push a value into a channel.
@@ -366,8 +366,8 @@ safe_member    = "?." IDENT
 # When parser sees IDENT followed by "{", it is a struct_literal.
 # A bare IDENT is a variable reference.
 # "this" is valid inside impl methods — refers to the receiver instance.
-# Disambiguation: "fn" followed by IDENT is fn_decl (compound_stmt).
-# "fn" followed by "(" or "[" is a lambda (anonymous function).
+# Disambiguation: "|" at the start of an expression is a lambda.
+# "|" after a complete expression is bitwise OR.
 primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
                | "true" | "false" | "nil"
                | "this"
@@ -380,7 +380,7 @@ primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
                | "(" expr ")"
                | struct_literal
 
-# Anonymous function — like fn_decl but without name or visibility.
+# Lambda — anonymous function using |params| syntax.
 # Produces a callable value. Often called immediately or passed as argument.
 # Captures are copy-by-value: the closure receives a snapshot of each
 # captured variable at the time of creation. Mutations inside the closure
@@ -388,11 +388,15 @@ primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
 # between concurrent tasks.
 # Param types are optional (inferred from context). Return type is always inferred.
 # Expression body returns its value implicitly. Block body uses explicit return.
-#   fn(x) x * 2                      expression body, inferred types
-#   fn(x, y) x + y                   multiple params
-#   items.filter(fn(x) x > 0)        inline usage
-#   rush fn() { do_work() }()        block body for side effects
-lambda         = "fn" "(" [ lambda_params ] ")" ( expr | block )
+# No ambiguity with "|" (bitwise OR) — Zerg uses "or" for logical OR,
+# and "|" after a complete expression is always bitwise OR.
+#   |x| x * 2                        expression body, inferred types
+#   |x, y| x + y                     multiple params
+#   |x: int| x * 2                   explicit type when needed
+#   || { do_work() }                  no params, block body
+#   items.filter(|x| x > 0)          inline usage
+#   rush || { ch <- compute() }()    immediately invoked
+lambda         = "|" [ lambda_params ] "|" ( expr | block )
 lambda_params  = lambda_param { "," lambda_param }
 lambda_param   = IDENT [ ":" type ]
 

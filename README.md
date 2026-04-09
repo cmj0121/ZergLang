@@ -34,7 +34,7 @@ More examples in [`examples/`](examples/).
 | collections          | `list[int]`, `map[str, int]`, `set[int]`, `tuple[int, str]` |
 | guard                | `return x if condition`                                     |
 | enum with data       | `Token.Ident(str)`                                          |
-| lambda               | `fn(x) x * 2`, `fn() { block }`                             |
+| lambda               | `\|x\| x * 2`, `\|\| { block }`                             |
 | pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
 | error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
 | defer                | `defer close(fd)`                                           |
