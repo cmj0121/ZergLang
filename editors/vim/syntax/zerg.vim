@@ -91,7 +91,7 @@ syn match   zergAsmLabel    contained "^\s*\w\+:"
 " Exclude #<digit> and #0x so ARM immediates (#1, #0x80) in asm blocks
 " are not treated as comments.
 syn match   zergDocComment  "##.*$"
-syn match   zergComment     "#\([0-9]\|0x\)\@!.*$"
+syn match   zergComment     "#\(#\|[0-9]\|0x\)\@!.*$"
 
 " ── Highlight groups ───────────────────────────────────────────────────
 hi def link zergDecl        Keyword

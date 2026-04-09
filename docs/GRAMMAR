@@ -64,7 +64,7 @@ defer_stmt     = "defer" ( expr_stmt | block )
 
 # Type alias — gives a name to an existing type.
 #   type TokenKind = int
-#   type NodeList = List[Node]
+#   type NodeList = list[Node]
 type_alias     = "type" IDENT "=" type
 
 # Module imports — path is a string literal resolved by the compiler.
@@ -182,7 +182,8 @@ if_stmt        = "if" expr block { "elif" expr block } [ "else" block ]
 for_stmt       = "for" [ ident_list "in" expr | expr ] block
 
 # Match — structural pattern matching on values.
-# "_" is a reserved wildcard pattern (not an identifier).
+# "_" is a valid identifier used as a discard placeholder — it binds
+# but is intentionally unused (compiler suppresses unused-variable warnings).
 # Arms use "->" to separate pattern from body.
 # After "->", "{" always starts a block, never a map_literal.
 # Patterns can destructure enum variants and struct fields:
@@ -344,8 +345,12 @@ NEWLINE        = "\n"
 EOF            = ? end of input ?
 
 # Comments start with # and run to end of line.
-# Discarded by the lexer before parsing (not referenced in grammar rules).
+# Doc comments start with ## and are preserved by the compiler for
+# documentation tooling. Regular comments are discarded by the lexer.
+# Both are not referenced in grammar rules.
+# Lexer uses maximal munch: ## is matched as DOC_COMMENT before COMMENT.
 COMMENT        = "#" { CHAR } NEWLINE
+DOC_COMMENT    = "##" { CHAR } NEWLINE
 
 LETTER         = "a"..."z" | "A"..."Z" | "_"
 DIGIT          = "0"..."9"
