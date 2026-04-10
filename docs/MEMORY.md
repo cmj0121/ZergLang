@@ -1,6 +1,6 @@
 # Zerg Memory Management Specification
 
-Zerg uses **scope-based ownership** with copy-by-value semantics.
+Zerg uses **scope-based ownership** with value semantics.
 No garbage collector. No manual memory management. Memory is freed
 deterministically when the owning scope exits.
 
@@ -8,11 +8,72 @@ deterministically when the owning scope exits.
 
 | #   | Principle            | Rule                                           |
 | --- | -------------------- | ---------------------------------------------- |
-| P1  | Copy-by-value        | assignment produces independent copies         |
+| P1  | Value semantics      | values behave as independent copies            |
 | P2  | Immutable by default | shared access is safe without synchronization  |
 | P3  | Caller owns memory   | caller allocates, callees borrow, caller frees |
 | P4  | No GC                | no tracing GC; refcount only for concurrency   |
 | P5  | Deterministic        | `defer` for cleanup; refcount frees at zero    |
+
+### Decision tree
+
+Use this flowchart to determine which memory mechanism applies:
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                      What is the operation?                         │
+└───────┬─────────────┬──────────┬──────────────┬─────────────────────┘
+        │             │          │              │
+        ▼             ▼          ▼              ▼
+   ┌─────────┐     ┌──────┐ ┌────────┐ ┌──────────────┐
+   │ ASSIGN  │     │PARAM │ │ RETURN │ │CLOSURE/CONCUR│
+   │ b := a  │     │fn(x) │ │return x│ │|x| / ch <- x │
+   └────┬────┘     └──┬───┘ └───┬────┘ └──────┬───────┘
+        │             │          │             │
+        ▼             ▼          ▼             ▼
+   ┌─────────┐    ┌───────┐ ┌────────┐ ┌──────────────┐
+   │ mut?    │    │ &mut? │ │caller  │ │ var mutable? │
+   └─┬────┬──┘    └─┬───┬─┘ │assigns?│ └──┬────────┬──┘
+     │    │         │   │   └─┬────┬─┘    │        │
+    yes   no       yes  no   yes  no     yes       no
+     │    │         │   │     │    │      │        │
+     ▼    ▼         ▼   ▼     ▼    ▼      ▼        ▼
+   ┌────┐┌─────┐┌────┐┌───┐ ┌────┐┌───┐ ┌─────┐ ┌────────┐
+   │DEEP││SHARE│|&MUT│|IMM│ │RET ││STK│ │ERROR│ │escapes?│
+   │COPY││ REF ││REF ││REF│ │SLOT│|TMP│ │     │ └┬────┬──┘
+   └─┬──┘└─────┘└────┘└───┘ └────┘└───┘ └─────┘  │    │
+     │   O(1)  O(1) O(1) O(1) O(1)             no   yes
+     ▼                                          │    │
+   ┌─────────┐                                  ▼    ▼
+   │ source  │                               ┌────┐┌────────┐
+   │ unused? │                               │HOLD││ how?   │
+   └─┬────┬──┘                               │ REF│└┬─────┬─┘
+     │    │                                  └────┘ │     │
+    yes   no                                  O(1)  ret  ch/rush
+     │    │                                         │     │
+     ▼    ▼                                         ▼     ▼
+   ┌────┐┌────┐                                 ┌────┐  ┌─────┐
+   │MOVE││DEEP│                                 │DEEP│  │SHARE│
+   │OPT ││COPY│                                 │COPY│  │+RC  │
+   └────┘└────┘                                 └────┘  └─────┘
+    O(1)  O(n)                                   O(n)    O(1)
+```
+
+Quick reference:
+
+| Operation           | Condition           | Mechanism            | Cost |
+| ------------------- | ------------------- | -------------------- | ---- |
+| `b := a`            | both immutable      | share reference      | O(1) |
+| `mut b := a`        | target mutable      | deep copy            | O(n) |
+| `mut b := a`        | source unused after | move (optimization)  | O(1) |
+| `fn f(x: T)`        | immutable param     | borrow (immut ref)   | O(1) |
+| `fn f(x: &mut T)`   | mutable param       | borrow (mut ref)     | O(1) |
+| `return x`          | caller assigns      | return slot pointer  | O(1) |
+| `\|x\| ...` capture | var is `mut`        | **compile error**    | --   |
+| `\|x\| ...` capture | non-escaping        | hold reference       | O(1) |
+| `\|x\| ...` capture | escape via return   | deep copy            | O(n) |
+| `\|x\| ...` capture | escape via ch/rush  | share ref + refcount | O(1) |
+| `ch <- x`           | immutable           | share ref + refcount | O(1) |
+| `ch <- x`           | mutable             | deep copy            | O(n) |
 
 ## 2. Ownership
 
@@ -43,27 +104,31 @@ process(items)               # process borrows items (immutable ref)
 
 ### Module-level variables
 
-Module-level variables are **always immutable**. `mut` is forbidden
-at module scope — mutable state must live inside function scopes.
+Module-level `mut` is allowed but **private only**. `pub mut` is a
+compile error — mutable state cannot be exposed outside the module.
 
 ```zerg
 # module.zg
-name := "MyModule"          # OK — immutable, lives for program lifetime
-config := load_defaults()   # OK — immutable, initialized once
-
-mut counter := 0            # ERROR: mut not allowed at module scope
+name := "MyModule"             # OK — immutable, public or private
+pub config := load_defaults()  # OK — pub immutable
+mut counter := 0               # OK — private mutable (module-internal)
+pub mut shared := 0            # ERROR: pub mut not allowed at module scope
 ```
 
-Module variables are owned by the runtime and freed at program exit.
-Since they are immutable, they are safe to read from any task without
-synchronization. This prevents data races on global state entirely.
+Private `mut` variables are accessible only within the module's own
+functions. Since external code cannot access them, the module author
+controls all mutation. Concurrent safety is the module author's
+responsibility — use channels or `&mut` patterns within the module
+to avoid races between `rush` tasks calling module functions.
 
-| Rule             | Description                             |
-| ---------------- | --------------------------------------- |
-| Always immutable | `mut` forbidden at module scope         |
-| Runtime-owned    | freed at program exit, never early      |
-| Concurrent-safe  | immutable — no synchronization needed   |
-| Initialized once | `_init()` then `init()` on first import |
+| Rule               | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `pub` immutable    | public module variables are always immutable |
+| `mut` private only | mutable module variables cannot be `pub`     |
+| `pub mut`          | compile error                                |
+| Runtime-owned      | freed at program exit, never early           |
+| Concurrent caution | module author must guard private `mut` state |
+| Initialized once   | `_init()` then `init()` on first import      |
 
 ## 3. Calling Conventions
 
@@ -528,7 +593,7 @@ The compiler enforces at compile time (zero runtime overhead):
 | `&mut` requires `mut` variable  | cannot reference immutable        |
 | Borrows cannot outlive owner    | scope-checked                     |
 | Closures capture immutable only | mutable capture is compile error  |
-| Concurrency always deep copies  | cannot borrow across tasks        |
+| Concurrency: refcount or copy   | immut shares ref+rc, mut copies   |
 | `ptr[T]` owns its target        | no shared pointers, no cycles     |
 
 ## 10. Resource Cleanup
@@ -623,3 +688,77 @@ GC finalizers, destructors, and context managers.
 | Cleanup     | `defer`           | `defer`+GC   | `Drop`           | `deinit`+ARC |
 | GC pauses   | none              | yes (sub-ms) | none             | none (ARC)   |
 | Cycles      | impossible        | GC handles   | borrow ck        | weak refs    |
+
+## 13. Edge Cases
+
+### 13.1 Channel close
+
+Channels implement `Iterable[T]` (iterate until closed). Closing uses
+the built-in `close()` function. Sending to a closed channel raises
+an exception. Receiving from a closed, empty channel returns `nil`.
+
+```zerg
+ch := chan[int](10)
+ch <- 1
+ch <- 2
+close(ch)
+for val in ch {     # receives 1, 2, then stops
+    print val
+}
+```
+
+### 13.2 Channel of channels
+
+`chan[chan[T]]` is valid. Since channels are runtime resources passed
+by reference, sending a channel through a channel transfers the
+reference — no copy, no refcount. The receiving task gets access to
+the same channel.
+
+```zerg
+dispatch := chan[chan[int]]()
+worker_ch := chan[int]()
+dispatch <- worker_ch        # sends reference to worker_ch
+```
+
+### 13.3 Closures in structs and collections
+
+Function types as struct fields or collection elements (`list[fn(int)->int]`)
+are values. Deep copy of a struct or collection recursively deep-copies
+each closure's capture environment. Refcount applies when sending such
+structures through channels (immutable data, entire blob refcounted as
+a unit).
+
+```zerg
+struct Handler {
+    callback: fn(int) -> int
+}
+h := Handler { callback: |x| x + 1 }
+mut h2 := h                          # deep copies closure + captures
+```
+
+### 13.4 Extracting ptr[T] from &mut structs
+
+Assigning from a `ptr[T]` field in a `&mut` context follows the default
+rule: deep copy. To perform zero-cost tree surgery, set the field to
+`nil` first (the compiler may optimize this into a move).
+
+```zerg
+fn detach(t: &mut Tree) -> ptr[Node]? {
+    old := t.root        # deep copy of the ptr chain
+    t.root = nil         # compiler may optimize to move
+    return old
+}
+```
+
+### 13.5 Nested closure refcount
+
+When a closure captures another closure, and the outer closure is sent
+through a channel, the runtime refcounts the outermost closure as a
+single unit. All transitively captured data shares one refcount.
+
+```zerg
+x := [1, 2, 3]
+f := |y| x.length() + y     # captures x
+g := |z| f(z) + 1           # captures f (which captured x)
+ch <- g                      # refcount on g's blob (includes f and x)
+```
