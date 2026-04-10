@@ -51,11 +51,12 @@ print root.next?.value    # 2 (auto-deref)
 
 Copy semantics:
 
-| Assignment               | Behavior                              |
-| ------------------------ | ------------------------------------- |
-| `b := a` (immutable)     | share heap allocation (safe, no copy) |
-| `mut b := a`             | deep copy (entire chain)              |
-| Concurrency (`rush`, ch) | deep copy (entire chain)              |
+| Assignment              | Behavior                              |
+| ----------------------- | ------------------------------------- |
+| `b := a` (immutable)    | share heap allocation (safe, no copy) |
+| `mut b := a`            | deep copy (entire chain)              |
+| Concurrency (immutable) | share ref + refcount (entire chain)   |
+| Concurrency (mutable)   | deep copy (entire chain)              |
 
 Limitations: `ptr[T]` owns its target — no shared references, no cycles.
 Trees and linked lists work. Graphs with shared nodes do not — use
