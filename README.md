@@ -9,14 +9,14 @@ More examples in [`examples/`](examples/).
 
 ## Design Principles
 
-| Principle         | Description                            |
-| ----------------- | -------------------------------------- |
-| small and crisp   | minimal syntax (109 grammar rules)     |
-| procedural-first  | straightforward, top-down control flow |
-| concurrent        | built-in support for concurrency       |
-| garbage-collected | no manual memory management            |
-| strongly typed    | catch errors at compile time           |
-| null-safe         | no billion-dollar mistakes             |
+| Principle        | Description                            |
+| ---------------- | -------------------------------------- |
+| small and crisp  | minimal syntax (109 grammar rules)     |
+| procedural-first | straightforward, top-down control flow |
+| concurrent       | built-in support for concurrency       |
+| scope-owned      | no GC — memory freed at scope exit     |
+| strongly typed   | catch errors at compile time           |
+| null-safe        | no billion-dollar mistakes             |
 
 ## Language Highlights
 
@@ -26,7 +26,7 @@ More examples in [`examples/`](examples/).
 | explicit type        | `x: int = 1`                                                |
 | print statement      | `print "hello"`                                             |
 | string interpolation | `"hello {name}"`                                            |
-| null safety          | `T?`, `?.`, `??`                                            |
+| null safety          | `T?`, `?.`, `??`, `nil` is both type and value              |
 | pattern matching     | `match x { ... }`                                           |
 | specs (interfaces)   | `spec Printable { ... }`                                    |
 | generics             | `fn sort[T: Comparable](...)`                               |
@@ -38,6 +38,7 @@ More examples in [`examples/`](examples/).
 | pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
 | error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
 | defer                | `defer close(fd)`                                           |
+| shared state         | `sync[T]` — interior mutability via lock API                |
 | concurrency          | `rush task()`, `ch <- val`, `<- ch`                         |
 | raw strings          | `r"no \escapes"`                                            |
 

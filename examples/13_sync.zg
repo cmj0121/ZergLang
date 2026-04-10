@@ -1,0 +1,36 @@
+# Shared State with sync[T]
+# sync[T] wraps a value with a lock — the only way to share
+# mutable state across rush tasks safely.
+
+# Shared counter
+counter := sync[int](0)
+
+# Shared cache
+cache := sync[map[str, str]]({:})
+
+# Multiple tasks increment the counter
+fn worker(id: int, c: sync[int], ca: sync[map[str, str]]) {
+    c.lock(|v: &mut int| {
+        v += 1
+    })
+    ca.lock(|m: &mut map[str, str]| {
+        m["worker_{id}"] = "done"
+    })
+}
+
+done := chan[bool]()
+for i in 0..4 {
+    rush |id, c, ca, d| {
+        worker(id, c, ca)
+        d <- true
+    }(i, counter, cache, done)
+}
+
+# Wait for all tasks
+for _ in 0..4 {
+    <- done
+}
+
+# Read results (immutable copies, read-lock)
+print counter.read()          # 4
+print cache.read()            # {"worker_0": "done", ...}

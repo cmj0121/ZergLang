@@ -1,7 +1,7 @@
 # Concurrency
 # rush spawns a fire-and-forget concurrent task (function call only).
 # chan[T] is a typed channel. <- sends and receives.
-# Closures capture by value — no shared mutable state.
+# Closures only capture immutable variables (mutable = compile error).
 
 # Unbuffered channel — send blocks until receiver ready
 ch1 := chan[int]()
@@ -23,13 +23,13 @@ rush || {
     ch2 <- "hello"
 }()
 
-# Closures capture by value — mutations don't leak
-mut x := 42
-rush || {
-    x += 1      # modifies local copy, not original
-    ch1 <- x    # sends 43
-}()
-print x         # still 42
+# Closures only capture immutable variables.
+# To pass data to a rush task, use function parameters.
+x := 42
+rush |val| {
+    ch1 <- val + 1    # val shares x via refcount (immutable)
+}(x)
+print x               # still 42
 
 # Receive values
 for _ in 0..5 {

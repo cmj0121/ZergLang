@@ -222,8 +222,9 @@ if_stmt        = "if" expr block { "elif" expr block } [ "else" block ]
 #   for x in expr { }    iterate (expr must implement Iterable[T])
 #   for x, y in fn() {}  unpack during iteration
 #   for x < y { }        conditional loop (while-style)
-# The iterator form creates a mutable copy of expr (copy-by-value),
-# then calls next() until nil. The original value is not modified.
+# The iterator form borrows expr as an immutable reference.
+# Iterator state is managed internally by the runtime.
+# The original value is not modified.
 # Disambiguation: after "for", if next tokens are ident_list "in",
 # parse as iteration. Otherwise parse as conditional or bare block.
 for_stmt       = "for" [ ident_list "in" expr | expr ] block
@@ -231,6 +232,8 @@ for_stmt       = "for" [ ident_list "in" expr | expr ] block
 # Match — structural pattern matching on values.
 # "_" is a valid identifier used as a discard placeholder — it binds
 # but is intentionally unused (compiler suppresses unused-variable warnings).
+# Non-exhaustive match is a compiler warning. Unmatched value at runtime
+# causes a panic. Use "_" catch-all to ensure exhaustiveness.
 # Arms use "->" to separate pattern from body.
 # After "->", "{" always starts a block, never a map_literal.
 # Patterns can destructure enum variants and struct fields:
@@ -382,10 +385,10 @@ primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
 
 # Lambda — anonymous function using |params| syntax.
 # Produces a callable value. Often called immediately or passed as argument.
-# Captures are copy-by-value: the closure receives a snapshot of each
-# captured variable at the time of creation. Mutations inside the closure
-# do not affect the original, and vice versa. Use channels to communicate
-# between concurrent tasks.
+# Only immutable variables can be captured. Capturing a mutable variable
+# is a compile error. Use &mut parameters for mutation instead.
+# Non-escaping closures hold references (zero cost). Escaping closures
+# (returned, sent to channel, captured by rush) deep-copy at creation.
 # Param types are optional (inferred from context). Return type is always inferred.
 # Expression body returns its value implicitly. Block body uses explicit return.
 # No ambiguity with "|" (bitwise OR) — Zerg uses "or" for logical OR,
@@ -437,6 +440,8 @@ field_init     = IDENT ":" expr
 #   set[T]                 unordered collection of unique values
 #   tuple[T, U, ...]       fixed-size, heterogeneous sequence
 #   chan[T]                typed channel for concurrent communication
+#   sync[T]                mutex-protected shared value for concurrency
+#   ptr[T]                 owned heap pointer (enables recursive types)
 #   Result[T, E]           success (Ok) or error (Err) — built-in enum
 #   Option[T]              type alias for Result[T, nil]
 # T? in type position is syntax sugar for Option[T] = Result[T, nil].
@@ -444,7 +449,7 @@ field_init     = IDENT ":" expr
 # Channels are created via constructor call: chan[int]() or chan[int](10).
 #
 # Built-in specs (compiler-provided):
-#   Printable, Iterable[T], Exception
+#   Printable, Iterable[T], Iterator[T], Exception
 #   Operator specs: Add[T], Sub[T], Mul[T], Div[T], Mod[T], Neg
 #   Eq, Comparable, Hashable, Index[K, V]
 #   BitAnd[T], BitOr[T], BitXor[T], BitNot, Shl, Shr

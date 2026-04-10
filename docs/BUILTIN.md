@@ -13,6 +13,10 @@ are resolved as IDENT by the lexer and pre-declared by the compiler.
 | `str`   | UTF-8 immutable string          | `""`       |
 | `byte`  | 8-bit unsigned integer (0--255) | `0`        |
 | `rune`  | Unicode code point              | `'\0'`     |
+| `nil`   | Unit type with one value: `nil` | `nil`      |
+
+`nil` is both a **type** and a **value**. As a type, it has exactly
+one inhabitant: the value `nil`. This enables `type Option[T] = Result[T, nil]`.
 
 ## Collection Types
 
@@ -26,15 +30,78 @@ are resolved as IDENT by the lexer and pre-declared by the compiler.
 All collections implement `Iterable[T]`. Maps iterate over keys.
 Arity of generic arguments is checked semantically, not syntactically.
 
+## Pointer Types
+
+| Type     | Description                     | Constructor |
+| -------- | ------------------------------- | ----------- |
+| `ptr[T]` | Owned heap pointer to a value T | `ptr(expr)` |
+
+`ptr[T]` enables recursive data structures (linked lists, trees).
+The pointer owns the heap-allocated value — freed when the owner's
+scope exits (recursive: freeing a struct frees all its `ptr` fields).
+
+```zerg
+struct Node {
+    value: int
+    next: ptr[Node]?
+}
+
+root := Node {
+    value: 1,
+    next: ptr(Node { value: 2, next: nil })
+}
+print root.next?.value    # 2 (auto-deref)
+```
+
+Copy semantics:
+
+| Assignment              | Behavior                              |
+| ----------------------- | ------------------------------------- |
+| `b := a` (immutable)    | share heap allocation (safe, no copy) |
+| `mut b := a`            | deep copy (entire chain)              |
+| Concurrency (immutable) | share ref + refcount (entire chain)   |
+| Concurrency (mutable)   | deep copy (entire chain)              |
+
+Limitations: `ptr[T]` owns its target — no shared references, no cycles.
+Trees and linked lists work. Graphs with shared nodes do not — use
+index-based patterns with `list[T]` + `map[K, V]` instead.
+
 ## Concurrency Types
 
 | Type      | Description                       | Constructor                                        |
 | --------- | --------------------------------- | -------------------------------------------------- |
 | `chan[T]` | Typed channel for message passing | `chan[int]()` unbuffered, `chan[int](10)` buffered |
+| `sync[T]` | Mutex-protected shared value      | `sync[int](0)`                                     |
 
 Unbuffered channels block send until a receiver is ready.
 Buffered channels block send only when the buffer is full.
 Channels implement `Iterable[T]` — iterating receives until closed.
+
+### sync
+
+`sync[T]` wraps a value with a read-write lock. The data is only
+accessible through the lock API — impossible to bypass. Passed by
+immutable reference to tasks (like `chan[T]`).
+
+```zerg
+counter := sync[int](0)
+rush |c| {
+    c.lock(|v: &mut int| { v += 1 })
+}(counter)
+print counter.read()    # immutable copy, read-lock
+```
+
+| Method                     | Description               | Lock       |
+| -------------------------- | ------------------------- | ---------- |
+| `sync[T](val)`             | create with initial value | —          |
+| `.lock(\|v: &mut T\| { })` | exclusive write access    | write lock |
+| `.read() -> T`             | return immutable copy     | read lock  |
+
+The compiler may optimize `sync[T]` for primitive types (int, bool,
+byte, rune) to use CPU atomic instructions instead of a mutex.
+
+Both `chan[T]` and `sync[T]` are **runtime resources**: cannot be
+copied or assigned, passed by reference, freed at owning scope exit.
 
 ## Built-in Specs
 
@@ -49,19 +116,38 @@ spec Printable {
 }
 ```
 
-### Iterable
+### Iterable and Iterator
 
-The iteration protocol. Any type implementing `Iterable[T]` can be
-used with `for x in expr`. Returns `T?` (`Option[T]`) — `nil` signals
-exhaustion.
-
-The `for` loop creates a mutable copy of the iterable (copy-by-value),
-then calls `next()` repeatedly. The original value is not modified.
+The iteration protocol uses two specs. `Iterable[T]` is implemented
+by collections — it returns a separate `Iterator[T]`. `Iterator[T]`
+holds mutable iteration state and yields values via `next()`.
 
 ```zerg
 spec Iterable[T] {
+    fn iter() -> Iterator[T]
+}
+
+spec Iterator[T] {
     fn next() -> T?
 }
+```
+
+`for x in expr` borrows `expr` immutably, calls `iter()` to get a
+mutable `Iterator`, then calls `next()` until `nil`. The original
+collection is not modified.
+
+```text
+for x in items {
+    ...
+}
+# compiler generates:
+#   mut _iter := items.iter()    # items borrowed immutably
+#   for {
+#       _x := _iter.next()
+#       break if _x == nil
+#       x := _x
+#       ...
+#   }
 ```
 
 Built-in iterables:
