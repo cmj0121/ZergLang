@@ -351,21 +351,11 @@ Immutable data may outlive its declaring scope when shared via
 channels or `rush` captures. The runtime frees it when the last
 reference drops — still deterministic, just not scope-bound.
 
-### 6.2 Mutable data — always deep copy
+### 6.2 Mutable data — channels only
 
-Mutable data must be deep-copied because each task needs independent
-storage for mutation.
-
-```zerg
-mut items := [1, 2, 3]
-rush || {
-    # items is deep-copied — task gets independent data
-    items.push(4)                   # ERROR: can't capture mut
-}()
-```
-
-Since closures cannot capture mutable variables, mutable data only
-crosses task boundaries through channels:
+Closures cannot capture mutable variables (compile error). The only
+way mutable data crosses task boundaries is through **channels**,
+which deep-copy the value:
 
 ```zerg
 mut items := [1, 2, 3]
