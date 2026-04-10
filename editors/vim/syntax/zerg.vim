@@ -20,7 +20,7 @@ syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
 " Built-in types
-syn keyword zergType        int float bool str byte rune list map set tuple chan Result Option Exception
+syn keyword zergType        int float bool str byte rune list map set tuple chan ptr Result Option Exception
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"

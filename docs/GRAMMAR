@@ -438,6 +438,7 @@ field_init     = IDENT ":" expr
 #   set[T]                 unordered collection of unique values
 #   tuple[T, U, ...]       fixed-size, heterogeneous sequence
 #   chan[T]                typed channel for concurrent communication
+#   ptr[T]                 owned heap pointer (enables recursive types)
 #   Result[T, E]           success (Ok) or error (Err) — built-in enum
 #   Option[T]              type alias for Result[T, nil]
 # T? in type position is syntax sugar for Option[T] = Result[T, nil].

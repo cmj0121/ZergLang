@@ -26,6 +26,41 @@ are resolved as IDENT by the lexer and pre-declared by the compiler.
 All collections implement `Iterable[T]`. Maps iterate over keys.
 Arity of generic arguments is checked semantically, not syntactically.
 
+## Pointer Types
+
+| Type     | Description                     | Constructor |
+| -------- | ------------------------------- | ----------- |
+| `ptr[T]` | Owned heap pointer to a value T | `ptr(expr)` |
+
+`ptr[T]` enables recursive data structures (linked lists, trees).
+The pointer owns the heap-allocated value — freed when the owner's
+scope exits (recursive: freeing a struct frees all its `ptr` fields).
+
+```zerg
+struct Node {
+    value: int
+    next: ptr[Node]?
+}
+
+root := Node {
+    value: 1,
+    next: ptr(Node { value: 2, next: nil })
+}
+print root.next?.value    # 2 (auto-deref)
+```
+
+Copy semantics:
+
+| Assignment               | Behavior                              |
+| ------------------------ | ------------------------------------- |
+| `b := a` (immutable)     | share heap allocation (safe, no copy) |
+| `mut b := a`             | deep copy (entire chain)              |
+| Concurrency (`rush`, ch) | deep copy (entire chain)              |
+
+Limitations: `ptr[T]` owns its target — no shared references, no cycles.
+Trees and linked lists work. Graphs with shared nodes do not — use
+index-based patterns with `list[T]` + `map[K, V]` instead.
+
 ## Concurrency Types
 
 | Type      | Description                       | Constructor                                        |
@@ -55,8 +90,8 @@ The iteration protocol. Any type implementing `Iterable[T]` can be
 used with `for x in expr`. Returns `T?` (`Option[T]`) — `nil` signals
 exhaustion.
 
-The `for` loop creates a mutable copy of the iterable (copy-by-value),
-then calls `next()` repeatedly. The original value is not modified.
+The `for` loop borrows the iterable (immutable reference). The iterator
+state is managed internally. The original value is not modified.
 
 ```zerg
 spec Iterable[T] {
