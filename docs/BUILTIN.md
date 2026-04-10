@@ -13,6 +13,10 @@ are resolved as IDENT by the lexer and pre-declared by the compiler.
 | `str`   | UTF-8 immutable string          | `""`       |
 | `byte`  | 8-bit unsigned integer (0--255) | `0`        |
 | `rune`  | Unicode code point              | `'\0'`     |
+| `nil`   | Unit type with one value: `nil` | `nil`      |
+
+`nil` is both a **type** and a **value**. As a type, it has exactly
+one inhabitant: the value `nil`. This enables `type Option[T] = Result[T, nil]`.
 
 ## Collection Types
 

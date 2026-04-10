@@ -26,7 +26,7 @@ More examples in [`examples/`](examples/).
 | explicit type        | `x: int = 1`                                                |
 | print statement      | `print "hello"`                                             |
 | string interpolation | `"hello {name}"`                                            |
-| null safety          | `T?`, `?.`, `??`                                            |
+| null safety          | `T?`, `?.`, `??`, `nil` is both type and value              |
 | pattern matching     | `match x { ... }`                                           |
 | specs (interfaces)   | `spec Printable { ... }`                                    |
 | generics             | `fn sort[T: Comparable](...)`                               |
