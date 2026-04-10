@@ -9,14 +9,14 @@ More examples in [`examples/`](examples/).
 
 ## Design Principles
 
-| Principle         | Description                            |
-| ----------------- | -------------------------------------- |
-| small and crisp   | minimal syntax (109 grammar rules)     |
-| procedural-first  | straightforward, top-down control flow |
-| concurrent        | built-in support for concurrency       |
-| garbage-collected | no manual memory management            |
-| strongly typed    | catch errors at compile time           |
-| null-safe         | no billion-dollar mistakes             |
+| Principle        | Description                            |
+| ---------------- | -------------------------------------- |
+| small and crisp  | minimal syntax (109 grammar rules)     |
+| procedural-first | straightforward, top-down control flow |
+| concurrent       | built-in support for concurrency       |
+| scope-owned      | no GC — memory freed at scope exit     |
+| strongly typed   | catch errors at compile time           |
+| null-safe        | no billion-dollar mistakes             |
 
 ## Language Highlights
 
