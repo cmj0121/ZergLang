@@ -112,7 +112,7 @@ fn make_pool(size: int) -> chan[Connection] {
 
 # Acquire and release
 conn := <- pool         # blocks if empty
-defer (pool <- conn)    # return to pool on scope exit
+defer { pool <- conn }  # return to pool on scope exit
 use(conn)
 ```
 
@@ -217,7 +217,9 @@ for _ in 0..16 {
 
 # Use and return
 buf := <- buf_pool
-defer (buf_pool <- buf)
+defer {
+    buf_pool <- buf
+}
 write_data(&mut buf)
 ```
 

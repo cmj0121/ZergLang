@@ -232,6 +232,8 @@ for_stmt       = "for" [ ident_list "in" expr | expr ] block
 # Match — structural pattern matching on values.
 # "_" is a valid identifier used as a discard placeholder — it binds
 # but is intentionally unused (compiler suppresses unused-variable warnings).
+# Non-exhaustive match is a compiler warning. Unmatched value at runtime
+# causes a panic. Use "_" catch-all to ensure exhaustiveness.
 # Arms use "->" to separate pattern from body.
 # After "->", "{" always starts a block, never a map_literal.
 # Patterns can destructure enum variants and struct fields:
