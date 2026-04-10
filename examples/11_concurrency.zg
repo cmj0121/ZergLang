@@ -27,7 +27,7 @@ rush || {
 # To pass data to a rush task, use function parameters.
 x := 42
 rush |val| {
-    ch1 <- val + 1    # val is a copy of x (passed as param)
+    ch1 <- val + 1    # val shares x via refcount (immutable)
 }(x)
 print x               # still 42
 
