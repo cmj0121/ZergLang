@@ -222,8 +222,9 @@ if_stmt        = "if" expr block { "elif" expr block } [ "else" block ]
 #   for x in expr { }    iterate (expr must implement Iterable[T])
 #   for x, y in fn() {}  unpack during iteration
 #   for x < y { }        conditional loop (while-style)
-# The iterator form creates a mutable copy of expr (copy-by-value),
-# then calls next() until nil. The original value is not modified.
+# The iterator form borrows expr as an immutable reference.
+# Iterator state is managed internally by the runtime.
+# The original value is not modified.
 # Disambiguation: after "for", if next tokens are ident_list "in",
 # parse as iteration. Otherwise parse as conditional or bare block.
 for_stmt       = "for" [ ident_list "in" expr | expr ] block
@@ -382,10 +383,10 @@ primary        = INT | FLOAT | STRING | MULTI_STRING | RAW_STRING | RUNE
 
 # Lambda — anonymous function using |params| syntax.
 # Produces a callable value. Often called immediately or passed as argument.
-# Captures are copy-by-value: the closure receives a snapshot of each
-# captured variable at the time of creation. Mutations inside the closure
-# do not affect the original, and vice versa. Use channels to communicate
-# between concurrent tasks.
+# Only immutable variables can be captured. Capturing a mutable variable
+# is a compile error. Use &mut parameters for mutation instead.
+# Non-escaping closures hold references (zero cost). Escaping closures
+# (returned, sent to channel, captured by rush) deep-copy at creation.
 # Param types are optional (inferred from context). Return type is always inferred.
 # Expression body returns its value implicitly. Block body uses explicit return.
 # No ambiguity with "|" (bitwise OR) — Zerg uses "or" for logical OR,
