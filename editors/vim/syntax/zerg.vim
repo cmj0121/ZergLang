@@ -19,8 +19,9 @@ syn keyword zergConstant    true false nil
 syn keyword zergSpecial     this
 syn keyword zergStatement   print
 
-" Built-in types
-syn keyword zergType        int float bool str byte rune list map set tuple chan sync ptr Result Option Exception
+" Built-in types and specs
+syn keyword zergType        int float bool str byte rune list map set tuple chan sync ptr Result Option
+syn keyword zergType        Exception Printable Iterable Comparable Hashable Eq
 
 " ── Numbers ────────────────────────────────────────────────────────────
 syn match   zergNumber      "\<\d[0-9_]*\>"
