@@ -408,6 +408,41 @@ rush |c| { c <- 42 }(ch)      # task borrows ch (immutable ref)
 value := <- ch                 # caller receives a copy
 ```
 
+### Shared mutable state with sync[T]
+
+When tasks need shared mutable state, use `sync[T]`. It wraps a value
+with a read-write lock. The data is only accessible through the lock
+API — impossible to access without locking.
+
+```zerg
+counter := sync[int](0)
+cache := sync[map[str, str]]({:})
+
+# Multiple tasks share the same sync (passed by immutable ref)
+for _ in 0..10 {
+    rush |c, ca| {
+        c.lock(|v: &mut int| { v += 1 })
+        ca.lock(|m: &mut map[str, str]| {
+            m["hits"] = "{c.read()}"
+        })
+    }(counter, cache)
+}
+
+print counter.read()      # immutable copy, read-lock
+```
+
+`sync[T]` is a runtime resource like `chan[T]`:
+
+| Property          | `chan[T]`         | `sync[T]`                       |
+| ----------------- | ----------------- | ------------------------------- |
+| Copyable          | no                | no                              |
+| Passed to tasks   | immutable ref     | immutable ref                   |
+| Internal mutation | `<-` send/receive | `.lock()` write, `.read()` read |
+| Freed by          | owning scope exit | owning scope exit               |
+
+The `.lock()` lambda pattern guarantees the lock is always released —
+no forgotten unlocks, no deadlock from early return.
+
 ### Rush task exceptions
 
 `rush` is fire-and-forget. If a task raises an unhandled exception:
@@ -547,10 +582,16 @@ flat collection, referenced by index. Used by ECS game engines,
 relational databases, and compilers. No `ptr` needed — just `list`
 and `map`.
 
-### 7.6 Channels
+### 7.6 Runtime resources
 
-`chan[T]` is a runtime resource. Cannot be copied or assigned.
-Created once, passed by reference, freed when the owning scope exits.
+`chan[T]` and `sync[T]` are **runtime resources**. Cannot be copied
+or assigned. Passed by immutable reference. Provide internal mutability
+through their API. Freed when the owning scope exits.
+
+| Resource  | Internal mechanism | Use case                          |
+| --------- | ------------------ | --------------------------------- |
+| `chan[T]` | ring buffer + lock | message passing between tasks     |
+| `sync[T]` | read-write lock    | shared mutable state across tasks |
 
 ## 8. Compiler Optimizations
 

@@ -438,6 +438,7 @@ field_init     = IDENT ":" expr
 #   set[T]                 unordered collection of unique values
 #   tuple[T, U, ...]       fixed-size, heterogeneous sequence
 #   chan[T]                typed channel for concurrent communication
+#   sync[T]                mutex-protected shared value for concurrency
 #   ptr[T]                 owned heap pointer (enables recursive types)
 #   Result[T, E]           success (Ok) or error (Err) — built-in enum
 #   Option[T]              type alias for Result[T, nil]

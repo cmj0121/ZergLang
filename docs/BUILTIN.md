@@ -66,10 +66,37 @@ index-based patterns with `list[T]` + `map[K, V]` instead.
 | Type      | Description                       | Constructor                                        |
 | --------- | --------------------------------- | -------------------------------------------------- |
 | `chan[T]` | Typed channel for message passing | `chan[int]()` unbuffered, `chan[int](10)` buffered |
+| `sync[T]` | Mutex-protected shared value      | `sync[int](0)`                                     |
 
 Unbuffered channels block send until a receiver is ready.
 Buffered channels block send only when the buffer is full.
 Channels implement `Iterable[T]` — iterating receives until closed.
+
+### sync
+
+`sync[T]` wraps a value with a read-write lock. The data is only
+accessible through the lock API — impossible to bypass. Passed by
+immutable reference to tasks (like `chan[T]`).
+
+```zerg
+counter := sync[int](0)
+rush |c| {
+    c.lock(|v: &mut int| { v += 1 })
+}(counter)
+print counter.read()    # immutable copy, read-lock
+```
+
+| Method                     | Description               | Lock       |
+| -------------------------- | ------------------------- | ---------- |
+| `sync[T](val)`             | create with initial value | —          |
+| `.lock(\|v: &mut T\| { })` | exclusive write access    | write lock |
+| `.read() -> T`             | return immutable copy     | read lock  |
+
+The compiler may optimize `sync[T]` for primitive types (int, bool,
+byte, rune) to use CPU atomic instructions instead of a mutex.
+
+Both `chan[T]` and `sync[T]` are **runtime resources**: cannot be
+copied or assigned, passed by reference, freed at owning scope exit.
 
 ## Built-in Specs
 
