@@ -38,6 +38,7 @@ More examples in [`examples/`](examples/).
 | pass by reference    | `fn inc(x: &mut int)`, `inc(&mut n)`                        |
 | error handling       | `Result[T, E]`, `?`, `try/except/finally`                   |
 | defer                | `defer close(fd)`                                           |
+| shared state         | `sync[T]` — interior mutability via lock API                |
 | concurrency          | `rush task()`, `ch <- val`, `<- ch`                         |
 | raw strings          | `r"no \escapes"`                                            |
 

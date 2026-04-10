@@ -626,6 +626,28 @@ The compiler enforces at compile time (zero runtime overhead):
 | Closures capture immutable only | mutable capture is compile error  |
 | Concurrency: refcount or copy   | immut shares ref+rc, mut copies   |
 | `ptr[T]` owns its target        | no shared pointers, no cycles     |
+| Runtime resources: interior mut | `chan`, `sync` mutate via API     |
+
+### Interior mutability
+
+Runtime resources (`chan[T]` and `sync[T]`) are exempt from the `&mut`
+requirement. Their API provides **safe internal mutability** through
+locks and atomic operations. They are passed as regular immutable
+parameters — no `&mut` needed.
+
+```zerg
+fn send(ch: chan[int], val: int) {
+    ch <- val                  # mutates channel buffer internally
+}                              # no &mut — channel API is safe
+
+fn increment(c: sync[int]) {
+    c.lock(|v: &mut int| { v += 1 })
+}                              # no &mut on c — lock API is safe
+```
+
+This is the same concept as Rust's `Mutex<T>` (interior mutability
+behind a lock) and Go's channels (mutation via send/receive). The
+runtime guarantees safety; the compiler does not need `&mut`.
 
 ## 10. Resource Cleanup
 
