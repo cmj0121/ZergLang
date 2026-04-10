@@ -112,19 +112,38 @@ spec Printable {
 }
 ```
 
-### Iterable
+### Iterable and Iterator
 
-The iteration protocol. Any type implementing `Iterable[T]` can be
-used with `for x in expr`. Returns `T?` (`Option[T]`) — `nil` signals
-exhaustion.
-
-The `for` loop borrows the iterable (immutable reference). The iterator
-state is managed internally. The original value is not modified.
+The iteration protocol uses two specs. `Iterable[T]` is implemented
+by collections — it returns a separate `Iterator[T]`. `Iterator[T]`
+holds mutable iteration state and yields values via `next()`.
 
 ```zerg
 spec Iterable[T] {
+    fn iter() -> Iterator[T]
+}
+
+spec Iterator[T] {
     fn next() -> T?
 }
+```
+
+`for x in expr` borrows `expr` immutably, calls `iter()` to get a
+mutable `Iterator`, then calls `next()` until `nil`. The original
+collection is not modified.
+
+```text
+for x in items {
+    ...
+}
+# compiler generates:
+#   mut _iter := items.iter()    # items borrowed immutably
+#   for {
+#       _x := _iter.next()
+#       break if _x == nil
+#       x := _x
+#       ...
+#   }
 ```
 
 Built-in iterables:
